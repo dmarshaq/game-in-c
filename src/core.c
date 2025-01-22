@@ -207,6 +207,40 @@ void _array_list_unordered_remove(void *list, u32 index) {
  * Math float.
  */
 
+Matrix4f matrix4f_multiplication(Matrix4f *multiplier, Matrix4f *target) {
+    Matrix4f result = {
+        .array = {0}
+    };
+    float row_product;
+    for (u8 col2 = 0; col2 < 4; col2++) {
+        for (u8 row = 0; row < 4; row++) {
+            row_product = 0;
+            for (u8 col = 0; col < 4; col++) {
+                row_product += multiplier->array[row * 4 + col] * target->array[col * 4 + col2];
+            }
+            result.array[row * 4 + col2] = row_product;
+        }
+    }
+    return result;
+}
+
+Transform transform_srt_2d(Vec2f position, float angle, Vec2f scale) {
+    return (Transform) {
+        .array = { scale.x * cosf(angle),   scale.y * -sinf(angle), 0.0f, position.x, 
+                   scale.x * sinf(angle),   scale.y *  cosf(angle), 0.0f, position.y,
+                   0.0f,                    0.0f,                   1.0f, 0.0f,
+                   0.0f,                    0.0f,                   0.0f, 1.0f}
+    };
+}
+
+Transform transform_trs_2d(Vec2f position, float angle, Vec2f scale) {
+    Transform s = transform_scale_2d(scale);
+    Transform r = transform_rotation_2d(angle);
+    Transform t = transform_translation_2d(position);
+
+    r = matrix4f_multiplication(&s, &r);
+    return matrix4f_multiplication(&r, &t);
+}
 
 
 /**

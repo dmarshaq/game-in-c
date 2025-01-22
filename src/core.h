@@ -170,15 +170,16 @@ typedef struct vec2f {
     float y;
 } Vec2f;
 
-#define vec2f_make(x, y)                    ((Vec2f) { x, y })
+#define vec2f_make(x, y)                    ((Vec2f) { x, y } )
 
-#define VEC2F_ORIGIN                        ((Vec2f) { 0.0f,  0.0f})
-#define VEC2F_RIGHT                         ((Vec2f) { 1.0f,  0.0f})
-#define VEC2F_LEFT                          ((Vec2f) {-1.0f,  0.0f})
-#define VEC2F_UP                            ((Vec2f) { 0.0f,  1.0f})
-#define VEC2F_DOWN                          ((Vec2f) { 0.0f, -1.0f})
+#define VEC2F_ORIGIN                        ((Vec2f) { 0.0f,  0.0f } )
+#define VEC2F_RIGHT                         ((Vec2f) { 1.0f,  0.0f } )
+#define VEC2F_LEFT                          ((Vec2f) {-1.0f,  0.0f } )
+#define VEC2F_UP                            ((Vec2f) { 0.0f,  1.0f } )
+#define VEC2F_DOWN                          ((Vec2f) { 0.0f, -1.0f } )
+#define VEC2F_UNIT                          ((Vec2f) { 1.0f,  1.0f } )
 
-#define vec2f_print(v1)                     printf(#v1 " = ( %2.2f , %2.2f )\n", v1.x, v1.y)
+#define vec2f_print(v1)                     printf(#v1 " = ( % 2.2f , % 2.2f )\n", v1.x, v1.y)
 
 #define vec2f_sum(v1, v2)                   vec2f_make(v1.x + v2.x, v1.y + v2.y)
 #define vec2f_difference(v1, v2)            vec2f_make(v1.x - v2.x, v1.y - v2.y) 
@@ -197,7 +198,9 @@ typedef struct vec3f {
     float z;
 } Vec3f;
 
-#define vec3f_make(x, y, z)    ((Vec3f) { x, y, z })
+#define vec3f_make(x, y, z)                 ((Vec3f) { x, y, z } )
+
+#define vec3f_print(v1)                     printf(#v1 " = ( % 2.2f , % 2.2f , %2.2f )\n", v1.x, v1.y, v1.z)
 
 typedef struct vec4f {
     float x;
@@ -206,15 +209,36 @@ typedef struct vec4f {
     float w;
 } Vec4f;
 
-#define vec4f_make(x, y, z, w)    ((Vec3f) { x, y, z, w })
+#define vec4f_make(x, y, z, w)              ((Vec4f) { x, y, z, w } )
 
+#define vec4f_print(v1)                     printf(#v1 " = ( % 2.2f , % 2.2f , % 2.2f , % 2.2f )\n", v1.x, v1.y, v1.z, v1.w)
 
 typedef struct matrix4f {
     float array[16];
 } Matrix4f;
 
+#define MATRIX4F_ZERO                                                   ((Matrix4f) {{ 0.0f, 0.0f, 0.0f, 0.0f,   0.0f, 0.0f, 0.0f, 0.0f,    0.0f, 0.0f, 0.0f, 0.0f,    0.0f, 0.0f, 0.0f, 0.0f }} )
+#define MATRIX4F_IDENTITY                                               ((Matrix4f) {{ 1.0f, 0.0f, 0.0f, 0.0f,   0.0f, 1.0f, 0.0f, 0.0f,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} )
+
+#define matrix4f_print(matrix)                                          printf(#matrix " =\n[[ % 2.2f , % 2.2f , % 2.2f , % 2.2f ]\n [ % 2.2f , % 2.2f , % 2.2f , % 2.2f ]\n [ % 2.2f , % 2.2f , % 2.2f , % 2.2f ]\n [ % 2.2f , % 2.2f , % 2.2f , % 2.2f ]]\n", matrix.array[0], matrix.array[1], matrix.array[2], matrix.array[3], matrix.array[4], matrix.array[5], matrix.array[6], matrix.array[7], matrix.array[8], matrix.array[9], matrix.array[10], matrix.array[11], matrix.array[12], matrix.array[13], matrix.array[14], matrix.array[15])
+
+#define matrix4f_orthographics(left, right, bottom, top, near, far)     ((Matrix4f) {{ 2.0f / ((right) - (left)), 0.0f, 0.0f, 0.0f,    0.0f, 2.0f / ((top) - (bottom)), 0.0f, 0.0f,    0.0f, 0.0f, 2.0f / ((near) - (far)), 0.0f,    ((left) + (right)) / ((left) - (right)), ((bottom) + (top)) / ((bottom) - (top)), ((near) + (far)) / ((near) - (far)), 1.0f }} )
+
+#define matrix4f_vec2f_multiplication(matrix, vec2)                     ((Vec2f) { .x = multiplier->array[0] * target->x + multiplier->array[1] * target->y,    .y = multiplier->array[4] * target->x + multiplier->array[5] * target->y, } )
+#define matrix4f_vec3f_multiplication(matrix, vec3)                     ((Vec3f) { .x = multiplier->array[0] * target->x + multiplier->array[1] * target->y + multiplier->array[2] * target->z,    .y = multiplier->array[4] * target->x + multiplier->array[5] * target->y + multiplier->array[6] * target->z,    .z = multiplier->array[8] * target->x + multiplier->array[9] * target->y + multiplier->array[10] * target->z, } )
+#define matrix4f_vec4f_multiplication(matrix, vec4)                     ((Vec4f) { .x = multiplier->array[0] * target->x + multiplier->array[1] * target->y + multiplier->array[2] * target->z + multiplier->array[3] * target->w,    .y = multiplier->array[4] * target->x + multiplier->array[5] * target->y + multiplier->array[6] * target->z + multiplier->array[7] * target->w,    .z = multiplier->array[8] * target->x + multiplier->array[9] * target->y + multiplier->array[10] * target->z + multiplier->array[11] * target->w,    .w = multiplier->array[12] * target->x + multiplier->array[13] * target->y + multiplier->array[14] * target->z + multiplier->array[15] * target->w, } )
+
+Matrix4f matrix4f_multiplication(Matrix4f *multiplier, Matrix4f *target);
 
 typedef Matrix4f Transform;
+
+#define transform_translation_2d(position)                              ((Transform) {{ 1.0f, 0.0f, 0.0f, position.x,   0.0f, 1.0f, 0.0f, position.y,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} )
+#define transform_rotation_2d(angle)                                    ((Transform) {{ cosf(angle), -sinf(angle), 0.0f, 0.0f,    sinf(angle),  cosf(angle), 0.0f, 0.0f,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} )
+#define transform_scale_2d(scale)                                       ((Transform) {{ scale.x, 0.0f, 0.0f, 0.0f,   0.0f, scale.y, 0.0f, 0.0f,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} )
+
+Transform transform_srt_2d(Vec2f position, float angle, Vec2f scale);
+Transform transform_trs_2d(Vec2f position, float angle, Vec2f scale);
+
 
 /**
  * This macro uses [ domain_start, domain_end ] to specify domain boundaries, and checks if value inside that domain.

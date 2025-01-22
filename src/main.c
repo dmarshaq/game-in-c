@@ -1,5 +1,15 @@
 #include "core.h"
 
+void start() {
+    Matrix4f proj = matrix4f_orthographics(-2.0f, 2.0f, -1.0f, 1.0f, -1.0f, 1.0f);
+    matrix4f_print(proj);
+}
+
+void update() {
+    
+}
+
+
 int main(int argc, char *argv[]) {
     if (init_sdl_gl()) {
         fprintf(stderr, "%s Couldn't init SDL and GL.\n", debug_error_str);
@@ -17,9 +27,10 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    check_gl_error();
-
     bool quit = false;
+
+    start();
+
     SDL_Event event;
     while (!quit) {
         while (SDL_PollEvent(&event)) {
@@ -29,6 +40,8 @@ int main(int argc, char *argv[]) {
                     break;
                 default:
                     break;
+
+                update();
             }
         }
 
