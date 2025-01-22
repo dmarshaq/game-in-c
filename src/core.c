@@ -1,4 +1,5 @@
 #include "core.h"
+#include "SDL2/SDL_video.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -212,5 +213,77 @@ void _array_list_unordered_remove(void *list, u32 index) {
  * Graphics.
  */
 
+#include <GL/glew.h>
 
+bool check_gl_error() {
+    s32 error = glGetError();
+    if (error != 0) {
+        fprintf(stderr, "%s OpenGL error: %d.\n", debug_error_str, error);
+        return false;
+    }
+    return true;
+}
+
+int init_sdl_gl() {
+    // Initialize SDL.
+    if (SDL_Init(SDL_INIT_VIDEO) < 0 || SDL_Init(SDL_INIT_AUDIO) < 0) {
+        fprintf(stderr, "%s SDL could not initialize! SDL_Error: %s\n", debug_error_str, SDL_GetError());
+        return 1;
+    }
+    
+
+    // Set OpenGL attributes.
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    
+    return 0;
+}
+
+SDL_Window* create_gl_window(const char *title, int x, int y, int width, int height) {
+    // Create window.
+    SDL_Window *window = SDL_CreateWindow(title, x, y, width, height, SDL_WINDOW_OPENGL);
+    if (window == NULL) {
+        fprintf(stderr, "%s Window could not be created! SDL_Error: %s\n", debug_error_str, SDL_GetError());
+        return NULL;
+    }
+
+    // Create OpenGL context.
+    SDL_GLContext glContext = SDL_GL_CreateContext(window);
+    if (glContext == NULL) {
+        fprintf(stderr, "%s OpenGL context could not be created! SDL_Error: %s\n", debug_error_str, SDL_GetError());
+        return window;
+    }
+
+    if (SDL_GL_MakeCurrent(window, glContext) < 0) {
+        fprintf(stderr, "%s OpenGL current could not be created! SDL_Error: %s\n", debug_error_str, SDL_GetError());
+        return window;
+    }
+
+    // Initialize GLEW.
+    if (glewInit() != GLEW_OK) {
+        fprintf(stderr, "%s GLEW initialization failed!\n", debug_error_str);
+        return window;
+    }
+
+    return window;
+}
+
+int init_sdl_audio() {
+    // Initialize sound.
+    if (Mix_Init(MIX_INIT_MP3) < 0) {
+        fprintf(stderr, "%s SDL Mixer could not initialize! SDL_Error: %s\n", debug_error_str, SDL_GetError());
+        return 1;
+    }
+
+    Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024);
+    return 0;
+}
+
+Camera camera_make(Vec2f center, u32 unit_scale) {
+    return (Camera) {
+        .center = center,
+        .unit_scale = unit_scale,
+    };
+}
 

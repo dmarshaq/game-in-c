@@ -241,4 +241,64 @@ typedef struct circle {
 } Circle;
 
 
+/**
+ * Graphics.
+ */
+
+#include <SDL2/SDL.h>
+#include <GL/glew.h>
+#include <SDL2/SDL_events.h>
+#include <SDL2/SDL_video.h>
+#include <SDL2/SDL_audio.h>
+#include <SDL2/SDL_mixer.h>
+#include <SDL2/SDL_timer.h>
+#include <SDL2/SDL_keycode.h>
+
+/**
+ * @Incomplete: Write description.
+ */
+bool check_gl_error();
+
+/**
+ * @Incomplete: Write description.
+ */
+int init_sdl_gl();
+
+/**
+ * @Incomplete: Write description.
+ */
+SDL_Window* create_gl_window(const char *title, int x, int y, int width, int height);
+
+/**
+ * @Incomplete: Write description.
+ */
+int init_sdl_audio();
+
+typedef struct texture {
+    u32 id;             // OpenGL texture id.
+    s32 width;          // Pixel width of texture.
+    s32 height;         // Pixel height of texture.
+    Vec2f uv0;          // Bottom left uv coordinate of the texture.
+    Vec2f uv1;          // Top right uv coordinate of the texture.
+} Texture;
+
+typedef struct shader {
+    u32 id;             // OpenGL program id.
+} Shader;
+
+typedef struct quad_drawer {
+    u32 vao;            // OpenGL id of Vertex Array Object.
+    u32 vbo;            // OpenGL id of Vertex Buffer Object.
+    u32 ebo;            // OpenGL id of Element Buffer Object.
+
+    Shader *program;    // Pointer to shader that will be used to draw.
+} Quad_Drawer;
+
+typedef struct camera {
+    Vec2f center;       // World center.
+    u32 unit_scale;     // Pixels per 1 world unit.
+} Camera;
+
+Camera camera_make(Vec2f center, u32 unit_scale);
+
 #endif

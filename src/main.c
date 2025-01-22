@@ -1,24 +1,44 @@
 #include "core.h"
 
-int main() {
+int main(int argc, char *argv[]) {
+    if (init_sdl_gl()) {
+        fprintf(stderr, "%s Couldn't init SDL and GL.\n", debug_error_str);
+        return 1;
+    }
     
-    Vec2f v1 = vec2f_make(2.0f, 1.5f);
-    Vec2f v2 = vec2f_make(-1.5f, 1.0f);
+    if (init_sdl_audio()) {
+        fprintf(stderr, "%s Couldn't init audio.\n", debug_error_str);
+        return 1;
+    }
 
-    v1 = vec2f_difference_constant(v1, 2.0f);
-    v1 = vec2f_multi_constant(v1, 2.0f);
+    SDL_Window *window = create_gl_window("Spacejet", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600);
+    if (window == NULL) {
+        fprintf(stderr, "%s Couldn't create window.\n", debug_error_str);
+        return 1;
+    }
 
-    v2 = vec2f_sum(v1, v2);
-    
-    vec2f_print(v1);
-    vec2f_print(v2);
-    printf("dot = %2.2f\n", vec2f_dot(v1, v2));
-    
-    // Vec2f v3 = vec2f_difference(v2, VEC2F_RIGHT);
-    printf("%2.2f\n", vec2f_distance(v1, v2));
-    vec2f_print(vec2f_make(0.5f, vec2f_distance(v1, v2)));
-    vec2f_print(vec2f_difference(vec2f_make(0.5f, vec2f_distance(v1, v2)), VEC2F_RIGHT));
-    
-    // v1 = vec2f_make(0.5f, vec2f_distance(v1, v2));
+    check_gl_error();
+
+    bool quit = false;
+    SDL_Event event;
+    while (!quit) {
+        while (SDL_PollEvent(&event)) {
+            switch (event.type) {
+                case SDL_QUIT:
+                    quit = true;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        // Clear the screen with color.
+        glClearColor(0.1f, 0.5f, 0.3f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        
+        // Swap buffers to display the rendered image.
+        SDL_GL_SwapWindow(window);
+    }
+
     return 0;
 }
