@@ -298,6 +298,12 @@ SDL_Window* create_gl_window(const char *title, int x, int y, int width, int hei
  */
 int init_sdl_audio();
 
+
+/**
+ * @Incomplete: Write description.
+ */
+void graphics_init();
+
 typedef struct texture {
     u32 id;             // OpenGL texture id.
     s32 width;          // Pixel width of texture.
@@ -306,9 +312,22 @@ typedef struct texture {
     Vec2f uv1;          // Top right uv coordinate of the texture.
 } Texture;
 
+/**
+ * Loads texture from image file and returns struct that contains it's OpenGL id with other texture parameters.
+ */
+Texture texture_load(char *texture_path);
+
+
 typedef struct shader {
     u32 id;             // OpenGL program id.
+    u32 vertex_stride;  // Stride length in bytes needed to be allocated per vertex for shader to run correctly for each vertex.
 } Shader;
+
+/**
+ * Loads shader from .glsl file and returns struct that contains it's OpenGL id.
+ */
+Shader shader_load(char *shader_path);
+
 
 typedef struct quad_drawer {
     u32 vao;            // OpenGL id of Vertex Array Object.
@@ -317,6 +336,10 @@ typedef struct quad_drawer {
 
     Shader *program;    // Pointer to shader that will be used to draw.
 } Quad_Drawer;
+
+#define MAX_QUADS_PER_BATCH     16
+#define VERTICIES_PER_QUAD      4
+#define INDICIES_PER_QUAD       6
 
 typedef struct camera {
     Vec2f center;       // World center.

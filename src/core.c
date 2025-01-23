@@ -244,6 +244,78 @@ Transform transform_trs_2d(Vec2f position, float angle, Vec2f scale) {
 
 
 /**
+ * File utils.
+ */
+
+char* read_file_into_string_buffer(char *file_name) {
+    FILE *file = fopen(file_name, "rb");
+    if (file == NULL) {
+        printf("Error: Couldn't open the file \"%s\".\n", file_name);
+        return NULL;
+    }
+
+    fseek(file, 0, SEEK_END);
+    size_t file_size = ftell(file);
+    rewind(file);
+
+    char *buffer = (char*) malloc(file_size + 1);
+    if (buffer == NULL) {
+        printf("Error: Memory allocation for string buffer failed while reading the file \"%s\".\n", file_name);
+        fclose(file);
+        return NULL;
+    }
+
+    if (fread(buffer, 1, file_size, file) != file_size) {
+        printf("Error: Failure reading the file \"%s\".\n", file_name);
+        fclose(file);
+        free(buffer);
+        return NULL;
+    }
+
+    buffer[file_size] = '\0';
+    fclose(file);
+
+    return buffer;
+}
+
+String_8 read_file_into_str8(char *file_name) {
+    FILE *file = fopen(file_name, "rb");
+    if (file == NULL) {
+        printf("Error: Couldn't open the file \"%s\".\n", file_name);
+    }
+
+    fseek(file, 0, SEEK_END);
+    size_t file_size = ftell(file);
+    rewind(file);
+
+    String_8 str = {
+        .ptr = malloc(file_size),
+        .length = (u32)file_size,
+    };
+    str.ptr = malloc(file_size);
+    str.length = (u32)file_size;
+
+    if (str.ptr == NULL) {
+        printf("Error: Memory allocation for string buffer failed while reading the file \"%s\".\n", file_name);
+        fclose(file);
+        str.length = 0;
+    }
+
+    if (fread(str.ptr, 1, file_size, file) != file_size) {
+        printf("Error: Failure reading the file \"%s\".\n", file_name);
+        fclose(file);
+        free(str.ptr);
+        str.ptr = NULL;
+        str.length = 0;
+    }
+
+    fclose(file);
+
+    return str;
+}
+
+
+/**
  * Graphics.
  */
 
@@ -312,6 +384,205 @@ int init_sdl_audio() {
 
     Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024);
     return 0;
+}
+
+
+String_8 VERTEX_SHADER_DEFINES;
+String_8 FRAGMENT_SHADER_DEFINES;
+
+String_8 SHADER_VERSION_TAG;
+
+
+s32 SHADER_STRINGS_LENGTHS[3];
+
+s32 TEXTURE_MIN_FILTER;
+s32 TEXTURE_MAX_FILTER;
+s32 TEXTURE_WRAP_S;
+s32 TEXTURE_WRAP_T;
+
+void graphics_init() {
+    // Enable Blending (Rendering with alpha channels in mind).
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Init strings for shader defines.
+    str8_init_statically(&VERTEX_SHADER_DEFINES, "#define VERTEX\n");
+    str8_init_statically(&FRAGMENT_SHADER_DEFINES, "#define FRAGMENT\n");
+
+    // Init string for version tage in shader, for shader creation to look for when loading shader.
+    str8_init_statically(&SHADER_VERSION_TAG, "#version");
+
+    // Make stbi flip images vertically when loading.
+    stbi_set_flip_vertically_on_load(true);
+}
+
+Texture texture_load(char *texture_path) {
+    // Process image into texture.
+    Texture texture;
+    s32 nrChannels;
+
+    u8 *data = stbi_load(texture_path, &texture.width, &texture.height, &nrChannels, 0);
+
+    if (data == NULL) {
+        fprintf(stderr, "%s Stbi couldn't load image.\n", debug_error_str);
+    }
+
+    // Loading a single image into texture example:
+    glGenTextures(1, &texture.id);
+    glBindTexture(GL_TEXTURE_2D, texture.id);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, TEXTURE_WRAP_S);	
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, TEXTURE_WRAP_T);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, TEXTURE_MIN_FILTER);  
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, TEXTURE_MAX_FILTER);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture.width, texture.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+
+    stbi_image_free(data);
+
+    return texture;
+}
+
+
+static const char *SHADER_UNIFORM_PR_MATRIX_NAME = "pr_matrix";
+static const char *SHADER_UNIFORM_ML_MATRIX_NAME = "ml_matrix";
+static const char *SHADER_UNIFORM_SAMPLERS_NAME = "u_textures";
+
+/**
+ * @Temporary: Later, setting uniforms either will be done more automatically, or simplified to be done by uset manually. 
+ * But right now it is not neccassary to care about too much, since only one shader is used anyway.
+ */
+void shader_set_uniforms(Shader *program) {
+    // Get uniform's locations based on unifrom's name.
+    s32 quad_shader_pr_matrix_loc = glGetUniformLocation(program->id, SHADER_UNIFORM_PR_MATRIX_NAME);
+    if (quad_shader_pr_matrix_loc == -1) {
+        fprintf(stderr, "%s Couldn't get location of %s uniform, in quad_shader.\n", debug_error_str, SHADER_UNIFORM_PR_MATRIX_NAME);
+    }
+
+    s32 quad_shader_ml_matrix_loc = glGetUniformLocation(program->id, SHADER_UNIFORM_ML_MATRIX_NAME);
+    if (quad_shader_ml_matrix_loc == -1) {
+        fprintf(stderr, "%s Couldn't get location of %s uniform, in quad_shader.\n", debug_error_str, SHADER_UNIFORM_ML_MATRIX_NAME);
+    }
+
+    s32 quad_shader_u_textures_loc = glGetUniformLocation(program->id, SHADER_UNIFORM_SAMPLERS_NAME);
+    if (quad_shader_u_textures_loc == -1) {
+        fprintf(stderr, "%s Couldn't get location of %s uniform, in quad_shader.\n", debug_error_str, SHADER_UNIFORM_SAMPLERS_NAME);
+    }
+    
+    // Set uniforms.
+    // glUseProgram(program->id);
+    // glUniformMatrix4fv(quad_shader_pr_matrix_loc, 1, GL_FALSE, PR_MATRIX.array);
+    // glUniformMatrix4fv(quad_shader_ml_matrix_loc, 1, GL_FALSE, ML_MATRIX.array);
+    // glUniform1iv(quad_shader_u_textures_loc, 32, SAMPLERS);
+    // glUseProgram(0);
+}
+
+bool check_program(u32 id, char *shader_path) {
+    s32 is_linked = 0;
+    glGetProgramiv(id, GL_LINK_STATUS, &is_linked); 
+    if (is_linked == GL_FALSE) {
+        fprintf(stderr, "%s Program of %s, failed to link.\n", debug_error_str, shader_path);
+       
+        s32 info_log_length;
+        glGetProgramiv(id, GL_INFO_LOG_LENGTH, &info_log_length);
+        char *buffer = malloc(info_log_length);
+        
+        s32 buffer_size;
+        glGetProgramInfoLog(id, info_log_length, &buffer_size, buffer);
+        fprintf(stderr, "%s\n", buffer);
+        
+        free(buffer);
+
+        return false;
+    } 
+    return true;
+}
+
+bool check_shader(u32 id, char *shader_path) {
+    s32 is_compiled = 0;
+    glGetShaderiv(id, GL_COMPILE_STATUS, &is_compiled); 
+    if (is_compiled == GL_FALSE) {
+        fprintf(stderr, "%s Shader of %s, failed to compile.\n", debug_error_str, shader_path);
+        
+        s32 info_log_length;
+        glGetShaderiv(id, GL_INFO_LOG_LENGTH, &info_log_length);
+        char *buffer = malloc(info_log_length);
+        
+        s32 buffer_size;
+        glGetShaderInfoLog(id, info_log_length, &buffer_size, buffer);
+        fprintf(stderr, "%s\n", buffer);
+        
+        free(buffer);
+
+        return false;
+    } 
+    return true;
+}
+
+Shader shader_load(char *shader_path) {
+    /**
+     * @Important: To avoid error while compiling glsl file we need to ensure that "#version ...\n" line comes before anything else in the final shader string. 
+     * That said, we can't just have "#define ...\n" come before version tag. 
+     * Therefore we split original shader source on it's shader version part that consists of single "#version ...\n" line, and rest of the shader code that comes after.
+     * And finally we insert "define ...\n" part in between these two substrings.
+     */
+    String_8 shader_source, shader_version, shader_code;
+
+    shader_source = read_file_into_str8(shader_path);
+    
+    // Splitting on two substrings, "shader_version" and "shader_code".
+    u32 start_of_version_tag = str8_index_of_str8(&shader_source, &SHADER_VERSION_TAG, 0, shader_source.length);
+    u32 end_of_version_tag = str8_index_of_char(&shader_source, '\n', start_of_version_tag, shader_source.length);
+    str8_substring(&shader_source, &shader_version, start_of_version_tag, end_of_version_tag + 1);
+    str8_substring(&shader_source, &shader_code, end_of_version_tag + 1, shader_source.length);
+    
+    // Passing all parts in the respective shader sources, where defines inserted between version and code parts.
+    const char *vertex_shader_source[3] = { (char *)shader_version.ptr, (char *)VERTEX_SHADER_DEFINES.ptr, (char *)shader_code.ptr };
+    const char *fragment_shader_source[3] = { (char *)shader_version.ptr, (char *)FRAGMENT_SHADER_DEFINES.ptr, (char *)shader_code.ptr };
+
+    // Specifying lengths, because we don't pass null terminated strings.
+    // @Important: Since defines length depends on whether we are loading vertex or fragment shader, we set it's length values separately when loading each.
+    SHADER_STRINGS_LENGTHS[0] = shader_version.length;
+    SHADER_STRINGS_LENGTHS[2] = shader_code.length;
+    
+
+    SHADER_STRINGS_LENGTHS[1] = VERTEX_SHADER_DEFINES.length;
+    u32 vertex_shader;
+    vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertex_shader, 3, vertex_shader_source, SHADER_STRINGS_LENGTHS);
+    glCompileShader(vertex_shader);
+    
+    // Check results for errors.
+    check_shader(vertex_shader, shader_path);
+
+    SHADER_STRINGS_LENGTHS[1] = FRAGMENT_SHADER_DEFINES.length;
+    u32 fragment_shader;
+    fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragment_shader, 3, fragment_shader_source, SHADER_STRINGS_LENGTHS);
+    glCompileShader(fragment_shader);
+    
+    // Check results for errors.
+    check_shader(fragment_shader, shader_path);
+    
+    Shader shader = {
+        .id = glCreateProgram(),
+    };
+
+    glAttachShader(shader.id, vertex_shader);
+    glAttachShader(shader.id, fragment_shader);
+    glLinkProgram(shader.id);
+    
+    // Check results for errors.
+    check_program(shader.id, shader_path);
+
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
+    
+
+    str8_free(&shader_source);
+
+    return shader;
 }
 
 Camera camera_make(Vec2f center, u32 unit_scale) {

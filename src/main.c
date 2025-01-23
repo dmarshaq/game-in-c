@@ -1,8 +1,13 @@
 #include "core.h"
 
+Vec4f color = vec4f_make(1.0f, 0.2f, 0.5f, 1.0f);
+
 void start() {
     Matrix4f proj = matrix4f_orthographics(-2.0f, 2.0f, -1.0f, 1.0f, -1.0f, 1.0f);
     matrix4f_print(proj);
+    
+    color = vec4f_make(0.2f, 0.4f, 0.2f, 1.0f);
+    vec4f_print(color);
 }
 
 void update() {
@@ -28,6 +33,8 @@ int main(int argc, char *argv[]) {
     }
 
     bool quit = false;
+    
+    graphics_init();
 
     start();
 
@@ -46,7 +53,7 @@ int main(int argc, char *argv[]) {
         }
 
         // Clear the screen with color.
-        glClearColor(0.1f, 0.5f, 0.3f, 1.0f);
+        glClearColor(color.x, color.y, color.z, color.w);
         glClear(GL_COLOR_BUFFER_BIT);
         
         // Swap buffers to display the rendered image.
