@@ -1,17 +1,41 @@
 #include "core.h"
 
-Vec4f color = vec4f_make(1.0f, 0.2f, 0.5f, 1.0f);
+#define WINDOW_WIDTH 800
+#define WINDOW_HEIGHT 600
+
+const char* APP_NAME = "Spacejet";
+
+Vec4f clear_color = vec4f_make(1.0f, 0.2f, 0.5f, 1.0f);
+Camera main_camera;
+
+Shader quad_shader;
+Quad_Drawer drawer;
 
 void start() {
-    Matrix4f proj = matrix4f_orthographics(-2.0f, 2.0f, -1.0f, 1.0f, -1.0f, 1.0f);
-    matrix4f_print(proj);
-    
-    color = vec4f_make(0.2f, 0.4f, 0.2f, 1.0f);
-    vec4f_print(color);
+    quad_shader = shader_load("res/shader/quad.glsl");
+    quad_shader.vertex_stride = 10;
+    drawer_init(&drawer, &quad_shader);
+
+    clear_color = vec4f_make(0.2f, 0.4f, 0.2f, 0.2f);
+    vec4f_print(clear_color);
+
+    main_camera = camera_make(VEC2F_ORIGIN, 32);
 }
 
 void update() {
-    
+    graphics_update_projection(&drawer, &main_camera, WINDOW_WIDTH, WINDOW_HEIGHT);
+    float quad_data[40] = {
+        -1.5f, -1.5f,  0.0f,  1.0f,  0.2f,  0.2f,  1.0f,  0.0f,  0.0f, -1.0f,
+         1.5f, -1.5f,  0.0f,  1.0f,  0.2f,  0.2f,  1.0f,  1.0f,  0.0f, -1.0f,
+        -1.5f,  1.5f,  0.0f,  1.0f,  0.2f,  0.2f,  1.0f,  0.0f,  1.0f, -1.0f,
+         1.5f,  1.5f,  0.0f,  1.0f,  0.2f,  0.2f,  1.0f,  1.0f,  1.0f, -1.0f,
+    };
+    float *ptr = quad_data;
+
+    draw_quad(&drawer, ptr);
+
+    draw(&drawer);
+    draw_clean();
 }
 
 
@@ -26,7 +50,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    SDL_Window *window = create_gl_window("Spacejet", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600);
+    SDL_Window *window = create_gl_window(APP_NAME, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT);
     if (window == NULL) {
         fprintf(stderr, "%s Couldn't create window.\n", debug_error_str);
         return 1;
@@ -47,15 +71,14 @@ int main(int argc, char *argv[]) {
                     break;
                 default:
                     break;
-
-                update();
             }
         }
-
-        // Clear the screen with color.
-        glClearColor(color.x, color.y, color.z, color.w);
+        // Clear the screen with clear_color.
+        glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
-        
+
+        update();
+
         // Swap buffers to display the rendered image.
         SDL_GL_SwapWindow(window);
     }

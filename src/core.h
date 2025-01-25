@@ -222,7 +222,7 @@ typedef struct matrix4f {
 
 #define matrix4f_print(matrix)                                          printf(#matrix " =\n[[ % 2.2f , % 2.2f , % 2.2f , % 2.2f ]\n [ % 2.2f , % 2.2f , % 2.2f , % 2.2f ]\n [ % 2.2f , % 2.2f , % 2.2f , % 2.2f ]\n [ % 2.2f , % 2.2f , % 2.2f , % 2.2f ]]\n", matrix.array[0], matrix.array[1], matrix.array[2], matrix.array[3], matrix.array[4], matrix.array[5], matrix.array[6], matrix.array[7], matrix.array[8], matrix.array[9], matrix.array[10], matrix.array[11], matrix.array[12], matrix.array[13], matrix.array[14], matrix.array[15])
 
-#define matrix4f_orthographics(left, right, bottom, top, near, far)     ((Matrix4f) {{ 2.0f / ((right) - (left)), 0.0f, 0.0f, 0.0f,    0.0f, 2.0f / ((top) - (bottom)), 0.0f, 0.0f,    0.0f, 0.0f, 2.0f / ((near) - (far)), 0.0f,    ((left) + (right)) / ((left) - (right)), ((bottom) + (top)) / ((bottom) - (top)), ((near) + (far)) / ((near) - (far)), 1.0f }} )
+#define matrix4f_orthographic(left, right, bottom, top, near, far)     ((Matrix4f) {{ 2.0f / ((right) - (left)), 0.0f, 0.0f, 0.0f,    0.0f, 2.0f / ((top) - (bottom)), 0.0f, 0.0f,    0.0f, 0.0f, 2.0f / ((near) - (far)), 0.0f,    ((left) + (right)) / ((left) - (right)), ((bottom) + (top)) / ((bottom) - (top)), ((near) + (far)) / ((near) - (far)), 1.0f }} )
 
 #define matrix4f_vec2f_multiplication(matrix, vec2)                     ((Vec2f) { .x = multiplier->array[0] * target->x + multiplier->array[1] * target->y,    .y = multiplier->array[4] * target->x + multiplier->array[5] * target->y, } )
 #define matrix4f_vec3f_multiplication(matrix, vec3)                     ((Vec3f) { .x = multiplier->array[0] * target->x + multiplier->array[1] * target->y + multiplier->array[2] * target->z,    .y = multiplier->array[4] * target->x + multiplier->array[5] * target->y + multiplier->array[6] * target->z,    .z = multiplier->array[8] * target->x + multiplier->array[9] * target->y + multiplier->array[10] * target->z, } )
@@ -304,6 +304,7 @@ int init_sdl_audio();
  */
 void graphics_init();
 
+
 typedef struct texture {
     u32 id;             // OpenGL texture id.
     s32 width;          // Pixel width of texture.
@@ -337,9 +338,31 @@ typedef struct quad_drawer {
     Shader *program;    // Pointer to shader that will be used to draw.
 } Quad_Drawer;
 
-#define MAX_QUADS_PER_BATCH     16
+#define MAX_QUADS_PER_BATCH     1
 #define VERTICIES_PER_QUAD      4
 #define INDICIES_PER_QUAD       6
+
+/**
+ * @Incomplete: Write description.
+ */
+void drawer_init(Quad_Drawer *drawer, Shader *shader);
+
+/**
+ * @Incomplete: Write description.
+ */
+void draw(Quad_Drawer *drawer);
+
+/**
+ * @Incomplete: Write description.
+ */
+void draw_clean();
+
+
+/**
+ * Simply places specified data directly into the verticies array.
+ */
+void draw_quad(Quad_Drawer *drawer, float *quad_data);
+
 
 typedef struct camera {
     Vec2f center;       // World center.
@@ -347,5 +370,12 @@ typedef struct camera {
 } Camera;
 
 Camera camera_make(Vec2f center, u32 unit_scale);
+
+/**
+ * @Incomplete: Write description.
+ */
+void graphics_update_projection(Quad_Drawer *drawer, Camera *camera, float window_width, float window_height);
+
+
 
 #endif

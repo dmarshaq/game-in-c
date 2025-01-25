@@ -387,18 +387,30 @@ int init_sdl_audio() {
 }
 
 
-String_8 VERTEX_SHADER_DEFINES;
-String_8 FRAGMENT_SHADER_DEFINES;
+// Shader loading variables.
+String_8 vertex_shader_defines;
+String_8 fragment_shader_defines;
 
-String_8 SHADER_VERSION_TAG;
+String_8 shader_version_tag;
 
 
-s32 SHADER_STRINGS_LENGTHS[3];
+s32 shader_strings_lengths[3];
 
-s32 TEXTURE_MIN_FILTER;
-s32 TEXTURE_MAX_FILTER;
-s32 TEXTURE_WRAP_S;
-s32 TEXTURE_WRAP_T;
+// Texture params.
+s32 texture_min_filter;
+s32 texture_max_filter;
+s32 texture_wrap_s;
+s32 texture_wrap_t;
+
+// Shader unifroms.
+Matrix4f shader_uniform_pr_matrix;
+Matrix4f shader_uniform_ml_matrix;
+s32 shader_uniform_samplers[32];
+
+// Drawing variables.
+float *verticies;
+u32 *quad_indicies;
+u32 texture_ids[32];
 
 void graphics_init() {
     // Enable Blending (Rendering with alpha channels in mind).
@@ -406,14 +418,35 @@ void graphics_init() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // Init strings for shader defines.
-    str8_init_statically(&VERTEX_SHADER_DEFINES, "#define VERTEX\n");
-    str8_init_statically(&FRAGMENT_SHADER_DEFINES, "#define FRAGMENT\n");
+    str8_init_statically(&vertex_shader_defines, "#define VERTEX\n");
+    str8_init_statically(&fragment_shader_defines, "#define FRAGMENT\n");
 
     // Init string for version tage in shader, for shader creation to look for when loading shader.
-    str8_init_statically(&SHADER_VERSION_TAG, "#version");
+    str8_init_statically(&shader_version_tag, "#version");
 
     // Make stbi flip images vertically when loading.
     stbi_set_flip_vertically_on_load(true);
+
+    // Init default texture parameters.
+    texture_wrap_s = GL_CLAMP_TO_EDGE;
+    texture_wrap_t = GL_CLAMP_TO_EDGE;
+    texture_min_filter = GL_LINEAR;
+    texture_max_filter = GL_LINEAR;
+
+    // Init shader uniforms.
+    shader_uniform_pr_matrix = MATRIX4F_IDENTITY;
+    shader_uniform_ml_matrix = MATRIX4F_IDENTITY;
+    for (s32 i = 0; i < 32; i++)
+        shader_uniform_samplers[i] = i;
+
+    // Setting drawing variables.
+    verticies = array_list_make(float, 40); // @Leak.
+    quad_indicies = array_list_make(u32, MAX_QUADS_PER_BATCH * 6); // @Leak.
+    Array_List_Header *header = (void *)(quad_indicies) - sizeof(Array_List_Header);
+    header->length = MAX_QUADS_PER_BATCH * 6;
+    for (u32 i = 0; i < MAX_QUADS_PER_BATCH * 6; i++) {
+        quad_indicies[i] = i - (i / 3) * 2 + (i / 6) * 2;
+    }
 }
 
 Texture texture_load(char *texture_path) {
@@ -430,14 +463,13 @@ Texture texture_load(char *texture_path) {
     // Loading a single image into texture example:
     glGenTextures(1, &texture.id);
     glBindTexture(GL_TEXTURE_2D, texture.id);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, TEXTURE_WRAP_S);	
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, TEXTURE_WRAP_T);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, TEXTURE_MIN_FILTER);  
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, TEXTURE_MAX_FILTER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, texture_wrap_s);	
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, texture_wrap_t);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texture_min_filter);  
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, texture_max_filter);
 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture.width, texture.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     glBindTexture(GL_TEXTURE_2D, 0);
-
 
     stbi_image_free(data);
 
@@ -445,9 +477,9 @@ Texture texture_load(char *texture_path) {
 }
 
 
-static const char *SHADER_UNIFORM_PR_MATRIX_NAME = "pr_matrix";
-static const char *SHADER_UNIFORM_ML_MATRIX_NAME = "ml_matrix";
-static const char *SHADER_UNIFORM_SAMPLERS_NAME = "u_textures";
+const char *SHADER_UNIFORM_PR_MATRIX_NAME = "pr_matrix";
+const char *SHADER_UNIFORM_ML_MATRIX_NAME = "ml_matrix";
+const char *SHADER_UNIFORM_SAMPLERS_NAME = "u_textures";
 
 /**
  * @Temporary: Later, setting uniforms either will be done more automatically, or simplified to be done by uset manually. 
@@ -465,17 +497,17 @@ void shader_set_uniforms(Shader *program) {
         fprintf(stderr, "%s Couldn't get location of %s uniform, in quad_shader.\n", debug_error_str, SHADER_UNIFORM_ML_MATRIX_NAME);
     }
 
-    s32 quad_shader_u_textures_loc = glGetUniformLocation(program->id, SHADER_UNIFORM_SAMPLERS_NAME);
-    if (quad_shader_u_textures_loc == -1) {
+    s32 quad_shader_samplers_loc = glGetUniformLocation(program->id, SHADER_UNIFORM_SAMPLERS_NAME);
+    if (quad_shader_samplers_loc == -1) {
         fprintf(stderr, "%s Couldn't get location of %s uniform, in quad_shader.\n", debug_error_str, SHADER_UNIFORM_SAMPLERS_NAME);
     }
     
     // Set uniforms.
-    // glUseProgram(program->id);
-    // glUniformMatrix4fv(quad_shader_pr_matrix_loc, 1, GL_FALSE, PR_MATRIX.array);
-    // glUniformMatrix4fv(quad_shader_ml_matrix_loc, 1, GL_FALSE, ML_MATRIX.array);
-    // glUniform1iv(quad_shader_u_textures_loc, 32, SAMPLERS);
-    // glUseProgram(0);
+    glUseProgram(program->id);
+    glUniformMatrix4fv(quad_shader_pr_matrix_loc, 1, GL_FALSE, shader_uniform_pr_matrix.array);
+    glUniformMatrix4fv(quad_shader_ml_matrix_loc, 1, GL_FALSE, shader_uniform_ml_matrix.array);
+    glUniform1iv(quad_shader_samplers_loc, 32, shader_uniform_samplers);
+    glUseProgram(0);
 }
 
 bool check_program(u32 id, char *shader_path) {
@@ -532,34 +564,34 @@ Shader shader_load(char *shader_path) {
     shader_source = read_file_into_str8(shader_path);
     
     // Splitting on two substrings, "shader_version" and "shader_code".
-    u32 start_of_version_tag = str8_index_of_str8(&shader_source, &SHADER_VERSION_TAG, 0, shader_source.length);
+    u32 start_of_version_tag = str8_index_of_str8(&shader_source, &shader_version_tag, 0, shader_source.length);
     u32 end_of_version_tag = str8_index_of_char(&shader_source, '\n', start_of_version_tag, shader_source.length);
     str8_substring(&shader_source, &shader_version, start_of_version_tag, end_of_version_tag + 1);
     str8_substring(&shader_source, &shader_code, end_of_version_tag + 1, shader_source.length);
     
     // Passing all parts in the respective shader sources, where defines inserted between version and code parts.
-    const char *vertex_shader_source[3] = { (char *)shader_version.ptr, (char *)VERTEX_SHADER_DEFINES.ptr, (char *)shader_code.ptr };
-    const char *fragment_shader_source[3] = { (char *)shader_version.ptr, (char *)FRAGMENT_SHADER_DEFINES.ptr, (char *)shader_code.ptr };
+    const char *vertex_shader_source[3] = { (char *)shader_version.ptr, (char *)vertex_shader_defines.ptr, (char *)shader_code.ptr };
+    const char *fragment_shader_source[3] = { (char *)shader_version.ptr, (char *)fragment_shader_defines.ptr, (char *)shader_code.ptr };
 
     // Specifying lengths, because we don't pass null terminated strings.
     // @Important: Since defines length depends on whether we are loading vertex or fragment shader, we set it's length values separately when loading each.
-    SHADER_STRINGS_LENGTHS[0] = shader_version.length;
-    SHADER_STRINGS_LENGTHS[2] = shader_code.length;
+    shader_strings_lengths[0] = shader_version.length;
+    shader_strings_lengths[2] = shader_code.length;
     
 
-    SHADER_STRINGS_LENGTHS[1] = VERTEX_SHADER_DEFINES.length;
+    shader_strings_lengths[1] = vertex_shader_defines.length;
     u32 vertex_shader;
     vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertex_shader, 3, vertex_shader_source, SHADER_STRINGS_LENGTHS);
+    glShaderSource(vertex_shader, 3, vertex_shader_source, shader_strings_lengths);
     glCompileShader(vertex_shader);
     
     // Check results for errors.
     check_shader(vertex_shader, shader_path);
 
-    SHADER_STRINGS_LENGTHS[1] = FRAGMENT_SHADER_DEFINES.length;
+    shader_strings_lengths[1] = fragment_shader_defines.length;
     u32 fragment_shader;
     fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragment_shader, 3, fragment_shader_source, SHADER_STRINGS_LENGTHS);
+    glShaderSource(fragment_shader, 3, fragment_shader_source, shader_strings_lengths);
     glCompileShader(fragment_shader);
     
     // Check results for errors.
@@ -591,4 +623,165 @@ Camera camera_make(Vec2f center, u32 unit_scale) {
         .unit_scale = unit_scale,
     };
 }
+
+void graphics_update_projection(Quad_Drawer *drawer, Camera *camera, float window_width, float window_height) {
+    float camera_width_offset = (window_width / (float) camera->unit_scale) / 2;
+    float camera_height_offset = (window_height / (float) camera->unit_scale) / 2;
+    shader_uniform_pr_matrix = matrix4f_orthographic(camera->center.x - camera_width_offset, camera->center.x + camera_width_offset, camera->center.y - camera_height_offset, camera->center.y + camera_height_offset, -1.0f, 1.0f);
+
+    s32 quad_shader_pr_matrix_loc = glGetUniformLocation(drawer->program->id, SHADER_UNIFORM_PR_MATRIX_NAME);
+    if (quad_shader_pr_matrix_loc == -1) {
+        fprintf(stderr, "%s Couldn't get location of %s uniform, in quad_shader.\n", debug_error_str, SHADER_UNIFORM_PR_MATRIX_NAME);
+    }   
+
+    // Set uniforms.
+    glUseProgram(drawer->program->id);
+    glUniformMatrix4fv(quad_shader_pr_matrix_loc, 1, GL_FALSE, shader_uniform_pr_matrix.array);
+    glUseProgram(0);
+}
+
+// @Incomplete: Finish attributes pointers setting for different types of shaders and strides.
+void drawer_init(Quad_Drawer *drawer, Shader *shader) {
+    drawer->program = shader;
+
+    // Setting Vertex Objects for render using OpenGL. Also seeting up Element Buffer Object for indices to load.
+    glGenVertexArrays(1, &drawer->vao);
+    glGenBuffers(1, &drawer->vbo);
+    glGenBuffers(1, &drawer->ebo);
+
+    // 1. Bind Vertex Array Object. [VAO]
+    glBindVertexArray(drawer->vao);
+    
+    // 2. Copy verticies array in a buffer for OpenGL to use. [VBO].
+    glBindBuffer(GL_ARRAY_BUFFER, drawer->vbo);
+    glBufferData(GL_ARRAY_BUFFER, drawer->program->vertex_stride * VERTICIES_PER_QUAD * MAX_QUADS_PER_BATCH * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+
+    // 3. Copy indicies array in a buffer for OpenGL to use. [EBO].
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, drawer->ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, array_list_length(&quad_indicies) * sizeof(float), quad_indicies, GL_STATIC_DRAW);
+    
+    // 3. Set vertex attributes pointers. [VAO, VBO, EBO].
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(7 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    
+    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(9 * sizeof(float)));
+    glEnableVertexAttribArray(3);
+    
+    // 4. Unbind EBO, VBO and VAO.
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
+    shader_set_uniforms(drawer->program);
+}
+
+u8 texture_ids_filled_length = 0;
+float addTextureToSlots(Texture *texture) {
+    for (u8 i = 0; i < texture_ids_filled_length; i++) {
+        if (texture_ids[i] == texture->id)
+            return i;
+    }
+    if (texture_ids_filled_length < 32) {
+        texture_ids[texture_ids_filled_length] = texture->id;
+        texture_ids_filled_length++;
+        return texture_ids_filled_length - 1;
+    }
+    fprintf(stderr, "%s Overflow of 32 texture slots limit, can't add texture id: %d, to current draw call texture slots.\n", debug_error_str, texture->id);
+    return -1.0f;
+}
+
+void print_verticies() {
+    printf("\n---------- VERTICIES -----------\n");
+    u32 length = array_list_length(&verticies);
+    if (length == 0) {
+        printf("[ ]\n");
+    }
+    else {
+        printf("[ ");
+        for (u32 i = 0; i < length - 1; i++) {
+            printf("%6.1f, ", verticies[i]);
+            if ((i + 1) % 10 == 0)
+                printf("\n  ");
+        }
+        printf("%6.1f  ]\n", verticies[length - 1]);
+    }
+
+    printf("Length   : %8d\n", length);
+    printf("Capacity : %8d\n\n", array_list_capacity(&verticies));
+    
+}
+
+void print_indicies() {
+    printf("\n----------- INDICIES -----------\n");
+    printf("[\n\n  ");
+    u32 length = array_list_length(&quad_indicies);
+    for (u32 i = 0; i < length; i++) {
+        if ((i + 1) % 6 == 0)
+            printf("%4d\n\n  ", quad_indicies[i]);
+        else if ((i + 1) % 3 == 0)
+            printf("%4d\n  ", quad_indicies[i]);
+        else
+            printf("%4d, ", quad_indicies[i]);
+    }
+    printf("\r]\n");
+    printf("Length   : %8d\n", length);
+    printf("Capacity : %8d\n\n", array_list_capacity(&quad_indicies));
+}
+void draw(Quad_Drawer *drawer) {
+    // Bind buffers, program, textures.
+    glUseProgram(drawer->program->id);
+
+    for (u8 i = 0; i < 32; i++) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        glBindTexture(GL_TEXTURE_2D, texture_ids[i]);
+    }
+
+    glBindVertexArray(drawer->vao);
+    glBindBuffer(GL_ARRAY_BUFFER, drawer->vbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, drawer->ebo);
+
+    u32 batch_stride = MAX_QUADS_PER_BATCH * VERTICIES_PER_QUAD * drawer->program->vertex_stride;
+    // Spliting all data on equal batches, and processing each batch in each draw call.
+    u32 batches = array_list_length(&verticies) / batch_stride;
+    for (u32 i = 0; i < batches; i++) {
+        glBufferSubData(GL_ARRAY_BUFFER, 0, batch_stride * sizeof(float), verticies + (i * batch_stride));
+        glDrawElements(GL_TRIANGLES, array_list_length(&quad_indicies), GL_UNSIGNED_INT, 0);
+    }
+    
+    // Data that didn't group into full batch, rendered in last draw call.
+    u32 float_attributes_left = (array_list_length(&verticies) - batch_stride * batches);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, float_attributes_left * sizeof(float), verticies + (batches * batch_stride));
+    glDrawElements(GL_TRIANGLES, float_attributes_left / drawer->program->vertex_stride / VERTICIES_PER_QUAD * INDICIES_PER_QUAD, GL_UNSIGNED_INT, 0);
+
+    // Unbinding of buffers after use.
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    
+    // Unbind texture ids.
+    for (u8 i = 0; i < 32; i++) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+    texture_ids_filled_length = 0;
+
+    glUseProgram(0);
+}
+
+
+void draw_clean() {
+    array_list_clear(&verticies);
+}
+
+void draw_quad(Quad_Drawer *drawer, float *quad_data) {
+    array_list_append_multiple(&verticies, quad_data, VERTICIES_PER_QUAD * drawer->program->vertex_stride);
+}
+
+
 
