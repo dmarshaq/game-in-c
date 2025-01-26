@@ -190,6 +190,7 @@ typedef struct vec2f {
 #define vec2f_divide_constant(v1, c)        vec2f_make(v1.x / c, v1.y / c)
 #define vec2f_magnitude(v1)                 right_triangle_hypotenuse(v1.x, v1.y)
 #define vec2f_distance(v1, v2)              right_triangle_hypotenuse(v1.x - v2.x, v1.y - v2.y)
+#define vec2f_negate(v1)                    vec2f_make(-v1.x, -v1.y)
 
 
 typedef struct vec3f {
@@ -309,8 +310,6 @@ typedef struct texture {
     u32 id;             // OpenGL texture id.
     s32 width;          // Pixel width of texture.
     s32 height;         // Pixel height of texture.
-    Vec2f uv0;          // Bottom left uv coordinate of the texture.
-    Vec2f uv1;          // Top right uv coordinate of the texture.
 } Texture;
 
 /**
@@ -350,18 +349,22 @@ void drawer_init(Quad_Drawer *drawer, Shader *shader);
 /**
  * @Incomplete: Write description.
  */
-void draw(Quad_Drawer *drawer);
+float add_texture_to_slots(Texture *texture);
 
 /**
  * @Incomplete: Write description.
  */
-void draw_clean();
+void draw_begin(Quad_Drawer *drawer);
 
+/**
+ * @Incomplete: Write description.
+ */
+void draw_end();
 
 /**
  * Simply places specified data directly into the verticies array.
  */
-void draw_quad(Quad_Drawer *drawer, float *quad_data);
+void draw_quad_data(float *quad_data);
 
 
 typedef struct camera {
