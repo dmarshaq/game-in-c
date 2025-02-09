@@ -265,6 +265,26 @@ typedef struct circle {
     float radius;
 } Circle;
 
+/**
+ * File utils.
+ */
+
+/**
+ * Reads contents of the file into the buffer that is preemptivly allocated using malloc.
+ * Return pointer to the buffer and sets buffer size in bytes into the file_size.
+ * @Important: Buffer should be freed manually when not used anymore.
+ */
+void* read_file_into_buffer(char *file_name, u64* file_size);
+
+/**
+ * @Incomplete: Write description.
+ */
+char* read_file_into_string_buffer(char *file_name);
+    
+/**
+ * @Incomplete: Write description.
+ */
+String_8 read_file_into_str8(char *file_name);
 
 /**
  * Graphics.
@@ -278,6 +298,8 @@ typedef struct circle {
 #include <SDL2/SDL_mixer.h>
 #include <SDL2/SDL_timer.h>
 #include <SDL2/SDL_keycode.h>
+
+#include "stb_truetype.h"
 
 /**
  * @Incomplete: Write description.
@@ -378,6 +400,30 @@ Camera camera_make(Vec2f center, u32 unit_scale);
  * @Incomplete: Write description.
  */
 void graphics_update_projection(Quad_Drawer *drawer, Camera *camera, float window_width, float window_height);
+
+
+typedef struct font_baked {
+    stbtt_bakedchar *chars;
+    Texture texture;
+} Font_Baked;
+
+Font_Baked font_bake(u8 *font_data);
+
+
+
+
+
+void test_font();
+
+
+
+
+
+
+
+
+
+
 
 
 

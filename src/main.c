@@ -13,6 +13,8 @@ Camera main_camera;
 Shader quad_shader;
 Quad_Drawer drawer;
 
+Font_Baked font_baked;
+
 void start() {
     quad_shader = shader_load("res/shader/quad.glsl");
     quad_shader.vertex_stride = 10;
@@ -20,6 +22,13 @@ void start() {
 
     clear_color = vec4f_make(0.2f, 0.4f, 0.2f, 0.2f);
     vec4f_print(clear_color);
+    
+    u64 font_size;
+    u8* font_data = read_file_into_buffer("res/font/font.ttf", &font_size);
+
+    font_baked = font_bake(font_data);
+
+    free(font_data);
 
     main_camera = camera_make(VEC2F_ORIGIN, 64);
 }
@@ -30,7 +39,8 @@ void update() {
 
     draw_begin(&drawer);
 
-    draw_quad(vec2f_negate(VEC2F_UNIT), VEC2F_UNIT, vec4f_make(0.1f, 0.1f, 0.8f, 1.0f), NULL, VEC2F_ORIGIN, VEC2F_UNIT, 0.0f);
+    float size = 4.0f;
+    draw_quad(vec2f_make(-size, -size), vec2f_make(size, size), vec4f_make(0.1f, 0.1f, 0.8f, 1.0f), &font_baked.texture, vec2f_make(0.0f, 1.0f), vec2f_make(1.0f, 0.0f), 0.0f);
 
     draw_end();
 }

@@ -1,12 +1,13 @@
 #include "core.h"
 #include "SDL2/SDL_video.h"
+#include <stdlib.h>
+#include <string.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
-
 /**
  * Debug.
  */
@@ -276,6 +277,36 @@ char* read_file_into_string_buffer(char *file_name) {
     }
 
     buffer[file_size] = '\0';
+    fclose(file);
+
+    return buffer;
+}
+
+void* read_file_into_buffer(char *file_name, u64* file_size) {
+    FILE *file = fopen(file_name, "rb");
+    if (file == NULL) {
+        printf("Error: Couldn't open the file \"%s\".\n", file_name);
+        return NULL;
+    }
+
+    fseek(file, 0, SEEK_END);
+    *file_size = ftell(file);
+    rewind(file);
+
+    u8 *buffer = (u8*) malloc(*file_size);
+    if (buffer == NULL) {
+        printf("Error: Memory allocation for string buffer failed while reading the file \"%s\".\n", file_name);
+        fclose(file);
+        return NULL;
+    }
+
+    if (fread(buffer, 1, *file_size, file) != *file_size) {
+        printf("Error: Failure reading the file \"%s\".\n", file_name);
+        fclose(file);
+        free(buffer);
+        return NULL;
+    }
+
     fclose(file);
 
     return buffer;
@@ -795,5 +826,97 @@ void draw_quad_data(float *quad_data) {
     array_list_append_multiple(&verticies, quad_data, VERTICIES_PER_QUAD * active_drawer->program->vertex_stride);
 }
 
+
+Font_Baked font_bake(u8 *font_data) {
+    Font_Baked result;
+
+    // Create a bitmap.
+    result.texture.width = 512;
+    result.texture.height = 512;
+    u8 *bitmap = calloc(result.texture.width * result.texture.height, sizeof(u8));
+
+    // Bake the font into the bitmap.
+    int first_char = 32; // ASCII value of the first character to bake
+    int num_chars = 96;  // Number of characters to bake
+                         
+    result.chars = malloc(num_chars * sizeof(stbtt_bakedchar));
+    stbtt_BakeFontBitmap(font_data, 0, 24.0f, bitmap, result.texture.width, result.texture.height, first_char, num_chars, result.chars);
+
+    // Create an OpenGL texture.
+    glGenTextures(1, &result.texture.id);
+    glBindTexture(GL_TEXTURE_2D, result.texture.id);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, texture_wrap_s);	
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, texture_wrap_t);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texture_min_filter);  
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, texture_max_filter);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, result.texture.width, result.texture.height, 0, GL_RED, GL_UNSIGNED_BYTE, bitmap);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    free(bitmap);
+
+    return result;
+}
+
+
+
+void test_font() {
+    // Step 1: Load the TTF file into memory
+    FILE* fontFile = fopen("font.ttf", "rb");
+    if (!fontFile) {
+        perror("Failed to open font file");
+    }
+
+    fseek(fontFile, 0, SEEK_END);
+    long fontSize = ftell(fontFile);
+    fseek(fontFile, 0, SEEK_SET);
+
+    unsigned char* fontBuffer = (unsigned char*)malloc(fontSize);
+    if (!fontBuffer) {
+        perror("Failed to allocate memory for font");
+        fclose(fontFile);
+    }
+
+    fread(fontBuffer, 1, fontSize, fontFile);
+    fclose(fontFile);
+
+    // Step 2: Initialize the font
+    stbtt_fontinfo font;
+    if (!stbtt_InitFont(&font, fontBuffer, 0)) {
+        fprintf(stderr, "Failed to initialize font\n");
+        free(fontBuffer);
+    }
+
+    // Step 3: Get some metrics
+    int ascent, descent, lineGap;
+    stbtt_GetFontVMetrics(&font, &ascent, &descent, &lineGap);
+
+    float scale = stbtt_ScaleForPixelHeight(&font, 24.0f); // Scale for 24 pixels tall
+    
+    char* message = "Hello World!";
+    unsigned char* bitmap;
+
+    for (s32 i = 0; i < strlen(message); i++) {
+        // Step 4: Rasterize a glyph
+        int codepoint = message[i];
+        int width, height, xoff, yoff;
+        bitmap = stbtt_GetCodepointBitmap(&font, 0, scale, codepoint, &width, &height, &xoff, &yoff);
+
+        // Step 5: Render the glyph (for simplicity, just print to console)
+        for (int y = 0; y < height; ++y) {
+            for (int x = 0; x < width; ++x) {
+                printf("%c", bitmap[y * width + x] > 128 ? '#' : ' ');
+            }
+            printf("\n");
+        }
+    }
+
+ 
+
+    // Clean up
+    stbtt_FreeBitmap(bitmap, NULL);
+    free(fontBuffer);
+
+}
 
 
