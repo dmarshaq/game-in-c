@@ -827,12 +827,12 @@ void draw_quad_data(float *quad_data) {
 }
 
 
-Font_Baked font_bake(u8 *font_data) {
+Font_Baked font_bake(u8 *font_data, float font_size) {
     Font_Baked result;
 
     // Create a bitmap.
-    result.texture.width = 512;
-    result.texture.height = 512;
+    result.texture.width    = 256;
+    result.texture.height   = 256;
     u8 *bitmap = calloc(result.texture.width * result.texture.height, sizeof(u8));
 
     // Bake the font into the bitmap.
@@ -840,7 +840,7 @@ Font_Baked font_bake(u8 *font_data) {
     int num_chars = 96;  // Number of characters to bake
                          
     result.chars = malloc(num_chars * sizeof(stbtt_bakedchar));
-    stbtt_BakeFontBitmap(font_data, 0, 24.0f, bitmap, result.texture.width, result.texture.height, first_char, num_chars, result.chars);
+    stbtt_BakeFontBitmap(font_data, 0, font_size, bitmap, result.texture.width, result.texture.height, first_char, num_chars, result.chars);
 
     // Create an OpenGL texture.
     glGenTextures(1, &result.texture.id);
@@ -852,6 +852,8 @@ Font_Baked font_bake(u8 *font_data) {
 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, result.texture.width, result.texture.height, 0, GL_RED, GL_UNSIGNED_BYTE, bitmap);
     glBindTexture(GL_TEXTURE_2D, 0);
+
+    printf("1st pixels: %d\n", *bitmap);
 
     free(bitmap);
 

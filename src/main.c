@@ -26,7 +26,7 @@ void start() {
     u64 font_size;
     u8* font_data = read_file_into_buffer("res/font/font.ttf", &font_size);
 
-    font_baked = font_bake(font_data);
+    font_baked = font_bake(font_data, 48.0f);
 
     free(font_data);
 
@@ -39,8 +39,8 @@ void update() {
 
     draw_begin(&drawer);
 
-    float size = 4.0f;
-    draw_quad(vec2f_make(-size, -size), vec2f_make(size, size), vec4f_make(0.1f, 0.1f, 0.8f, 1.0f), &font_baked.texture, vec2f_make(0.0f, 1.0f), vec2f_make(1.0f, 0.0f), 0.0f);
+    float size = 2.0f;
+    draw_quad(vec2f_make(-size, -size), vec2f_make(size, size), vec4f_make(0.1f, 0.1f, 0.8f, 0.0f), &font_baked.texture, vec2f_make(0.0f, 0.0f), vec2f_make(1.0f, 1.0f), 0.0f);
 
     draw_end();
 }

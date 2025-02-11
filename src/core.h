@@ -407,7 +407,7 @@ typedef struct font_baked {
     Texture texture;
 } Font_Baked;
 
-Font_Baked font_bake(u8 *font_data);
+Font_Baked font_bake(u8 *font_data, float font_size);
 
 
 
