@@ -404,23 +404,12 @@ void graphics_update_projection(Quad_Drawer *drawer, Camera *camera, float windo
 
 typedef struct font_baked {
     stbtt_bakedchar *chars;
-    Texture texture;
+    s32 chars_count;                // Number of chars baked.
+    s32 first_char_code;            // ASCII value of the first character baked.
+    Texture bitmap;
 } Font_Baked;
 
 Font_Baked font_bake(u8 *font_data, float font_size);
-
-
-
-
-
-void test_font();
-
-
-
-
-
-
-
 
 
 

@@ -707,6 +707,9 @@ void drawer_init(Quad_Drawer *drawer, Shader *shader) {
     glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(9 * sizeof(float)));
     glEnableVertexAttribArray(3);
     
+    glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(10 * sizeof(float)));
+    glEnableVertexAttribArray(4);
+    
     // 4. Unbind EBO, VBO and VAO.
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -714,6 +717,26 @@ void drawer_init(Quad_Drawer *drawer, Shader *shader) {
 
     shader_set_uniforms(drawer->program);
 }
+
+
+u8 texture_ids_filled_length = 0;
+
+float add_texture_to_slots(Texture *texture) {
+    for (u8 i = 0; i < texture_ids_filled_length; i++) {
+        if (texture_ids[i] == texture->id)
+            return i;
+    }
+    if (texture_ids_filled_length < 32) {
+        texture_ids[texture_ids_filled_length] = texture->id;
+        texture_ids_filled_length++;
+        return texture_ids_filled_length - 1;
+    }
+    fprintf(stderr, "%s Overflow of 32 texture slots limit, can't add texture id: %d, to current draw call texture slots.\n", debug_error_str, texture->id);
+    return -1.0f;
+}
+
+
+Quad_Drawer *active_drawer = NULL;
 
 void print_verticies() {
     printf("\n---------- VERTICIES -----------\n");
@@ -725,7 +748,7 @@ void print_verticies() {
         printf("[ ");
         for (u32 i = 0; i < length - 1; i++) {
             printf("%6.1f, ", verticies[i]);
-            if ((i + 1) % 10 == 0)
+            if ((i + 1) % active_drawer->program->vertex_stride == 0)
                 printf("\n  ");
         }
         printf("%6.1f  ]\n", verticies[length - 1]);
@@ -752,26 +775,6 @@ void print_indicies() {
     printf("Length   : %8d\n", length);
     printf("Capacity : %8d\n\n", array_list_capacity(&quad_indicies));
 }
-
-
-u8 texture_ids_filled_length = 0;
-
-float add_texture_to_slots(Texture *texture) {
-    for (u8 i = 0; i < texture_ids_filled_length; i++) {
-        if (texture_ids[i] == texture->id)
-            return i;
-    }
-    if (texture_ids_filled_length < 32) {
-        texture_ids[texture_ids_filled_length] = texture->id;
-        texture_ids_filled_length++;
-        return texture_ids_filled_length - 1;
-    }
-    fprintf(stderr, "%s Overflow of 32 texture slots limit, can't add texture id: %d, to current draw call texture slots.\n", debug_error_str, texture->id);
-    return -1.0f;
-}
-
-
-Quad_Drawer *active_drawer = NULL;
 
 void draw_begin(Quad_Drawer* drawer) {
     active_drawer = drawer;
@@ -831,29 +834,27 @@ Font_Baked font_bake(u8 *font_data, float font_size) {
     Font_Baked result;
 
     // Create a bitmap.
-    result.texture.width    = 256;
-    result.texture.height   = 256;
-    u8 *bitmap = calloc(result.texture.width * result.texture.height, sizeof(u8));
+    result.bitmap.width    = 512;
+    result.bitmap.height   = 512;
+    u8 *bitmap = calloc(result.bitmap.width * result.bitmap.height, sizeof(u8));
 
     // Bake the font into the bitmap.
-    int first_char = 32; // ASCII value of the first character to bake
-    int num_chars = 96;  // Number of characters to bake
+    result.first_char_code  = 32; // ASCII value of the first character to bake.
+    result.chars_count      = 96;  // Number of characters to bake.
                          
-    result.chars = malloc(num_chars * sizeof(stbtt_bakedchar));
-    stbtt_BakeFontBitmap(font_data, 0, font_size, bitmap, result.texture.width, result.texture.height, first_char, num_chars, result.chars);
+    result.chars = malloc(result.chars_count * sizeof(stbtt_bakedchar));
+    stbtt_BakeFontBitmap(font_data, 0, font_size, bitmap, result.bitmap.width, result.bitmap.height, result.first_char_code, result.chars_count, result.chars);
 
     // Create an OpenGL texture.
-    glGenTextures(1, &result.texture.id);
-    glBindTexture(GL_TEXTURE_2D, result.texture.id);
+    glGenTextures(1, &result.bitmap.id);
+    glBindTexture(GL_TEXTURE_2D, result.bitmap.id);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, texture_wrap_s);	
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, texture_wrap_t);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texture_min_filter);  
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, texture_max_filter);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, result.texture.width, result.texture.height, 0, GL_RED, GL_UNSIGNED_BYTE, bitmap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, result.bitmap.width, result.bitmap.height, 0, GL_RED, GL_UNSIGNED_BYTE, bitmap);
     glBindTexture(GL_TEXTURE_2D, 0);
-
-    printf("1st pixels: %d\n", *bitmap);
 
     free(bitmap);
 
