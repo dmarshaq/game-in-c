@@ -406,10 +406,14 @@ typedef struct font_baked {
     stbtt_bakedchar *chars;
     s32 chars_count;                // Number of chars baked.
     s32 first_char_code;            // ASCII value of the first character baked.
+    s32 baseline;
+    s32 line_height;
     Texture bitmap;
 } Font_Baked;
 
 Font_Baked font_bake(u8 *font_data, float font_size);
+
+void font_free(Font_Baked *font);
 
 
 

@@ -1,10 +1,11 @@
 #include "core.h"
+#include <stdio.h>
 
 void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle);
 void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font);
 
-#define WINDOW_WIDTH 1200
-#define WINDOW_HEIGHT 900
+#define WINDOW_WIDTH 800
+#define WINDOW_HEIGHT 600
 
 const char* APP_NAME = "Spacejet";
 
@@ -21,13 +22,13 @@ void start() {
     quad_shader.vertex_stride = 11;
     drawer_init(&drawer, &quad_shader);
 
-    clear_color = vec4f_make(0.2f, 0.4f, 0.2f, 0.2f);
+    clear_color = vec4f_make(0.2f, 0.4f, 0.2f, 1.0f);
     vec4f_print(clear_color);
     
     u64 font_size;
-    u8* font_data = read_file_into_buffer("res/font/font.ttf", &font_size);
+    u8* font_data = read_file_into_buffer("res/font/Nasa21-l23X.ttf", &font_size);
 
-    font_baked = font_bake(font_data, 72.0f);
+    font_baked = font_bake(font_data, 69.0f);
 
     free(font_data);
 
@@ -40,12 +41,12 @@ void update() {
     
     draw_begin(&drawer);
 
-    float size = 8.0f;
+    float size = 4.0f;
 
-    draw_quad(VEC2F_ORIGIN, vec2f_make(size, size), vec4f_make(0.3f, 0.2f, 0.3f, 1.0f), NULL, vec2f_make(0.0f, 1.0f), vec2f_make(1.0f, 0.0f), NULL, 0.0f);
-    draw_quad(VEC2F_ORIGIN, vec2f_make(size, size), vec4f_make(1.0f, 1.0f, 1.0f, 0.5f), NULL, vec2f_make(0.0f, 1.0f), vec2f_make(1.0f, 0.0f), &font_baked.bitmap, 0.0f);
+    // draw_quad(VEC2F_ORIGIN, vec2f_make(size, size), vec4f_make(0.3f, 0.2f, 0.3f, 1.0f), NULL, vec2f_make(0.0f, 1.0f), vec2f_make(1.0f, 0.0f), NULL, 0.0f);
+    // draw_quad(VEC2F_ORIGIN, vec2f_make(size, size), vec4f_make(1.0f, 1.0f, 1.0f, 0.5f), NULL, vec2f_make(0.0f, 1.0f), vec2f_make(1.0f, 0.0f), &font_baked.bitmap, 0.0f);
 
-    draw_text("''Hello World! gy?()", VEC2F_ORIGIN, vec4f_make(1.0f, 1.0f, 1.0f, 1.0f), &font_baked);
+    draw_text("Hello World", vec2f_make(-2.0f, 0.0f), vec4f_make(0.0f, 0.0f, 1.0f, 0.8f), &font_baked);
 
     draw_end();
 }
@@ -125,29 +126,39 @@ void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec
     draw_quad_data(quad_data);
 }
 
-void draw_text(const char *text, Vec2f origin, Vec4f color, Font_Baked *font) {
+void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *font) {
     u64 text_length = strlen(text);
 
+    // Scale and adjust current_point.
+    current_point = vec2f_multi_constant(current_point, 64);
+    float origin_x = current_point.x;
+    current_point.y += font->baseline;
+
+    // Text rendering variables.
+    s32 font_char_index;
+    u16 width, height;
+    stbtt_bakedchar *c;
+
     for (u64 i = 0; i < text_length; i++) {
+        // printf("%d\n", font_char_index);
+
         // @Incomplete: Handle special characters / symbols.
+        if (text[i] == '\n') {
+            current_point.x = origin_x;
+            current_point.y -= font->line_height;
+            continue;
+        }
 
         // Character drawing.
-        
-        s32 font_char_index = (s32)text[i] - font->first_char_code;
-        u16 width, height;
-        stbtt_bakedchar *c;
+        font_char_index = (s32)text[i] - font->first_char_code;
         if (font_char_index < font->chars_count) {
             c = &font->chars[font_char_index];
             width  = font->chars[font_char_index].x1 - font->chars[font_char_index].x0;
             height = font->chars[font_char_index].y1 - font->chars[font_char_index].y0;
 
+            draw_quad(vec2f_divide_constant(vec2f_make(current_point.x + c->xoff, current_point.y - c->yoff - height), 64), vec2f_divide_constant(vec2f_make(current_point.x + c->xoff + width, current_point.y - c->yoff), 64), color, NULL, vec2f_make(c->x0 / (float)font->bitmap.width, c->y1 / (float)font->bitmap.height), vec2f_make(c->x1 / (float)font->bitmap.width, c->y0 / (float)font->bitmap.height), &font->bitmap, 0.0f);
 
-
-            // printf("index: %3d -> x0: %3d, y0: %3d, x1: %3d, y1: %3d, xoff: %2.4f, yoff: %2.2f, xadvance: %2.2f, width: %3d, height: %3d.\n", font_char_index, c->x0, c->y0, c->x1, c->y1, c->xoff, c->yoff, c->xadvance, width, height);
-            
-            draw_quad(vec2f_sum(origin, vec2f_divide_constant(vec2f_make(c->xoff, -height - c->yoff), 64)), vec2f_sum(origin, vec2f_divide_constant(vec2f_make(c->xoff + width, -c->yoff), 64)), color, NULL, vec2f_make(c->x0 / (float)font->bitmap.width, c->y1 / (float)font->bitmap.height), vec2f_make(c->x1 / (float)font->bitmap.width, c->y0 / (float)font->bitmap.height), &font->bitmap, 0.0f);
-
-            origin.x += font->chars[font_char_index].xadvance / 64;
+            current_point.x += font->chars[font_char_index].xadvance;
         }
     }
 }

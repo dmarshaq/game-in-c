@@ -832,6 +832,18 @@ void draw_quad_data(float *quad_data) {
 
 Font_Baked font_bake(u8 *font_data, float font_size) {
     Font_Baked result;
+    
+    // Init font info.
+    stbtt_fontinfo info;
+    stbtt_InitFont(&info, font_data, 0);
+
+    // Initing needed variables. @Temporary: Maybe move some of this variables into font struct directly and calculate when baking bitmap.
+    s32 ascent, descent, line_gap;
+    stbtt_GetFontVMetrics(&info, &ascent, &descent, &line_gap);
+
+    float scale = stbtt_ScaleForPixelHeight(&info, font_size);
+    result.line_height = (s32)((ascent - descent + line_gap) * scale);
+    result.baseline = (s32)(ascent * -scale);
 
     // Create a bitmap.
     result.bitmap.width    = 512;
@@ -859,6 +871,17 @@ Font_Baked font_bake(u8 *font_data, float font_size) {
     free(bitmap);
 
     return result;
+}
+
+void font_free(Font_Baked *font) {
+    free(font->chars);
+    font->line_height = 0;
+    font->baseline = 0;
+    font->first_char_code = 0;
+    font->chars_count = 0;
+    font->bitmap.height = 0;
+    font->bitmap.width = 0;
+    font->bitmap.id = -1;
 }
 
 
