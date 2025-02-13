@@ -28,7 +28,7 @@ void start() {
     u64 font_size;
     u8* font_data = read_file_into_buffer("res/font/Nasa21-l23X.ttf", &font_size);
 
-    font_baked = font_bake(font_data, 69.0f);
+    font_baked = font_bake(font_data, 20.0f);
 
     free(font_data);
 
@@ -41,13 +41,8 @@ void update() {
     
     draw_begin(&drawer);
 
-    float size = 4.0f;
 
-    // draw_quad(VEC2F_ORIGIN, vec2f_make(size, size), vec4f_make(0.3f, 0.2f, 0.3f, 1.0f), NULL, vec2f_make(0.0f, 1.0f), vec2f_make(1.0f, 0.0f), NULL, 0.0f);
-    // draw_quad(VEC2F_ORIGIN, vec2f_make(size, size), vec4f_make(1.0f, 1.0f, 1.0f, 0.5f), NULL, vec2f_make(0.0f, 1.0f), vec2f_make(1.0f, 0.0f), &font_baked.bitmap, 0.0f);
-
-    draw_text("Hello World", vec2f_make(-2.0f, 0.0f), vec4f_make(0.0f, 0.0f, 1.0f, 0.8f), &font_baked);
-
+    draw_text(" Spacejet Spacejet is a 2D structured game that is inspired by a combination\n of the roguelike genre and Galaga gameplay.\nMain goal is to write this game on C and develop a strong game development codebase for\n future projects. Development Timeline Codebase Create a new GitHub project. Create a simple project\nstructure. Game and framework, 2 file workflow. Float mathematics for game dev. \nGame loop, basic application. Foundation for graphics functionality. \nGeneric hashmap implementation.\n Advanced shader loading. Advanced texture loading. Better \ngraphics interface. Drawing interface. Immediate mode UI Development ", vec2f_make(-6.0f, 0.0f), vec4f_make(1.0f, 1.0f, 1.0f, 1.0f), &font_baked);
     draw_end();
 }
 
@@ -123,7 +118,7 @@ void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec
         p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, uv1.x, uv1.y, texture_slot, mask_slot,
     };
 
-    draw_quad_data(quad_data);
+    draw_quad_data(quad_data, 1);
 }
 
 void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *font) {

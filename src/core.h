@@ -386,7 +386,7 @@ void draw_end();
 /**
  * Simply places specified data directly into the verticies array.
  */
-void draw_quad_data(float *quad_data);
+void draw_quad_data(float *quad_data, u32 count);
 
 
 typedef struct camera {

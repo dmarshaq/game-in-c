@@ -825,8 +825,8 @@ void draw_end() {
     array_list_clear(&verticies);
 }
 
-void draw_quad_data(float *quad_data) {
-    array_list_append_multiple(&verticies, quad_data, VERTICIES_PER_QUAD * active_drawer->program->vertex_stride);
+void draw_quad_data(float *quad_data, u32 count) {
+    array_list_append_multiple(&verticies, quad_data, count * VERTICIES_PER_QUAD * active_drawer->program->vertex_stride);
 }
 
 
