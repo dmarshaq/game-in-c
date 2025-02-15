@@ -7,8 +7,19 @@ void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font);
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
 
+typedef struct time_data {
+    u32 current_time;
+    u32 delta_time_milliseconds;
+    float delta_time;
+
+    u32 last_update_time;
+    u32 accumilated_time;
+    u32 update_step_time;
+} Time_Data;
+
 const char* APP_NAME = "Spacejet";
 
+Time_Data t;
 Vec4f clear_color = vec4f_make(1.0f, 0.2f, 0.5f, 1.0f);
 Camera main_camera;
 
@@ -28,12 +39,14 @@ void start() {
     u64 font_size;
     u8* font_data = read_file_into_buffer("res/font/Nasa21-l23X.ttf", &font_size);
 
-    font_baked = font_bake(font_data, 20.0f);
+    font_baked = font_bake(font_data, 30.0f);
 
     free(font_data);
 
     main_camera = camera_make(VEC2F_ORIGIN, 64);
 }
+
+
 
 void update() {
     graphics_update_projection(&drawer, &main_camera, WINDOW_WIDTH, WINDOW_HEIGHT);
@@ -42,7 +55,7 @@ void update() {
     draw_begin(&drawer);
 
 
-    draw_text(" Spacejet Spacejet is a 2D structured game that is inspired by a combination\n of the roguelike genre and Galaga gameplay.\nMain goal is to write this game on C and develop a strong game development codebase for\n future projects. Development Timeline Codebase Create a new GitHub project. Create a simple project\nstructure. Game and framework, 2 file workflow. Float mathematics for game dev. \nGame loop, basic application. Foundation for graphics functionality. \nGeneric hashmap implementation.\n Advanced shader loading. Advanced texture loading. Better \ngraphics interface. Drawing interface. Immediate mode UI Development ", vec2f_make(-6.0f, 0.0f), vec4f_make(1.0f, 1.0f, 1.0f, 1.0f), &font_baked);
+    draw_text(" Spacejet Spacejet is a 2D structured game that is inspired by a combination\n of the roguelike genre and Galaga gameplay.\nMain goal is to write this game on C and develop a strong game development codebase for\n future projects. Development Timeline Codebase Create a new GitHub project. Create a simple project\nstructure. Game and framework, 2 file workflow. Float mathematics for game dev. \nGame loop, basic application. Foundation for graphics functionality. \nGeneric hashmap implementation.\n Advanced shader loading. Advanced texture loading. Better \ngraphics interface. Drawing interface. Immediate mode UI Development ", vec2f_make(-6.0f, 0.0f), vec4f_make(sin((double)t.current_time / 1440.0 - 0.0), sin((double)t.current_time / 1660.0 - 800.0), sin((double)t.current_time / 2200.0 - 1200.0), 1.0f), &font_baked);
     draw_end();
 }
 
@@ -71,7 +84,23 @@ int main(int argc, char *argv[]) {
     start();
 
     SDL_Event event;
+
+    t.last_update_time = 0; 
+    t.update_step_time = 10; // Milliseconds per one update time
     while (!quit) {
+        // Time management.
+        t.current_time = SDL_GetTicks();
+        t.accumilated_time += t.current_time - t.last_update_time;
+        t.last_update_time = t.current_time;
+        
+        if (t.accumilated_time < t.update_step_time) {
+            continue;
+        }
+        
+        t.delta_time_milliseconds = t.accumilated_time;
+        t.delta_time = (float)(t.delta_time_milliseconds) / 1000.0f;
+        t.accumilated_time = t.accumilated_time % t.update_step_time;
+
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
                 case SDL_QUIT:
@@ -125,9 +154,9 @@ void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *f
     u64 text_length = strlen(text);
 
     // Scale and adjust current_point.
-    current_point = vec2f_multi_constant(current_point, 64);
+    current_point = vec2f_multi_constant(current_point, (float)main_camera.unit_scale);
     float origin_x = current_point.x;
-    current_point.y += font->baseline;
+    current_point.y += (float)font->baseline;
 
     // Text rendering variables.
     s32 font_char_index;
@@ -140,7 +169,7 @@ void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *f
         // @Incomplete: Handle special characters / symbols.
         if (text[i] == '\n') {
             current_point.x = origin_x;
-            current_point.y -= font->line_height;
+            current_point.y -= (float)font->line_height;
             continue;
         }
 
@@ -151,7 +180,7 @@ void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *f
             width  = font->chars[font_char_index].x1 - font->chars[font_char_index].x0;
             height = font->chars[font_char_index].y1 - font->chars[font_char_index].y0;
 
-            draw_quad(vec2f_divide_constant(vec2f_make(current_point.x + c->xoff, current_point.y - c->yoff - height), 64), vec2f_divide_constant(vec2f_make(current_point.x + c->xoff + width, current_point.y - c->yoff), 64), color, NULL, vec2f_make(c->x0 / (float)font->bitmap.width, c->y1 / (float)font->bitmap.height), vec2f_make(c->x1 / (float)font->bitmap.width, c->y0 / (float)font->bitmap.height), &font->bitmap, 0.0f);
+            draw_quad(vec2f_divide_constant(vec2f_make(current_point.x + c->xoff, current_point.y - c->yoff - height), (float)main_camera.unit_scale), vec2f_divide_constant(vec2f_make(current_point.x + c->xoff + width, current_point.y - c->yoff), (float)main_camera.unit_scale), color, NULL, vec2f_make(c->x0 / (float)font->bitmap.width, c->y1 / (float)font->bitmap.height), vec2f_make(c->x1 / (float)font->bitmap.width, c->y0 / (float)font->bitmap.height), &font->bitmap, 0.0f);
 
             current_point.x += font->chars[font_char_index].xadvance;
         }
