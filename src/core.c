@@ -1,5 +1,6 @@
 #include "core.h"
 #include "SDL2/SDL_video.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -249,6 +250,7 @@ Transform transform_trs_2d(Vec2f position, float angle, Vec2f scale) {
 
 /**
  * File utils.
+ * @Incomplete: Fix error messages format :3 .
  */
 
 char* read_file_into_string_buffer(char *file_name) {
@@ -290,17 +292,17 @@ void* read_file_into_buffer(char *file_name, u64* file_size) {
     }
 
     fseek(file, 0, SEEK_END);
-    *file_size = ftell(file);
+    u64 size = ftell(file);
     rewind(file);
 
-    u8 *buffer = (u8*) malloc(*file_size);
+    u8 *buffer = (u8*) malloc(size);
     if (buffer == NULL) {
         printf("Error: Memory allocation for string buffer failed while reading the file \"%s\".\n", file_name);
         fclose(file);
         return NULL;
     }
 
-    if (fread(buffer, 1, *file_size, file) != *file_size) {
+    if (fread(buffer, 1, size, file) != size) {
         printf("Error: Failure reading the file \"%s\".\n", file_name);
         fclose(file);
         free(buffer);
@@ -308,6 +310,10 @@ void* read_file_into_buffer(char *file_name, u64* file_size) {
     }
 
     fclose(file);
+
+    if (file_size != NULL) {
+        *file_size = size;
+    }
 
     return buffer;
 }
@@ -523,17 +529,17 @@ void shader_set_uniforms(Shader *program) {
     // Get uniform's locations based on unifrom's name.
     s32 quad_shader_pr_matrix_loc = glGetUniformLocation(program->id, SHADER_UNIFORM_PR_MATRIX_NAME);
     if (quad_shader_pr_matrix_loc == -1) {
-        fprintf(stderr, "%s Couldn't get location of %s uniform, in quad_shader.\n", debug_error_str, SHADER_UNIFORM_PR_MATRIX_NAME);
+        fprintf(stderr, "%s Couldn't get location of %s uniform, in shader.\n", debug_error_str, SHADER_UNIFORM_PR_MATRIX_NAME);
     }
 
     s32 quad_shader_ml_matrix_loc = glGetUniformLocation(program->id, SHADER_UNIFORM_ML_MATRIX_NAME);
     if (quad_shader_ml_matrix_loc == -1) {
-        fprintf(stderr, "%s Couldn't get location of %s uniform, in quad_shader.\n", debug_error_str, SHADER_UNIFORM_ML_MATRIX_NAME);
+        fprintf(stderr, "%s Couldn't get location of %s uniform, in shader.\n", debug_error_str, SHADER_UNIFORM_ML_MATRIX_NAME);
     }
 
     s32 quad_shader_samplers_loc = glGetUniformLocation(program->id, SHADER_UNIFORM_SAMPLERS_NAME);
     if (quad_shader_samplers_loc == -1) {
-        fprintf(stderr, "%s Couldn't get location of %s uniform, in quad_shader.\n", debug_error_str, SHADER_UNIFORM_SAMPLERS_NAME);
+        fprintf(stderr, "%s Couldn't get location of %s uniform, in shader.\n", debug_error_str, SHADER_UNIFORM_SAMPLERS_NAME);
     }
     
     // Set uniforms.
@@ -658,18 +664,18 @@ Camera camera_make(Vec2f center, u32 unit_scale) {
     };
 }
 
-void graphics_update_projection(Quad_Drawer *drawer, Camera *camera, float window_width, float window_height) {
+void graphics_update_projection(Shader *shader, Camera *camera, float window_width, float window_height) {
     float camera_width_offset = (window_width / (float) camera->unit_scale) / 2;
     float camera_height_offset = (window_height / (float) camera->unit_scale) / 2;
     shader_uniform_pr_matrix = matrix4f_orthographic(camera->center.x - camera_width_offset, camera->center.x + camera_width_offset, camera->center.y - camera_height_offset, camera->center.y + camera_height_offset, -1.0f, 1.0f);
 
-    s32 quad_shader_pr_matrix_loc = glGetUniformLocation(drawer->program->id, SHADER_UNIFORM_PR_MATRIX_NAME);
+    s32 quad_shader_pr_matrix_loc = glGetUniformLocation(shader->id, SHADER_UNIFORM_PR_MATRIX_NAME);
     if (quad_shader_pr_matrix_loc == -1) {
         fprintf(stderr, "%s Couldn't get location of %s uniform, in quad_shader.\n", debug_error_str, SHADER_UNIFORM_PR_MATRIX_NAME);
     }   
 
     // Set uniforms.
-    glUseProgram(drawer->program->id);
+    glUseProgram(shader->id);
     glUniformMatrix4fv(quad_shader_pr_matrix_loc, 1, GL_FALSE, shader_uniform_pr_matrix.array);
     glUseProgram(0);
 }
@@ -719,6 +725,7 @@ void drawer_init(Quad_Drawer *drawer, Shader *shader) {
 }
 
 
+
 u8 texture_ids_filled_length = 0;
 
 float add_texture_to_slots(Texture *texture) {
@@ -737,44 +744,6 @@ float add_texture_to_slots(Texture *texture) {
 
 
 Quad_Drawer *active_drawer = NULL;
-
-void print_verticies() {
-    printf("\n---------- VERTICIES -----------\n");
-    u32 length = array_list_length(&verticies);
-    if (length == 0) {
-        printf("[ ]\n");
-    }
-    else {
-        printf("[ ");
-        for (u32 i = 0; i < length - 1; i++) {
-            printf("%6.1f, ", verticies[i]);
-            if ((i + 1) % active_drawer->program->vertex_stride == 0)
-                printf("\n  ");
-        }
-        printf("%6.1f  ]\n", verticies[length - 1]);
-    }
-
-    printf("Length   : %8d\n", length);
-    printf("Capacity : %8d\n\n", array_list_capacity(&verticies));
-    
-}
-
-void print_indicies() {
-    printf("\n----------- INDICIES -----------\n");
-    printf("[\n\n  ");
-    u32 length = array_list_length(&quad_indicies);
-    for (u32 i = 0; i < length; i++) {
-        if ((i + 1) % 6 == 0)
-            printf("%4d\n\n  ", quad_indicies[i]);
-        else if ((i + 1) % 3 == 0)
-            printf("%4d\n  ", quad_indicies[i]);
-        else
-            printf("%4d, ", quad_indicies[i]);
-    }
-    printf("\r]\n");
-    printf("Length   : %8d\n", length);
-    printf("Capacity : %8d\n\n", array_list_capacity(&quad_indicies));
-}
 
 void draw_begin(Quad_Drawer* drawer) {
     active_drawer = drawer;
@@ -942,7 +911,133 @@ void test_font() {
     // Clean up
     stbtt_FreeBitmap(bitmap, NULL);
     free(fontBuffer);
-
 }
 
 
+void line_drawer_init(Line_Drawer *drawer, Shader *shader) {
+    drawer->program = shader;
+
+    // Setting Vertex Objects for render using OpenGL. Also seeting up Element Buffer Object for indices to load.
+    glGenVertexArrays(1, &drawer->vao);
+    glGenBuffers(1, &drawer->vbo);
+
+    // 1. Bind Vertex Array Object. [VAO]
+    glBindVertexArray(drawer->vao);
+    
+    // 2. Copy verticies array in a buffer for OpenGL to use. [VBO].
+    glBindBuffer(GL_ARRAY_BUFFER, drawer->vbo);
+    glBufferData(GL_ARRAY_BUFFER, drawer->program->vertex_stride * VERTICIES_PER_QUAD * MAX_QUADS_PER_BATCH * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+
+    // 3. Set vertex attributes pointers. [VAO, VBO].
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    // 4. Unbind EBO, VBO and VAO.
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
+    shader_set_uniforms(drawer->program);
+}
+
+
+Line_Drawer *active_line_drawer = NULL;
+
+void line_draw_begin(Line_Drawer* drawer) {
+    active_line_drawer = drawer;
+}
+
+void line_draw_end() {
+    // Bind buffers, program, textures.
+    glUseProgram(active_line_drawer->program->id);
+
+    glBindVertexArray(active_line_drawer->vao);
+    glBindBuffer(GL_ARRAY_BUFFER, active_line_drawer->vbo);
+
+
+    u32 batch_stride = MAX_LINES_PER_BATCH * VERTICIES_PER_LINE * active_line_drawer->program->vertex_stride;
+    // Spliting all data on equal batches, and processing each batch in each draw call.
+    u32 batches = array_list_length(&verticies) / batch_stride;
+    for (u32 i = 0; i < batches; i++) {
+        glBufferSubData(GL_ARRAY_BUFFER, 0, batch_stride * sizeof(float), verticies + (i * batch_stride));
+        glDrawArrays(GL_LINES, 0, MAX_LINES_PER_BATCH * VERTICIES_PER_LINE);
+    }
+    
+    // Data that didn't group into full batch, rendered in last draw call.
+    u32 float_attributes_left = (array_list_length(&verticies) - batch_stride * batches);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, float_attributes_left * sizeof(float), verticies + (batches * batch_stride));
+    glDrawArrays(GL_LINES, 0, float_attributes_left / active_line_drawer->program->vertex_stride);
+
+
+    // Unbinding of buffers after use.
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    
+    glUseProgram(0);
+
+    // Clean up.
+    active_line_drawer = NULL;
+    array_list_clear(&verticies);
+}
+
+void draw_line_data(float *line_data, u32 count) {
+    array_list_append_multiple(&verticies, line_data, count * VERTICIES_PER_LINE * active_line_drawer->program->vertex_stride);
+}
+
+
+
+
+
+
+
+
+
+
+void print_verticies() {
+    u32 stride = 1;
+    if (active_drawer != NULL) {
+        stride = active_drawer->program->vertex_stride;
+    }
+    if (active_line_drawer != NULL) {
+        stride = active_line_drawer->program->vertex_stride;
+    }
+
+    printf("\n---------- VERTICIES -----------\n");
+    u32 length = array_list_length(&verticies);
+    if (length == 0) {
+        printf("[ ]\n");
+    }
+    else {
+        printf("[ ");
+        for (u32 i = 0; i < length - 1; i++) {
+            printf("%6.1f, ", verticies[i]);
+            if ((i + 1) % stride == 0)
+                printf("\n  ");
+        }
+        printf("%6.1f  ]\n", verticies[length - 1]);
+    }
+
+    printf("Length   : %8d\n", length);
+    printf("Capacity : %8d\n\n", array_list_capacity(&verticies));
+    
+}
+
+void print_indicies() {
+    printf("\n----------- INDICIES -----------\n");
+    printf("[\n\n  ");
+    u32 length = array_list_length(&quad_indicies);
+    for (u32 i = 0; i < length; i++) {
+        if ((i + 1) % 6 == 0)
+            printf("%4d\n\n  ", quad_indicies[i]);
+        else if ((i + 1) % 3 == 0)
+            printf("%4d\n  ", quad_indicies[i]);
+        else
+            printf("%4d, ", quad_indicies[i]);
+    }
+    printf("\r]\n");
+    printf("Length   : %8d\n", length);
+    printf("Capacity : %8d\n\n", array_list_capacity(&quad_indicies));
+}

@@ -212,6 +212,16 @@ typedef struct vec4f {
 
 #define vec4f_make(x, y, z, w)              ((Vec4f) { x, y, z, w } )
 
+#define VEC4F_WHITE                         ((Vec4f) { 1.0f,  1.0f,  1.0f,  1.0f } )
+#define VEC4F_BLACK                         ((Vec4f) { 0.0f,  0.0f,  0.0f,  1.0f } )
+#define VEC4F_GREY                          ((Vec4f) { 0.4f,  0.4f,  0.4f,  1.0f } )
+#define VEC4F_RED                           ((Vec4f) { 1.0f,  0.0f,  0.0f,  1.0f } )
+#define VEC4F_GREEN                         ((Vec4f) { 0.0f,  1.0f,  0.0f,  1.0f } )
+#define VEC4F_BLUE                          ((Vec4f) { 0.0f,  0.0f,  1.0f,  1.0f } )
+#define VEC4F_YELLOW                        ((Vec4f) { 1.0f,  1.0f,  0.0f,  1.0f } )
+#define VEC4F_PINK                          ((Vec4f) { 1.0f,  0.0f,  1.0f,  1.0f } )
+#define VEC4F_CYAN                          ((Vec4f) { 0.0f,  1.0f,  1.0f,  1.0f } )
+
 #define vec4f_print(v1)                     printf(#v1 " = ( % 2.2f , % 2.2f , % 2.2f , % 2.2f )\n", v1.x, v1.y, v1.z, v1.w)
 
 typedef struct matrix4f {
@@ -359,7 +369,7 @@ typedef struct quad_drawer {
     Shader *program;    // Pointer to shader that will be used to draw.
 } Quad_Drawer;
 
-#define MAX_QUADS_PER_BATCH     1
+#define MAX_QUADS_PER_BATCH     32
 #define VERTICIES_PER_QUAD      4
 #define INDICIES_PER_QUAD       6
 
@@ -399,7 +409,7 @@ Camera camera_make(Vec2f center, u32 unit_scale);
 /**
  * @Incomplete: Write description.
  */
-void graphics_update_projection(Quad_Drawer *drawer, Camera *camera, float window_width, float window_height);
+void graphics_update_projection(Shader *shader, Camera *camera, float window_width, float window_height);
 
 
 typedef struct font_baked {
@@ -415,6 +425,36 @@ Font_Baked font_bake(u8 *font_data, float font_size);
 
 void font_free(Font_Baked *font);
 
+
+typedef struct line_drawer {
+    u32 vao;            // OpenGL id of Vertex Array Object.
+    u32 vbo;            // OpenGL id of Vertex Buffer Object.
+
+    Shader *program;    // Pointer to shader that will be used to draw.
+} Line_Drawer;
+
+#define MAX_LINES_PER_BATCH     32
+#define VERTICIES_PER_LINE      2
+
+/**
+ * @Incomplete: Write description.
+ */
+void line_drawer_init(Line_Drawer *drawer, Shader *shader);
+
+/**
+ * @Incomplete: Write description.
+ */
+void line_draw_begin(Line_Drawer *drawer);
+
+/**
+ * @Incomplete: Write description.
+ */
+void line_draw_end();
+
+/**
+ * @Incomplete: Write description.
+ */
+void draw_line_data(float *line_data, u32 count);
 
 
 

@@ -1,8 +1,10 @@
 #include "core.h"
+#include <math.h>
 #include <stdio.h>
 
 void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle);
 void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font);
+void draw_line(Vec2f p0, Vec2f p1, Vec4f color);
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
@@ -17,45 +19,95 @@ typedef struct time_data {
     u32 update_step_time;
 } Time_Data;
 
-const char* APP_NAME = "Spacejet";
+const char* APP_NAME = "Game in C";
 
 Time_Data t;
-Vec4f clear_color = vec4f_make(1.0f, 0.2f, 0.5f, 1.0f);
+Vec4f clear_color = vec4f_make(0.2f, 0.2f, 0.2f, 1.0f);
 Camera main_camera;
 
 Shader quad_shader;
 Quad_Drawer drawer;
 
-Font_Baked font_baked;
+Font_Baked font_baked_medium;
+Font_Baked font_baked_small;
+
+
+Shader line_shader;
+Line_Drawer line_drawer;
 
 void start() {
+    // Shader loading.
     quad_shader = shader_load("res/shader/quad.glsl");
     quad_shader.vertex_stride = 11;
+
+    // Drawer init.
     drawer_init(&drawer, &quad_shader);
 
-    clear_color = vec4f_make(0.2f, 0.4f, 0.2f, 1.0f);
-    vec4f_print(clear_color);
-    
-    u64 font_size;
-    u8* font_data = read_file_into_buffer("res/font/Nasa21-l23X.ttf", &font_size);
 
-    font_baked = font_bake(font_data, 30.0f);
+    // Shader loading.
+    line_shader = shader_load("res/shader/line.glsl");
+    line_shader.vertex_stride = 7;
 
+    // Drawer init.
+    line_drawer_init(&line_drawer, &line_shader);
+
+
+    // Font loading.
+    u8* font_data = read_file_into_buffer("res/font/font.ttf", NULL);
+    font_baked_medium = font_bake(font_data, 20.0f);
+    font_baked_small = font_bake(font_data, 16.0f);
     free(font_data);
-
+    
+    // Main camera init.
     main_camera = camera_make(VEC2F_ORIGIN, 64);
 }
 
-
+float angle = 0;
+Vec2f cyan_vec;
+char buffer[50];
 
 void update() {
-    graphics_update_projection(&drawer, &main_camera, WINDOW_WIDTH, WINDOW_HEIGHT);
+    // Updating projection.
+    graphics_update_projection(drawer.program, &main_camera, WINDOW_WIDTH, WINDOW_HEIGHT);
 
-    
+
+    // Drawing: Always between draw_begin() and draw_end().
     draw_begin(&drawer);
 
+    // draw_text("game-in-c is a 2D structured game that will serve as a showcase product of\na simultaneously developing code base. Main goal is to write this game on C\nand create a game development codebase for future projects.", vec2f_make(-6.0f, 0.0f), vec4f_make(sinf((float)t.current_time / 1440.0f - 0.0f), sinf((float)t.current_time / 1660.0f - 800.0f), sinf((float)t.current_time / 2200.0f - 1200.0f), 1.0f), &font_baked_medium);
 
-    draw_text(" Spacejet Spacejet is a 2D structured game that is inspired by a combination\n of the roguelike genre and Galaga gameplay.\nMain goal is to write this game on C and develop a strong game development codebase for\n future projects. Development Timeline Codebase Create a new GitHub project. Create a simple project\nstructure. Game and framework, 2 file workflow. Float mathematics for game dev. \nGame loop, basic application. Foundation for graphics functionality. \nGeneric hashmap implementation.\n Advanced shader loading. Advanced texture loading. Better \ngraphics interface. Drawing interface. Immediate mode UI Development ", vec2f_make(-6.0f, 0.0f), vec4f_make(sin((double)t.current_time / 1440.0 - 0.0), sin((double)t.current_time / 1660.0 - 800.0), sin((double)t.current_time / 2200.0 - 1200.0), 1.0f), &font_baked);
+    draw_text("As seen here, it is easy to debug any vectors just by drawing lines.\nMaybe in the future it also will be possible to plot graphs to debug\nsome game math related mechanics.", vec2f_make(-5.5f, 3.6f), VEC4F_YELLOW, &font_baked_medium);
+
+    draw_end();
+
+
+    // Updating projection.
+    graphics_update_projection(line_drawer.program, &main_camera, WINDOW_WIDTH, WINDOW_HEIGHT);
+
+
+    // Line Drawing
+    line_draw_begin(&line_drawer);
+
+    cyan_vec.x = 2 * cosf(angle);
+    cyan_vec.y = 2 * sinf(angle);
+    draw_line(VEC2F_ORIGIN, cyan_vec, VEC4F_CYAN);
+    angle += PI / 12 * t.delta_time;
+
+    draw_line(VEC2F_ORIGIN, VEC2F_RIGHT,    VEC4F_RED);
+    draw_line(VEC2F_ORIGIN, VEC2F_UP,       VEC4F_GREEN);
+
+
+    line_draw_end();
+
+    // Drawing labels for vectors.
+    draw_begin(&drawer);
+
+    draw_text(" ( 1.00, 0.00 )", VEC2F_RIGHT,  VEC4F_WHITE, &font_baked_small);
+    draw_text(" ( 0.00, 1.00 )", VEC2F_UP,     VEC4F_WHITE, &font_baked_small);
+
+    sprintf(buffer, " ( %2.2f, %2.2f )", cyan_vec.x, cyan_vec.y);
+    draw_text(buffer, cyan_vec, VEC4F_WHITE, &font_baked_small);
+
     draw_end();
 }
 
@@ -185,6 +237,15 @@ void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *f
             current_point.x += font->chars[font_char_index].xadvance;
         }
     }
+}
+
+void draw_line(Vec2f p0, Vec2f p1, Vec4f color) {
+    float line_data[14] = {
+        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w,
+        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w,
+    };
+
+    draw_line_data(line_data, 1);
 }
 
 
