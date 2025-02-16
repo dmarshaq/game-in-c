@@ -1,2 +1,4 @@
-# Spacejet
-2D structured game that is inspired by a combination of the roguelike genre and Galaga like gameplay. Main goal is to write this game on C and develop a strong game development codebase for future projects.
+# Game in C
+2D structured game that will serve as a showcase product of a simultaneously developing code base.
+
+Main goal is to write this game on C and create a game development codebase for future projects.
