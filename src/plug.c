@@ -5,95 +5,95 @@ void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec
 void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font);
 void draw_line(Vec2f p0, Vec2f p1, Vec4f color);
 
-Vec4f clear_color = vec4f_make(0.2f, 0.2f, 0.2f, 1.0f);
+// Vec4f clear_color = vec4f_make(0.2f, 0.2f, 0.2f, 1.0f);
 Camera main_camera;
-
-Shader quad_shader;
-Quad_Drawer drawer;
-
-Font_Baked font_baked_medium;
-Font_Baked font_baked_small;
-
-
-Shader line_shader;
-Line_Drawer line_drawer;
+// 
+// Shader quad_shader;
+// Quad_Drawer drawer;
+// 
+// Font_Baked font_baked_medium;
+// Font_Baked font_baked_small;
+// 
+// 
+// Shader line_shader;
+// Line_Drawer line_drawer;
 
 
 void plug_init(Plug_State *state) {
-    // Shader loading.
-    quad_shader = shader_load("res/shader/quad.glsl");
-    quad_shader.vertex_stride = 11;
+    // // Shader loading.
+    // quad_shader = shader_load("res/shader/quad.glsl");
+    // quad_shader.vertex_stride = 11;
 
-    // Drawer init.
-    drawer_init(&drawer, &quad_shader);
-
-
-    // Shader loading.
-    line_shader = shader_load("res/shader/line.glsl");
-    line_shader.vertex_stride = 7;
-
-    // Drawer init.
-    line_drawer_init(&line_drawer, &line_shader);
+    // // Drawer init.
+    // drawer_init(&drawer, &quad_shader);
 
 
-    // Font loading.
-    u8* font_data = read_file_into_buffer("res/font/font.ttf", NULL);
-    font_baked_medium = font_bake(font_data, 20.0f);
-    font_baked_small = font_bake(font_data, 16.0f);
-    free(font_data);
-    
+    // // Shader loading.
+    // line_shader = shader_load("res/shader/line.glsl");
+    // line_shader.vertex_stride = 7;
+
+    // // Drawer init.
+    // line_drawer_init(&line_drawer, &line_shader);
+
+
+    // // Font loading.
+    // u8* font_data = read_file_into_buffer("res/font/font.ttf", NULL);
+    // font_baked_medium = font_bake(font_data, 20.0f);
+    // font_baked_small = font_bake(font_data, 16.0f);
+    // free(font_data);
+    // 
     // Main camera init.
     main_camera = camera_make(VEC2F_ORIGIN, 64);
 }
 
-float angle = 0;
-Vec2f cyan_vec;
-char buffer[50];
+// float angle = 0;
+// Vec2f cyan_vec;
+// char buffer[50];
 
 void plug_update(Plug_State *state) {
-    // Clear the screen with clear_color.
-    glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+    // // Clear the screen with clear_color.
+    glClearColor(1.0f, 0.2f, 0.5f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // Updating projection.
-    graphics_update_projection(drawer.program, &main_camera, 800, 600); // @Incomplete: Supply of window dimensions.
+    // // Updating projection.
+    // graphics_update_projection(drawer.program, &main_camera, 800, 600); // @Incomplete: Supply of window dimensions.
 
-    // Drawing: Always between draw_begin() and draw_end().
-    draw_begin(&drawer);
+    // // Drawing: Always between draw_begin() and draw_end().
+    // draw_begin(&drawer);
 
-    draw_text("As seen here, it is easy to debug any vectors just by drawing lines.\nMaybe in the future it also will be possible to plot graphs to debug\nsome game math related mechanics.", vec2f_make(-5.5f, 3.6f), VEC4F_YELLOW, &font_baked_medium);
+    // draw_text("As seen here, it is easy to debug any vectors just by drawing lines.\nMaybe in the future it also will be possible to plot graphs to debug\nsome game math related mechanics.", vec2f_make(-5.5f, 3.6f), VEC4F_CYAN, &font_baked_medium);
 
-    draw_end();
-
-
-    // Updating projection.
-    graphics_update_projection(line_drawer.program, &main_camera, 800, 600);
+    // draw_end();
 
 
-    // Line Drawing
-    line_draw_begin(&line_drawer);
-
-    cyan_vec.x = 2 * cosf(angle);
-    cyan_vec.y = 2 * sinf(angle);
-    draw_line(VEC2F_ORIGIN, cyan_vec, VEC4F_CYAN);
-    angle += PI / 12 * state->t->delta_time;
-
-    draw_line(VEC2F_ORIGIN, VEC2F_RIGHT,    VEC4F_RED);
-    draw_line(VEC2F_ORIGIN, VEC2F_UP,       VEC4F_GREEN);
+    // // Updating projection.
+    // graphics_update_projection(line_drawer.program, &main_camera, 800, 600);
 
 
-    line_draw_end();
+    // // Line Drawing
+    // line_draw_begin(&line_drawer);
 
-    // Drawing labels for vectors.
-    draw_begin(&drawer);
+    // cyan_vec.x = 2 * cosf(angle);
+    // cyan_vec.y = 2 * sinf(angle);
+    // draw_line(VEC2F_ORIGIN, cyan_vec, VEC4F_CYAN);
+    // angle += PI / 12 * state->t->delta_time;
 
-    draw_text(" ( 1.00, 0.00 )", VEC2F_RIGHT,  VEC4F_WHITE, &font_baked_small);
-    draw_text(" ( 0.00, 1.00 )", VEC2F_UP,     VEC4F_WHITE, &font_baked_small);
+    // draw_line(VEC2F_ORIGIN, VEC2F_RIGHT,    VEC4F_RED);
+    // draw_line(VEC2F_ORIGIN, VEC2F_UP,       VEC4F_GREEN);
 
-    sprintf(buffer, " ( %2.2f, %2.2f )", cyan_vec.x, cyan_vec.y);
-    draw_text(buffer, cyan_vec, VEC4F_WHITE, &font_baked_small);
 
-    draw_end();
+    // line_draw_end();
+
+    // // Drawing labels for vectors.
+    // draw_begin(&drawer);
+
+    // draw_text(" ( 1.00, 0.00 )", VEC2F_RIGHT,  VEC4F_WHITE, &font_baked_small);
+    // draw_text(" ( 0.00, 1.00 )", VEC2F_UP,     VEC4F_WHITE, &font_baked_small);
+
+    // sprintf(buffer, " ( %2.2f, %2.2f )", cyan_vec.x, cyan_vec.y);
+    // draw_text(buffer, cyan_vec, VEC4F_WHITE, &font_baked_small);
+
+    // draw_end();
 }
 
 void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle) {

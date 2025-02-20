@@ -1,3 +1,5 @@
+#include "libloaderapi.h"
+#include "minwindef.h"
 #include "plug.h"
 #include "core.h"
 #include <windows.h>
@@ -175,7 +177,9 @@ int main(int argc, char *argv[]) {
 
         if (is_pressed_keycode(SDLK_r)) {
             printf("hot reload!\n");
-
+            if(!reload_libplug()) {
+                fprintf(stderr, "%s Failed to hot reload plug.dll.\n", debug_error_str);
+            }
         }
 
         keyboard_state_old_update();
@@ -184,10 +188,18 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
+HMODULE mod = NULL;
+
 bool reload_libplug() {
     const char *libplug_path = "bin/plug.dll";
 
-    HMODULE mod = LoadLibrary(libplug_path);
+    if (mod != NULL) {
+        FreeLibrary(mod);
+        int result = system("make -B plug");
+        printf("Compilation result: %d\n", result);
+    }
+
+    mod = LoadLibrary(libplug_path);
     if (mod == NULL) {
         fprintf(stderr, "PLUG LOAD ERROR: Couldn't load dynamic library %s.\n", libplug_path);
         return false;
