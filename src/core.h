@@ -366,6 +366,11 @@ typedef struct texture {
  */
 Texture texture_load(char *texture_path);
 
+/**
+ * Deletes loaded OpenGL texture.
+ */
+void texture_unload(Texture *texture);
+
 
 typedef struct shader {
     u32 id;             // OpenGL program id.
@@ -376,6 +381,11 @@ typedef struct shader {
  * Loads shader from .glsl file and returns struct that contains it's OpenGL id.
  */
 Shader shader_load(char *shader_path);
+
+/**
+ * Deletes loaded OpenGL program.
+ */
+void shader_unload(Shader *shader);
 
 
 typedef struct quad_drawer {
@@ -394,6 +404,11 @@ typedef struct quad_drawer {
  * @Incomplete: Write description.
  */
 void drawer_init(Quad_Drawer *drawer, Shader *shader);
+
+/**
+ * @Incomplete: Write description.
+ */
+void drawer_free(Quad_Drawer *drawer);
 
 /**
  * @Incomplete: Write description.
@@ -457,6 +472,11 @@ typedef struct line_drawer {
  * @Incomplete: Write description.
  */
 void line_drawer_init(Line_Drawer *drawer, Shader *shader);
+
+/**
+ * @Incomplete: Write description.
+ */
+void line_drawer_free(Line_Drawer *drawer);
 
 /**
  * @Incomplete: Write description.

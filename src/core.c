@@ -550,6 +550,14 @@ Texture texture_load(char *texture_path) {
     return texture;
 }
 
+void texture_unload(Texture *texture) {
+    glDeleteTextures(1, &texture->id);
+
+    texture->id = 0;
+    texture->width = 0;
+    texture->height = 0;
+}
+
 
 const char *SHADER_UNIFORM_PR_MATRIX_NAME = "pr_matrix";
 const char *SHADER_UNIFORM_ML_MATRIX_NAME = "ml_matrix";
@@ -691,6 +699,15 @@ Shader shader_load(char *shader_path) {
     return shader;
 }
 
+void shader_unload(Shader *shader) {
+    glUseProgram(0);
+    glDeleteProgram(shader->id);
+    
+    shader->id = 0;
+    shader->vertex_stride = 0;
+}
+
+
 Camera camera_make(Vec2f center, u32 unit_scale) {
     return (Camera) {
         .center = center,
@@ -756,6 +773,17 @@ void drawer_init(Quad_Drawer *drawer, Shader *shader) {
     glBindVertexArray(0);
 
     shader_set_uniforms(drawer->program);
+}
+
+void drawer_free(Quad_Drawer *drawer) {
+    glDeleteVertexArrays(1, &drawer->vao); 
+    glDeleteBuffers(1, &drawer->vbo); 
+    glDeleteBuffers(1, &drawer->ebo); 
+
+    drawer->program = NULL;
+    drawer->vao = 0;
+    drawer->vbo = 0;
+    drawer->ebo = 0;
 }
 
 
@@ -882,9 +910,7 @@ void font_free(Font_Baked *font) {
     font->baseline = 0;
     font->first_char_code = 0;
     font->chars_count = 0;
-    font->bitmap.height = 0;
-    font->bitmap.width = 0;
-    font->bitmap.id = -1;
+    texture_unload(&font->bitmap);
 }
 
 
@@ -975,6 +1001,15 @@ void line_drawer_init(Line_Drawer *drawer, Shader *shader) {
     glBindVertexArray(0);
 
     shader_set_uniforms(drawer->program);
+}
+
+void line_drawer_free(Line_Drawer *drawer) {
+    glDeleteVertexArrays(1, &drawer->vao); 
+    glDeleteBuffers(1, &drawer->vbo); 
+
+    drawer->program = NULL;
+    drawer->vao = 0;
+    drawer->vbo = 0;
 }
 
 

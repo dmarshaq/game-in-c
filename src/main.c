@@ -1,5 +1,3 @@
-#include "libloaderapi.h"
-#include "minwindef.h"
 #include "plug.h"
 #include "core.h"
 #include <windows.h>
@@ -109,12 +107,12 @@ Time_Data t;
 bool reload_libplug();
 
 Plug_Init plug_init = NULL;
+Plug_Load plug_load = NULL;
+Plug_Unload plug_unload = NULL;
 Plug_Update plug_update = NULL;
 Plug_State state;
 
 int main(int argc, char *argv[]) {
-    reload_libplug();
-    state.t = &t;
 
 
     if (init_sdl_gl()) {
@@ -138,7 +136,11 @@ int main(int argc, char *argv[]) {
     graphics_init();
 
 
+    state.t = &t;
     state.quit = false;
+
+    reload_libplug();
+
     plug_init(&state);
 
 
@@ -194,6 +196,7 @@ bool reload_libplug() {
     const char *libplug_path = "bin/plug.dll";
 
     if (mod != NULL) {
+        plug_unload(&state);
         FreeLibrary(mod);
         int result = system("make -B plug");
         printf("Compilation result: %d\n", result);
@@ -201,22 +204,35 @@ bool reload_libplug() {
 
     mod = LoadLibrary(libplug_path);
     if (mod == NULL) {
-        fprintf(stderr, "PLUG LOAD ERROR: Couldn't load dynamic library %s.\n", libplug_path);
+        fprintf(stderr, "%s Couldn't load dynamic library %s.\n", debug_error_str, libplug_path);
         return false;
     }
 
     plug_init = (Plug_Init)GetProcAddress(mod, "plug_init");
     if (plug_init == NULL) {
-        fprintf(stderr, "PLUG LOAD ERROR: Couldn't get adress plug_init function from %s.\n", libplug_path);
+        fprintf(stderr, "%s Couldn't get adress plug_init function from %s.\n", debug_error_str, libplug_path);
+        return false;
+    }
+
+    plug_load = (Plug_Load)GetProcAddress(mod, "plug_load");
+    if (plug_load == NULL) {
+        fprintf(stderr, "%s Couldn't get adress plug_load function from %s.\n", debug_error_str, libplug_path);
+        return false;
+    }
+
+    plug_unload = (Plug_Unload)GetProcAddress(mod, "plug_unload");
+    if (plug_unload == NULL) {
+        fprintf(stderr, "%s Couldn't get adress plug_unload function from %s.\n", debug_error_str, libplug_path);
         return false;
     }
 
     plug_update = (Plug_Update)GetProcAddress(mod, "plug_update");
     if (plug_update == NULL) {
-        fprintf(stderr, "PLUG LOAD ERROR: Couldn't get adress plug_update function from %s.\n", libplug_path);
+        fprintf(stderr, "%s Couldn't get adress plug_update function from %s.\n", debug_error_str, libplug_path);
         return false;
     }
 
+    plug_load(&state);
     return true;
 }
 

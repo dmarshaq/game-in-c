@@ -12,9 +12,6 @@ void plug_init(Plug_State *state) {
 void plug_load(Plug_State *state) {
     state->clear_color = VEC4F_BLACK;
 
-    // Main camera init.
-    state->main_camera = camera_make(VEC2F_ORIGIN, 64);
-
     // Shader loading.
     state->quad_shader = shader_load("res/shader/quad.glsl");
     state->quad_shader.vertex_stride = 11;
@@ -67,10 +64,7 @@ void plug_update(Plug_State *state) {
 
     draw_text("As seen here, it is easy to debug any vectors just by drawing lines.\nMaybe in the future it also will be possible to plot graphs to debug\nsome game math related mechanics.", vec2f_make(-5.5f, 3.6f), VEC4F_CYAN, &state->font_baked_medium, state->main_camera.unit_scale);
 
-
-    draw_text("Hello from hot reload!", vec2f_make(-1.5f, -3.6f), VEC4F_WHITE, &state->font_baked_medium, state->main_camera.unit_scale);
-
-    draw_end();
+     draw_end();
 
 
     // Updating projection.
