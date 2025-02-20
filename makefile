@@ -24,22 +24,31 @@ BIN_DIR = bin
 # Target executable
 TARGET = $(BIN_DIR)/main.exe
 
-# Source and object files
-SRC_FILES = $(wildcard $(SRC_DIR)/*.c)
-OBJ_FILES = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_FILES))
+# Target plug dll
+TARGET_PLUG_DLL = $(BIN_DIR)/plug.dll
+
+# Target core dll
+TARGET_CORE_DLL = $(BIN_DIR)/core.dll
+
+# Automatic sourcing.
+## SRC_FILES = $(wildcard $(SRC_DIR)/*.c)
+## OBJ_FILES = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_FILES))
+
+# Manual sourcing.
+SRC_FILES = $(SRC_DIR)/main.c
+OBJ_FILES = $(OBJ_DIR)/main.o
 
 # Default target
-all: run
+all: clean core plug main
+	./$(TARGET)
 
-clean-run: clean run
-
-# Link object files into the final executable
-$(TARGET): $(OBJ_FILES) | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBFLAGS)
-
-# Compile each source file into an object file
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
-	$(CC) $(CFLAGS) -c $< -o $@
+# # Link object files into the final executable
+# $(TARGET): $(OBJ_FILES) | $(BIN_DIR)
+# 	$(CC) $(CFLAGS) -o $@ $^ $(LIBFLAGS) -Lbin/ -lcore
+# 
+# # Compile each source file into an object file
+# $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
+# 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Create directories if they don't exist
 $(OBJ_DIR):
@@ -48,13 +57,30 @@ $(OBJ_DIR):
 $(BIN_DIR):
 	mkdir $(BIN_DIR)
 
-# Run rule
-run: $(TARGET)
-	./$(TARGET)
+# Link into core dll
+$(TARGET_CORE_DLL):
+	$(CC) $(CFLAGS) -o ./$(TARGET_CORE_DLL) -fPIC -shared src/core.c $(LIBFLAGS)
+
+# Link into plug dll
+$(TARGET_PLUG_DLL):
+	$(CC) $(CFLAGS) -o ./$(TARGET_PLUG_DLL) -fPIC -shared src/plug.c $(LIBFLAGS) -Lbin/ -lcore
+
+# Link into main exe
+$(TARGET):
+	$(CC) $(CFLAGS) -o ./$(TARGET) src/main.c $(LIBFLAGS) -Lbin/ -lcore
+
+
+core: $(TARGET_CORE_DLL)
+
+plug: $(TARGET_PLUG_DLL)
+
+main: $(TARGET)
+
 
 # Clean build artifacts
 clean:
 	rm -f $(OBJ_DIR)/*.o
+	rm -f $(BIN_DIR)/*.dll
 	rm -f $(BIN_DIR)/*.exe
 
 

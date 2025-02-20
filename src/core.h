@@ -312,6 +312,23 @@ String_8 read_file_into_str8(char *file_name);
 #include "stb_truetype.h"
 
 /**
+ * Input
+ */
+void keyboard_state_init();
+
+void keyboard_state_old_update();
+
+void keyboard_state_free();
+
+
+bool is_hold_keycode(SDL_KeyCode keycode);
+
+bool is_pressed_keycode(SDL_KeyCode keycode);
+
+bool is_unpressed_keycode(SDL_KeyCode keycode);
+
+
+/**
  * @Incomplete: Write description.
  */
 bool check_gl_error();
@@ -457,6 +474,18 @@ void line_draw_end();
 void draw_line_data(float *line_data, u32 count);
 
 
+/**
+ * Time.
+ */
+typedef struct time_data {
+    u32 current_time;
+    u32 delta_time_milliseconds;
+    float delta_time;
+
+    u32 last_update_time;
+    u32 accumilated_time;
+    u32 update_step_time;
+} Time_Data;
 
 
 

@@ -354,6 +354,40 @@ String_8 read_file_into_str8(char *file_name) {
     return str;
 }
 
+/**
+ * Input.
+ */
+
+u8 *KEYBOARD_STATE_OLD;
+const u8 *KEYBOARD_STATE_CURRENT;
+s32 KEYBOARD_NUMBER_OF_KEYS;
+
+void keyboard_state_free() {
+    free(KEYBOARD_STATE_OLD);
+}
+
+void keyboard_state_old_update() {
+    memcpy(KEYBOARD_STATE_OLD, KEYBOARD_STATE_CURRENT, KEYBOARD_NUMBER_OF_KEYS);
+}
+
+void keyboard_state_init() {
+    KEYBOARD_STATE_CURRENT = SDL_GetKeyboardState(&KEYBOARD_NUMBER_OF_KEYS);
+    KEYBOARD_STATE_OLD = malloc(KEYBOARD_NUMBER_OF_KEYS);
+    keyboard_state_old_update();
+}
+
+bool is_hold_keycode(SDL_KeyCode keycode) {
+    return *(KEYBOARD_STATE_CURRENT + SDL_GetScancodeFromKey(keycode)) == 1;
+}
+
+bool is_pressed_keycode(SDL_KeyCode keycode) {
+    return *(KEYBOARD_STATE_OLD + SDL_GetScancodeFromKey(keycode)) == 0 && *(KEYBOARD_STATE_CURRENT + SDL_GetScancodeFromKey(keycode)) == 1;
+}
+
+bool is_unpressed_keycode(SDL_KeyCode keycode) {
+    return *(KEYBOARD_STATE_OLD + SDL_GetScancodeFromKey(keycode)) == 1 && *(KEYBOARD_STATE_CURRENT + SDL_GetScancodeFromKey(keycode)) == 0;
+}
+
 
 /**
  * Graphics.
