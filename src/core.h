@@ -251,6 +251,9 @@ Transform transform_srt_2d(Vec2f position, float angle, Vec2f scale);
 Transform transform_trs_2d(Vec2f position, float angle, Vec2f scale);
 
 
+typedef float (*Function)(float x);
+
+
 /**
  * This macro uses [ domain_start, domain_end ] to specify domain boundaries, and checks if value inside that domain.
  */
@@ -386,6 +389,8 @@ Shader shader_load(char *shader_path);
  * Deletes loaded OpenGL program.
  */
 void shader_unload(Shader *shader);
+
+void shader_set_uniforms(Shader *shader);
 
 
 typedef struct quad_drawer {

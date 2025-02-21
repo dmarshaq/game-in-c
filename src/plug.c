@@ -4,6 +4,8 @@
 void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle);
 void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale);
 void draw_line(Vec2f p0, Vec2f p1, Vec4f color);
+void draw_function(float x0, float x1, Function y, u32 detail, Vec4f color);
+void draw_parametric(float t0, float t1, Function x, Function y, u32 detail, Vec4f color);
 
 
 void plug_init(Plug_State *state) {
@@ -18,6 +20,11 @@ void plug_load(Plug_State *state) {
     // Shader loading.
     state->quad_shader = shader_load("res/shader/quad.glsl");
     state->quad_shader.vertex_stride = 11;
+
+
+    state->grid_shader = shader_load("res/shader/grid.glsl");
+    state->grid_shader.vertex_stride = 11;
+    shader_set_uniforms(&state->grid_shader);
 
     // Drawer init.
     drawer_init(&state->drawer, &state->quad_shader);
@@ -44,6 +51,7 @@ void plug_load(Plug_State *state) {
 void plug_unload(Plug_State *state) {
     shader_unload(&state->quad_shader);
     shader_unload(&state->line_shader);
+    shader_unload(&state->grid_shader);
 
     drawer_free(&state->drawer);
     line_drawer_free(&state->line_drawer);
@@ -53,7 +61,6 @@ void plug_unload(Plug_State *state) {
     font_free(&state->font_baked_small);
 }
 
-
 void plug_update(Plug_State *state) {
     // Clear the screen with clear_color.
     glClearColor(state->clear_color.x, state->clear_color.y, state->clear_color.z, state->clear_color.w);
@@ -61,8 +68,22 @@ void plug_update(Plug_State *state) {
 
     // Updating projection.
     graphics_update_projection(state->drawer.program, &state->main_camera, 800, 600); // @Incomplete: Supply of window dimensions.
+    
 
+
+    Vec2f p0, p1;
+    p0 = vec2f_make(-8.0f, -5.0f);
+    p1 = vec2f_make(8.0f, 5.0f);
+    // Draw background grid.
+    state->drawer.program = &state->grid_shader;
+    draw_begin(&state->drawer);
+    
+    draw_quad(p0, p1, vec4f_make(1.0f, 1.0f, 1.0f, 0.3f), NULL, p0, p1, NULL, 0.0f);
+
+    draw_end();
+    
     // Drawing: Always between draw_begin() and draw_end().
+    state->drawer.program = &state->quad_shader;
     draw_begin(&state->drawer);
 
     draw_text("As seen here, it is easy to debug any vectors just by drawing lines.\nMaybe in the future it also will be possible to plot graphs to debug\nsome game math related mechanics.", vec2f_make(-5.5f, 3.6f), VEC4F_CYAN, &state->font_baked_medium, state->main_camera.unit_scale);
@@ -79,6 +100,8 @@ void plug_update(Plug_State *state) {
 
     // Line Drawing
     line_draw_begin(&state->line_drawer);
+
+    draw_function(-4.0f, 4.0f, floorf, 32, VEC4F_YELLOW);
 
     Vec2f cyan_vec;
     cyan_vec.x = 2 * cosf(state->angle);
@@ -177,4 +200,55 @@ void draw_line(Vec2f p0, Vec2f p1, Vec4f color) {
     draw_line_data(line_data, 1);
 }
 
+void draw_function(float x0, float x1, Function y, u32 detail, Vec4f color) {
+    float line_data[detail * 14];
+
+    float step = (x1 - x0) / (float)detail;
+    for (u32 i = 0; i < detail; i++) {
+        line_data[0  + i * 14] = x0 + step * (float)i;
+        line_data[1  + i * 14] = y(x0 + step * (float)i);
+        line_data[2  + i * 14] = 0.0f;
+        line_data[3  + i * 14] = color.x;
+        line_data[4  + i * 14] = color.y;
+        line_data[5  + i * 14] = color.z;
+        line_data[6  + i * 14] = color.w;
+                     
+        line_data[7  + i * 14] = x0 + step * (float)(i + 1);
+        line_data[8  + i * 14] = y(x0 + step * (float)(i + 1));
+        line_data[9  + i * 14] = 0.0f;
+        line_data[10 + i * 14] = color.x;
+        line_data[11 + i * 14] = color.y;
+        line_data[12 + i * 14] = color.z;
+        line_data[13 + i * 14] = color.w;
+    }
+    
+   
+    draw_line_data(line_data, detail);
+}
+
+void draw_parametric(float t0, float t1, Function x, Function y, u32 detail, Vec4f color) {
+    float line_data[detail * 14];
+
+    float step = (t1 - t0) / (float)detail;
+    for (u32 i = 0; i < detail; i++) {
+        line_data[0  + i * 14] = x(t0 + step * (float)i);
+        line_data[1  + i * 14] = y(t0 + step * (float)i);
+        line_data[2  + i * 14] = 0.0f;
+        line_data[3  + i * 14] = color.x;
+        line_data[4  + i * 14] = color.y;
+        line_data[5  + i * 14] = color.z;
+        line_data[6  + i * 14] = color.w;
+
+        line_data[7  + i * 14] = x(t0 + step * (float)(i + 1));
+        line_data[8  + i * 14] = y(t0 + step * (float)(i + 1));
+        line_data[9  + i * 14] = 0.0f;
+        line_data[10 + i * 14] = color.x;
+        line_data[11 + i * 14] = color.y;
+        line_data[12 + i * 14] = color.z;
+        line_data[13 + i * 14] = color.w;
+    }
+    
+   
+    draw_line_data(line_data, detail);
+}
 

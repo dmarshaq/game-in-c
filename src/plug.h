@@ -15,6 +15,7 @@ typedef struct {
     float angle;
     
     Shader quad_shader;
+    Shader grid_shader;
     Quad_Drawer drawer;
     Font_Baked font_baked_medium;
     Font_Baked font_baked_small;
