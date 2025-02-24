@@ -43,6 +43,8 @@ int main(int argc, char *argv[]) {
 
     state.t = &t;
     state.quit = false;
+    state.window_width = WINDOW_WIDTH;
+    state.window_height = WINDOW_HEIGHT;
 
     reload_libplug();
 

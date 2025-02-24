@@ -122,37 +122,76 @@ u32 str8_index_of_string(String_8 *str, char *search_string, u32 start, u32 end)
  */
 u32 str8_index_of_char(String_8 *str, char character, u32 start, u32 end);
 
+
+/**
+ * Dynamic array.
+ */
+
+typedef struct dynamic_array_header {
+    u32 capacity;
+    u32 length;
+    u32 item_size;
+} Dynamic_Array_Header;
+
+void*   _dynamic_array_make(u32 item_size, u32 initial_capacity);
+u32     _dynamic_array_length(void *array);
+u32     _dynamic_array_capacity(void *array);
+u32     _dynamic_array_item_size(void *array);
+void    _dynamic_array_resize(void **array, u32 new_capacity);
+void    _dynamic_array_free(void **array);
+
 /**
  * Array list.
  */
 
-#define array_list_make(type, capacity)                             (type *)_array_list_make(sizeof(type), capacity)
-#define array_list_length(ptr_list)                                 _array_list_length((void*)*ptr_list)
-#define array_list_capacity(ptr_list)                               _array_list_capacity((void*)*ptr_list)
-#define array_list_item_size(ptr_list)                              _array_list_item_size((void*)*ptr_list)
+#define array_list_make(type, capacity)                             (type *)_dynamic_array_make(sizeof(type), capacity)
+#define array_list_length(ptr_list)                                 _dynamic_array_length((void*)*ptr_list)
+#define array_list_capacity(ptr_list)                               _dynamic_array_capacity((void*)*ptr_list)
+#define array_list_item_size(ptr_list)                              _dynamic_array_item_size((void*)*ptr_list)
 #define array_list_append(ptr_list, ptr_item)                       _array_list_append((void**)ptr_list, (void*)ptr_item, 1)
 #define array_list_append_multiple(ptr_list, item_arr, count)       _array_list_append((void**)ptr_list, (void*)item_arr, count)
 #define array_list_pop(ptr_list)                                    _array_list_pop((void*)*ptr_list, 1)
 #define array_list_pop_multiple(ptr_list, count)                    _array_list_pop((void*)*ptr_list, count)
 #define array_list_clear(ptr_list)                                  _array_list_clear((void*)*ptr_list)
-#define array_list_free(ptr_list)                                   _array_list_free((void**)ptr_list)
+#define array_list_free(ptr_list)                                   _dynamic_array_free((void**)ptr_list)
 #define array_list_unordered_remove(ptr_list, index)                _array_list_unordered_remove((void*)*ptr_list, index)
 
-typedef struct array_list_header {
-    u32 capacity;
-    u32 length;
-    u32 item_size;
-} Array_List_Header;
+typedef Dynamic_Array_Header Array_List_Header;
 
-void*   _array_list_make(u32 item_size, u32 capacity);
-u32     _array_list_length(void *list);
-u32     _array_list_capacity(void *list);
-u32     _array_list_item_size(void *list);
 void    _array_list_append(void **list, void *item, u32 count);
 void    _array_list_pop(void *list, u32 count);
 void    _array_list_clear(void *list);
-void    _array_list_free(void **list);
 void    _array_list_unordered_remove(void *list, u32 index);
+
+/**
+ * Hashmap.
+ */
+
+#define hashmap_make(item_type, capacity)                           _hashmap_make(sizeof(item_type), capacity) 
+#define hashmap_put(ptr_map, ptr_key, key_size, ptr_item)           _hashmap_put(ptr_map, ptr_key, key_size, ptr_item, 1) 
+#define hashmap_get(ptr_map, ptr_key, key_size, item_type)          (item_type *)_hashmap_get(ptr_map, ptr_key, key_size) 
+#define hashmap_remove(ptr_map, ptr_key, key_size)                  _hashmap_remove(ptr_map, ptr_key, key_size) 
+#define hashmap_count(ptr_map)                                      _dynamic_array_length(ptr_map->buffer)
+#define hashmap_capacity(ptr_map)                                   _dynamic_array_capacity(ptr_map->buffer)
+#define hashmap_item_size(ptr_map)                                  _dynamic_array_item_size(ptr_map->buffer)
+#define hashmap_free(ptr_map)                                       _dynamic_array_free(&ptr_map->buffer)
+
+typedef u32 (*Hashfunc)(void *, u32);
+
+typedef struct hashmap {
+    void *buffer;
+    Hashfunc hash_func;
+} Hashmap;
+
+Hashmap _hashmap_make(u32 item_size, u32 initial_capacity);
+void    _hashmap_put(Hashmap *map, void *key, u32 key_size, void *item, u32 count);
+void*   _hashmap_get(Hashmap *map, void *key, u32 key_size);
+void    _hashmap_remove(Hashmap *map, void *key, u32 key_size);
+
+u32 hashf(void *key, u32 key_size);
+
+void    hashmap_print(Hashmap *map);
+
 
 /**
  * Math float.
@@ -251,7 +290,9 @@ Transform transform_srt_2d(Vec2f position, float angle, Vec2f scale);
 Transform transform_trs_2d(Vec2f position, float angle, Vec2f scale);
 
 
-typedef float (*Function)(float x);
+typedef float (*Function)(float);
+
+#define func_expr(expr) ({ float __fn(float x) { return (expr); } (Function)__fn; })
 
 
 /**
@@ -444,9 +485,11 @@ typedef struct camera {
 Camera camera_make(Vec2f center, u32 unit_scale);
 
 /**
+ * @Incomplete: Replace with more dynamic way of setting uniform by its name.
+ * At this point it is fairly reasonable to implement hashmap and enchance overall resource management situation, to not introduce unnecesary "loop holes", "hacks" to ignore resource management issue.
  * @Incomplete: Write description.
  */
-void graphics_update_projection(Shader *shader, Camera *camera, float window_width, float window_height);
+void shader_update_projection(Shader *shader, Camera *camera, float window_width, float window_height);
 
 
 typedef struct font_baked {

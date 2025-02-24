@@ -41,13 +41,15 @@ in float v_mask_index;
 
 uniform sampler2D u_textures[32];
 
-void main() {
-    float x = 1 - abs(sin(v_uv0.x * PI) * AMP);
-    x = (abs(x) + x) / 2;
-    float y = 1 - abs(sin(v_uv0.y * PI) * AMP);
-    y = (abs(y) + y) / 2;
+float ground(float x) {
+    return (abs(x) + x) / 2;
+}
 
-    color = vec4(v_color.xyz * (x + y), v_color.w);
+void main() {
+    color.xyz = v_color.xyz * (ground(1 - abs(sin(v_uv0.x * PI) * AMP)) + ground(1 - abs(sin(v_uv0.y * PI) * AMP)));
+    color.x += ground(0.15 - pow(abs(v_uv0.y), 0.5)) * 24;
+    color.y += ground(0.15 - pow(abs(v_uv0.x), 0.5)) * 24;
+    color.w = v_color.w;
 }
 
 #endif

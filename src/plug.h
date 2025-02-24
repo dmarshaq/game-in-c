@@ -6,6 +6,8 @@
 typedef struct {
     bool quit;
     Time_Data *t;
+    u32 window_width;
+    u32 window_height;
 
     /**
      * Globals, @Important: Must be loaded or/and unloaded when hot reloading plug.
