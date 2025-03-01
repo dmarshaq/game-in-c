@@ -28,7 +28,18 @@ typedef uint32_t	u32;
 typedef int64_t     s64;
 typedef uint64_t    u64;
 
+
 /**
+ * Allocators.
+ * @Important: There are different ways to approach memory allocation situation, using malloc() calloc() and realloc() is all great, and if used correctly can benefit the program flow.
+ * The problem that arises is when you want to have more flexibility over memory use.
+ * For example - arena allocator uses pre-allocated memory to linearly distribute this "prepared" memory.
+ * And ideally all allocations of such should be easily done, without any overhead.
+ * So the use of dynamic memory becomes more convinient and logical when deciding what to use Stack or Heap.
+ * It is important that the whole process doesn't become super simple, since it is not about making garbade collection system, but about making the whole process more organized and easy to follow.
+ * This is why free(), malloc(), calloc(), realloc() and other std calls is fine to use. It is even convinient to provide an Allocator instance that directly calls this functions.
+ * The idea is to have a workflow where if you allocate dynamically something in the function, and the function returns it to you, you pass your allocator of choice to do this job.
+ *
  * Arena allocator.
  */
 
@@ -122,9 +133,17 @@ u32 str8_index_of_string(String_8 *str, char *search_string, u32 start, u32 end)
  */
 u32 str8_index_of_char(String_8 *str, char character, u32 start, u32 end);
 
-
 /**
  * Dynamic array.
+ * @Robustness: While trying out different strategies for designing array based data structures it became evident that almost all such mechanism seize down to the use of basis buffer manipulation.
+ * Strings, Arrays, Lists are very similar data structures, the only difference in all of them is logic behind their use: user doesn't expect to specify capacity for the string or array, or user doesn't expect to have lists and arrays only limited to u8 element size like strings usually are.
+ * But their are commonality among all array based data structures and it is the pointer to the first element in the array and array length to safely use this data.
+ * Then List just becomes same array with additional api to resize it. String becomes same array with the limitation to only u8 element sizes, and so on.
+ * This idea was initial reason for creation of some "dynamic array header" to generalize all structures which inherit this functionality.
+ * But, while designing hashmap it is seen that it is seen that data can be simplified even more, to the most basic array form, ptr and size.
+ * Where size can work as array length or be direct representation of some data set size, as example: if a ptr is a "void *" then size would directly corelate to the count of bytes stored under that pointer.
+ * All this said, it might be beneficial to store and access ptr + size data not separately but combined into a fat ptr. It would allow to easily combine specific length to specific ptr.
+ * But it is very @Important to not base the whole codebase off of the fat ptr concept, and most importantly try to desing such an interface to easily convert and blend between fat ptr and non-sized ptr, like null terminated strings to sized based strings.
  */
 
 typedef struct dynamic_array_header {
@@ -142,6 +161,7 @@ void    _dynamic_array_free(void **array);
 
 /**
  * Array list.
+ * @Incomplete: Look at the @Robustness comment above.
  */
 
 #define array_list_make(type, capacity)                             (type *)_dynamic_array_make(sizeof(type), capacity)
@@ -165,16 +185,17 @@ void    _array_list_unordered_remove(void *list, u32 index);
 
 /**
  * Hashmap.
+ * @Incomplete: Look at the @Robustness comment above.
  */
 
 #define hashmap_make(item_type, capacity)                           _hashmap_make(sizeof(item_type), capacity) 
 #define hashmap_put(ptr_map, ptr_key, key_size, ptr_item)           _hashmap_put(ptr_map, ptr_key, key_size, ptr_item, 1) 
-#define hashmap_get(ptr_map, ptr_key, key_size, item_type)          (item_type *)_hashmap_get(ptr_map, ptr_key, key_size) 
+#define hashmap_get(ptr_map, ptr_key, key_size)                     _hashmap_get(ptr_map, ptr_key, key_size) 
 #define hashmap_remove(ptr_map, ptr_key, key_size)                  _hashmap_remove(ptr_map, ptr_key, key_size) 
 #define hashmap_count(ptr_map)                                      _dynamic_array_length(ptr_map->buffer)
 #define hashmap_capacity(ptr_map)                                   _dynamic_array_capacity(ptr_map->buffer)
 #define hashmap_item_size(ptr_map)                                  _dynamic_array_item_size(ptr_map->buffer)
-#define hashmap_free(ptr_map)                                       _dynamic_array_free(&ptr_map->buffer)
+#define hashmap_free(ptr_map)                                       _dynamic_array_free(&(ptr_map)->buffer)
 
 typedef u32 (*Hashfunc)(void *, u32);
 
@@ -477,6 +498,11 @@ void draw_end();
 void draw_quad_data(float *quad_data, u32 count);
 
 
+void print_verticies();
+
+void print_indicies();
+
+
 typedef struct camera {
     Vec2f center;       // World center.
     u32 unit_scale;     // Pixels per 1 world unit.
@@ -513,7 +539,7 @@ typedef struct line_drawer {
     Shader *program;    // Pointer to shader that will be used to draw.
 } Line_Drawer;
 
-#define MAX_LINES_PER_BATCH     32
+#define MAX_LINES_PER_BATCH     1024
 #define VERTICIES_PER_LINE      2
 
 /**

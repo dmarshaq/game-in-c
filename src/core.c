@@ -143,6 +143,8 @@ u32 str8_index_of_char(String_8 *str, char character, u32 start, u32 end) {
 
 /**
  * Dynamic array.
+ * @Robustness: It is important to ensure program's safety, for this reason and also for recent bug possibly caused by memory leak, it is important to more carefully check bounds of the buffer which are constantly being used.
+ * This would help to debug and fix bugs, the goal is to introduce additional checking for possible memory errors.
  */
 void* _dynamic_array_make(u32 item_size, u32 capacity) {
     Dynamic_Array_Header *ptr = malloc(item_size * capacity + sizeof(Dynamic_Array_Header));
@@ -197,14 +199,20 @@ void _dynamic_array_free(void **list) {
  */
 
 void _array_list_append(void **list, void *item, u32 count) {
+
     Array_List_Header *header = *list - sizeof(Array_List_Header);
     
     u32 requiered_length = header->length + count;
     if (requiered_length > header->capacity) {
-        u32 capacity_multiplier = 2 * ((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1);
+        u32 capacity_multiplier = powf(2.0f, ((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
         
         _dynamic_array_resize(list, header->capacity * capacity_multiplier);
         header = *list - sizeof(Array_List_Header);
+    }
+
+    if (header->capacity * header->item_size < count * header->item_size) {
+        fprintf(stderr, "%s List capacity is less than size of elements being passed after being resized, capacity size: %d, size of elements: %d.\n", debug_error_str, header->capacity * header->item_size, header->item_size * count);
+        return;
     }
     
     memcpy(*list + header->length * header->item_size, item, header->item_size * count);
@@ -329,7 +337,7 @@ void _hashmap_put(Hashmap *map, void *key, u32 key_size, void *item, u32 count) 
 
         
         // Resize.
-        u32 capacity_multiplier = 2 * ((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1);
+        u32 capacity_multiplier = powf(2.0f, ((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
         
         _dynamic_array_resize(&map->buffer, header->capacity * capacity_multiplier);
         header = map->buffer - sizeof(Dynamic_Array_Header);
@@ -377,7 +385,24 @@ void _hashmap_put(Hashmap *map, void *key, u32 key_size, void *item, u32 count) 
 }
 
 void* _hashmap_get(Hashmap *map, void *key, u32 key_size) {
+    Dynamic_Array_Header *header = map->buffer - sizeof(Dynamic_Array_Header);
     
+    void *slot = NULL;
+    u32 index = map->hash_func(key, key_size) % header->capacity;
+
+    // Trying to get slot that is not occupied.
+    for (u32 j = 0; ; j++) {
+        slot = map->buffer + (index + j) * header->item_size;
+        printf("Checking index: %d, %d, %d, %d\n", index + j, *(u8 *)slot == SLOT_OCCUPIED, *(u32 *)(slot + sizeof(u8)) == key_size, memcmp(*(void **)(slot + sizeof(u8) + sizeof(u32)), key, key_size) == 0);
+        if (*(u8 *)slot == SLOT_OCCUPIED && *(u32 *)(slot + sizeof(u8)) == key_size && memcmp(*(void **)(slot + sizeof(u8) + sizeof(u32)), key, key_size) == 0) {
+            return slot + sizeof(u8) + sizeof(u32) + sizeof(void *);
+        }
+
+        if (j >= header->capacity) {
+            fprintf(stderr, "%s Couldn't find element stored under the key: 0x%8p of size: %4d.\n", debug_error_str, key, key_size);
+            return NULL;
+        }
+    }
 }
 
 void _hashmap_remove(Hashmap *map, void *key, u32 key_size) {
@@ -405,7 +430,7 @@ u32 hashf(void *key, u32 key_size) {
 
 void hashmap_print_slot(u8 state, u32 key_size, void *key, void *item, u32 item_size) {
     // Print the state and key_size as hex
-    printf("State: 0x%02x | Key Size: 0x%08x | Key: 0x%08x | Item: ", state, key_size, key);
+    printf("State: 0x%02x | Key Size: 0x%08x | Key: 0x%8p | Item: ", state, key_size, key);
     
     // Print the item in hex based on item_size
     for (u32 i = 0; i < item_size; i++) {
@@ -1219,7 +1244,8 @@ void line_drawer_init(Line_Drawer *drawer, Shader *shader) {
     
     // 2. Copy verticies array in a buffer for OpenGL to use. [VBO].
     glBindBuffer(GL_ARRAY_BUFFER, drawer->vbo);
-    glBufferData(GL_ARRAY_BUFFER, drawer->program->vertex_stride * VERTICIES_PER_QUAD * MAX_QUADS_PER_BATCH * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    // printf("max: %d\n", drawer->program->vertex_stride * VERTICIES_PER_QUAD * MAX_QUADS_PER_BATCH);
+    glBufferData(GL_ARRAY_BUFFER, drawer->program->vertex_stride * VERTICIES_PER_LINE * MAX_LINES_PER_BATCH * sizeof(float), NULL, GL_DYNAMIC_DRAW);
 
     // 3. Set vertex attributes pointers. [VAO, VBO].
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)0);

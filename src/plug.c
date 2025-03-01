@@ -1,5 +1,7 @@
 #include "plug.h"
 #include "core.h"
+#include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 
@@ -7,8 +9,14 @@
 void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle);
 void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale);
 void draw_line(Vec2f p0, Vec2f p1, Vec4f color);
+
 void draw_function(float x0, float x1, Function y, u32 detail, Vec4f color);
+void draw_polar(float t0, float t1, Function r, u32 detail, Vec4f color);
 void draw_parametric(float t0, float t1, Function x, Function y, u32 detail, Vec4f color);
+
+void draw_area_function(float x0, float x1, Function y, u32 rect_count, Vec4f color);
+void draw_area_polar(float t0, float t1, Function r, u32 rect_count, Vec4f color);
+void draw_area_parametric(float t0, float t1, Function x, Function y, u32 rect_count, Vec4f color);
 
 void draw_viewport(u32 x, u32 y, u32 width, u32 height, Vec4f color, Camera *camera);
 void viewport_reset(Plug_State *state);
@@ -18,7 +26,7 @@ void plug_init(Plug_State *state) {
     s64 item;
 
     Hashmap hashmap = hashmap_make(s64, 16);
-    hashmap_print(&hashmap);
+    // hashmap_print(&hashmap);
 
 
     item = -12;
@@ -44,6 +52,15 @@ void plug_init(Plug_State *state) {
     item = 10;
     hashmap_put(&hashmap, "candy", strlen("candy"), &item);
     hashmap_print(&hashmap);
+
+
+
+    s64 *num = hashmap_get(&hashmap, "apple", 5);
+    
+    // memcpy(buffer, (char *)hashmap_get(&hashmap, "candy", 5), 5 );
+    printf("%d\n", *num);
+    
+    hashmap_free(&hashmap);
 }
 
 void plug_load(Plug_State *state) {
@@ -117,57 +134,62 @@ void plug_update(Plug_State *state) {
     
     draw_quad(p0, p1, vec4f_make(0.9f, 0.9f, 0.9f, 0.2f), NULL, p0, p1, NULL, 0.0f);
 
+
     draw_end();
     
-    // Drawing: Always between draw_begin() and draw_end().
-    state->drawer.program = &state->quad_shader;
-    draw_begin(&state->drawer);
-
-    draw_text("As seen here, it is easy to debug any vectors just by drawing lines.\nMaybe in the future it also will be possible to plot graphs to debug\nsome game math related mechanics.", vec2f_make(-5.5f, 3.6f), VEC4F_CYAN, &state->font_baked_medium, state->main_camera.unit_scale);
-
-
-    draw_text("Hello from hot reload!", vec2f_make(-1.5f, -3.6f), VEC4F_WHITE, &state->font_baked_medium, state->main_camera.unit_scale);
-
-    draw_end();
 
 
     // Updating projection.
     shader_update_projection(state->line_drawer.program, &state->main_camera, state->window_width, state->window_height);
 
 
-    float seconds = (u32)(state->t->current_time) % (u32)(4000 * PI) / 1000.0f;
+    float seconds = (u32)(state->t->current_time) % (u32)(1000 * PI) / 1000.0f;
+
+    // Drawing: Always between draw_begin() and draw_end().
+    state->drawer.program = &state->quad_shader;
+    draw_begin(&state->drawer);
+
+    // draw_area_function(-2*PI, seconds - 2*PI, func_expr(sinf(x)), (u32)(32.0f * seconds), VEC4F_GREEN);
+
+    // draw_area_polar(0, seconds, func_expr(2*cosf(3*x)), 32.0f * seconds, VEC4F_BLUE);
+    // draw_area_polar((5*PI) / 6, 2*PI + PI / 6, func_expr(3), 32.0f * seconds, VEC4F_BLUE);
+
+    // draw_area_parametric(-2*PI, seconds - 2*PI, func_expr(cosf(x)), func_expr(sinf(x)), 32.0f * seconds, VEC4F_RED);
+
+    // draw_area_polar(0, (seconds / 12.0f), func_expr(1 - 2 * cosf(x)), 8.0f * seconds, VEC4F_BLUE);
+
+    draw_end();
 
     // Line Drawing
     line_draw_begin(&state->line_drawer);
-
-
-    draw_function(-2*PI, seconds - 2*PI, func_expr(sinf(x)), 64, VEC4F_YELLOW);
     
+    // printf("%u\n", (u32)(32.0f * seconds));
 
-    Vec2f cyan_vec;
-    cyan_vec.x = 2 * cosf(state->angle);
-    cyan_vec.y = 2 * sinf(state->angle);
-    draw_line(VEC2F_ORIGIN, cyan_vec, VEC4F_CYAN);
-    state->angle += PI / 12 * state->t->delta_time;
+    // draw_function(-2*PI, seconds - 2*PI, func_expr(sinf(x)), (u32)(32.0f * seconds), VEC4F_YELLOW);
 
-    draw_line(VEC2F_ORIGIN, VEC2F_RIGHT,    VEC4F_RED);
-    draw_line(VEC2F_ORIGIN, VEC2F_UP,       VEC4F_GREEN);
+    //draw_polar(0, seconds, func_expr(2*cosf(3*x)), 32.0f * seconds, VEC4F_GREEN);
+    draw_polar(0, seconds, func_expr(2*cosf(x)-1), 128, VEC4F_GREEN);
+    // draw_polar(0, 2*PI, func_expr(3), 64, VEC4F_GREEN);
 
+    // draw_parametric(-2*PI, seconds - 2*PI, func_expr(cosf(x)), func_expr(sinf(x)), 32.0f * seconds, VEC4F_GREEN);
+    
+    // draw_polar(0, (seconds / 4.0f), func_expr(1 - 2 * cosf(x)), 8.0f * seconds, VEC4F_YELLOW);
 
     line_draw_end();
 
+
     // Drawing labels for vectors.
-    draw_begin(&state->drawer);
+    // draw_begin(&state->drawer);
 
-    draw_text(" ( 1.00, 0.00 )", VEC2F_RIGHT,  VEC4F_WHITE, &state->font_baked_small, state->main_camera.unit_scale);
-    draw_text(" ( 0.00, 1.00 )", VEC2F_UP,     VEC4F_WHITE, &state->font_baked_small, state->main_camera.unit_scale);
+    // draw_text(" ( 1.00, 0.00 )", VEC2F_RIGHT,  VEC4F_WHITE, &state->font_baked_small, state->main_camera.unit_scale);
+    // draw_text(" ( 0.00, 1.00 )", VEC2F_UP,     VEC4F_WHITE, &state->font_baked_small, state->main_camera.unit_scale);
 
-    char buffer[50];
-    sprintf(buffer, " ( %2.2f, %2.2f )", cyan_vec.x, cyan_vec.y);
-    draw_text(buffer, cyan_vec, VEC4F_WHITE, &state->font_baked_small, state->main_camera.unit_scale);
+    // char buffer[50];
+    // sprintf(buffer, " ( %2.2f, %2.2f )", cyan_vec.x, cyan_vec.y);
+    // draw_text(buffer, cyan_vec, VEC4F_WHITE, &state->font_baked_small, state->main_camera.unit_scale);
 
 
-    draw_end();
+    // draw_end();
 
     
     // Separate viewport example
@@ -183,7 +205,7 @@ void plug_update(Plug_State *state) {
     state->drawer.program = &state->grid_shader;
     draw_begin(&state->drawer);
 
-    draw_viewport(25, 25, width, height, vec4f_make(0.3f, 0.3f, 0.3f, 1.0f), &state->main_camera);
+    // draw_viewport(25, 25, width, height, vec4f_make(0.3f, 0.3f, 0.3f, 1.0f), &state->main_camera);
 
     draw_end();
     state->drawer.program = &state->quad_shader;
@@ -191,7 +213,8 @@ void plug_update(Plug_State *state) {
     // Line Drawing
     line_draw_begin(&state->line_drawer);
 
-    draw_parametric(-2*PI, seconds - 4*PI, func_expr(cosf(x)), func_expr(sinf(x)), 64, VEC4F_GREEN);
+    // draw_parametric(-2*PI, seconds - 4*PI, func_expr(pow(cosf(x), 4)), func_expr(sinf(x)), 64, VEC4F_GREEN);
+    // draw_polar(0, seconds - PI, func_expr(2*sinf(3*x)), 128, VEC4F_GREEN);
 
     line_draw_end();
 
@@ -300,6 +323,35 @@ void draw_function(float x0, float x1, Function y, u32 detail, Vec4f color) {
     draw_line_data(line_data, detail);
 }
 
+void draw_polar(float t0, float t1, Function r, u32 detail, Vec4f color) {
+    float line_data[detail * 14];
+
+    float step = (t1 - t0) / (float)detail;
+    float radius;
+    for (u32 i = 0; i < detail; i++) {
+        radius = r(t0 + step * (float)i);
+        line_data[0  + i * 14] = radius * cosf(t0 + step * (float)i);
+        line_data[1  + i * 14] = radius * sinf(t0 + step * (float)i);
+        line_data[2  + i * 14] = 0.0f;
+        line_data[3  + i * 14] = color.x;
+        line_data[4  + i * 14] = color.y;
+        line_data[5  + i * 14] = color.z;
+        line_data[6  + i * 14] = color.w;
+                     
+        radius = r(t0 + step * (float)(i + 1));
+        line_data[7  + i * 14] = radius * cosf(t0 + step * (float)(i + 1));
+        line_data[8  + i * 14] = radius * sinf(t0 + step * (float)(i + 1));
+        line_data[9  + i * 14] = 0.0f;
+        line_data[10 + i * 14] = color.x;
+        line_data[11 + i * 14] = color.y;
+        line_data[12 + i * 14] = color.z;
+        line_data[13 + i * 14] = color.w;
+    }
+    
+   
+    draw_line_data(line_data, detail);
+}
+
 void draw_parametric(float t0, float t1, Function x, Function y, u32 detail, Vec4f color) {
     float line_data[detail * 14];
 
@@ -326,6 +378,80 @@ void draw_parametric(float t0, float t1, Function x, Function y, u32 detail, Vec
     draw_line_data(line_data, detail);
 }
 
+void draw_area_function(float x0, float x1, Function y, u32 rect_count, Vec4f color) {
+    float step = (x1 - x0) / (float)rect_count;
+    for (u32 i = 0; i < rect_count; i++) {
+        draw_quad(vec2f_make(x0 + step * i, 0.0f), vec2f_make(x0 + step * (i + 1), y(x0 + step * (i + 1))), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f);
+    }
+}
+
+void draw_area_polar(float t0, float t1, Function r, u32 rect_count, Vec4f color) {
+    float quad_data[rect_count * VERTICIES_PER_QUAD * 11];
+
+    float step = (t1 - t0) / (float)rect_count;
+    float radius;
+    for (u32 i = 0; i < rect_count; i++) {
+        quad_data[0  + i * VERTICIES_PER_QUAD * 11] = 0.0f;
+        quad_data[1  + i * VERTICIES_PER_QUAD * 11] = 0.0f;
+        quad_data[2  + i * VERTICIES_PER_QUAD * 11] = 0.0f;
+        quad_data[3  + i * VERTICIES_PER_QUAD * 11] = color.x;
+        quad_data[4  + i * VERTICIES_PER_QUAD * 11] = color.y;
+        quad_data[5  + i * VERTICIES_PER_QUAD * 11] = color.z;
+        quad_data[6  + i * VERTICIES_PER_QUAD * 11] = color.w;
+        quad_data[7  + i * VERTICIES_PER_QUAD * 11] = 0.0f;
+        quad_data[8  + i * VERTICIES_PER_QUAD * 11] = 0.0f;
+        quad_data[9  + i * VERTICIES_PER_QUAD * 11] = -1.0f;
+        quad_data[10 + i * VERTICIES_PER_QUAD * 11] = -1.0f;
+                     
+        quad_data[11 + i * VERTICIES_PER_QUAD * 11] = 0.0f;
+        quad_data[12 + i * VERTICIES_PER_QUAD * 11] = 0.0f;
+        quad_data[13 + i * VERTICIES_PER_QUAD * 11] = 0.0f;
+        quad_data[14 + i * VERTICIES_PER_QUAD * 11] = color.x;
+        quad_data[15 + i * VERTICIES_PER_QUAD * 11] = color.y;
+        quad_data[16 + i * VERTICIES_PER_QUAD * 11] = color.z;
+        quad_data[17 + i * VERTICIES_PER_QUAD * 11] = color.w;
+        quad_data[18 + i * VERTICIES_PER_QUAD * 11] = 1.0f;
+        quad_data[19 + i * VERTICIES_PER_QUAD * 11] = 0.0f;
+        quad_data[20 + i * VERTICIES_PER_QUAD * 11] = -1.0f;
+        quad_data[21 + i * VERTICIES_PER_QUAD * 11] = -1.0f;
+                     
+        radius = r(t0 + step * (float)i);
+        quad_data[22 + i * VERTICIES_PER_QUAD * 11] = radius * cosf(t0 + step * (float)i);
+        quad_data[23 + i * VERTICIES_PER_QUAD * 11] = radius * sinf(t0 + step * (float)i);
+        quad_data[24 + i * VERTICIES_PER_QUAD * 11] = 0.0f;
+        quad_data[25 + i * VERTICIES_PER_QUAD * 11] = color.x;
+        quad_data[26 + i * VERTICIES_PER_QUAD * 11] = color.y;
+        quad_data[27 + i * VERTICIES_PER_QUAD * 11] = color.z;
+        quad_data[28 + i * VERTICIES_PER_QUAD * 11] = color.w;
+        quad_data[29 + i * VERTICIES_PER_QUAD * 11] = 0.0f;
+        quad_data[30 + i * VERTICIES_PER_QUAD * 11] = 1.0f;
+        quad_data[31 + i * VERTICIES_PER_QUAD * 11] = -1.0f;
+        quad_data[32 + i * VERTICIES_PER_QUAD * 11] = -1.0f;
+                     
+        radius = r(t0 + step * (float)(i + 1));
+        quad_data[33 + i * VERTICIES_PER_QUAD * 11] = radius * cosf(t0 + step * (float)(i + 1));
+        quad_data[34 + i * VERTICIES_PER_QUAD * 11] = radius * sinf(t0 + step * (float)(i + 1));
+        quad_data[35 + i * VERTICIES_PER_QUAD * 11] = 0.0f;
+        quad_data[36 + i * VERTICIES_PER_QUAD * 11] = color.x;
+        quad_data[37 + i * VERTICIES_PER_QUAD * 11] = color.y;
+        quad_data[38 + i * VERTICIES_PER_QUAD * 11] = color.z;
+        quad_data[39 + i * VERTICIES_PER_QUAD * 11] = color.w;
+        quad_data[40 + i * VERTICIES_PER_QUAD * 11] = 1.0f;
+        quad_data[41 + i * VERTICIES_PER_QUAD * 11] = 1.0f;
+        quad_data[42 + i * VERTICIES_PER_QUAD * 11] = -1.0f;
+        quad_data[43 + i * VERTICIES_PER_QUAD * 11] = -1.0f;
+    }
+    
+   
+    draw_quad_data(quad_data, rect_count);
+}
+
+void draw_area_parametric(float t0, float t1, Function x, Function y, u32 rect_count, Vec4f color) {
+    float step = (t1 - t0) / (float)rect_count;
+    for (u32 i = 0; i < rect_count; i++) {
+        draw_quad(vec2f_make(x(t0 + step * i), 0.0f), vec2f_make(x(t0 + step * (i + 1)), y(t0 + step * (i + 1))), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f);
+    }
+}
 
 
 void draw_viewport(u32 x, u32 y, u32 width, u32 height, Vec4f color, Camera *camera) {
