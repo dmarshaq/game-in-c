@@ -43,17 +43,43 @@ typedef uint64_t    u64;
  * Arena allocator.
  */
 
+
 #include <stdlib.h>
 
-typedef struct arena_allocator {
-    void *ptr;
-    u64 size;
+typedef struct allocator_header {
+    u64 capacity;
     u64 size_filled;
-} Arena;
+} Allocator_Header;
 
-void arena_init(Arena *arena, u64 size);
-void* arena_allocate(Arena *arena, u64 size);
-void arena_free(Arena *arena);
+typedef void * (*Allocate)(Allocator_Header *header, u64 size);
+typedef void * (*Zero_Allocate)(Allocator_Header *header, u64 size);
+typedef void * (*Re_Allocate)(Allocator_Header *header, void *ptr, u64 size);
+typedef void   (*Free)(Allocator_Header *header, void *ptr);
+
+typedef struct allocator {
+    Allocator_Header *ptr;
+    
+    Allocate alc_alloc;
+    Zero_Allocate alc_zero_alloc;
+    Re_Allocate alc_re_alloc;
+    Free alc_free;
+} Allocator;
+
+// Std.
+extern Allocator std_allocator;
+
+// Arena.
+typedef Allocator Arena_Allocator;
+
+Arena_Allocator arena_make(u64 capacity);
+void arena_destroy(Arena_Allocator *arena);
+
+// Allocator interface.
+void * allocator_alloc(Allocator *allocator, u64 size);
+void * allocator_zero_alloc(Allocator *allocator, u64 size);
+void * allocator_re_alloc(Allocator *allocator, void *ptr, u64 size);
+void allocator_free(Allocator *allocator, void *ptr);
+
 
 /**
  * String.
@@ -74,25 +100,17 @@ typedef struct string_8 {
  * Points "str" to statically created string, and modified "str" length accordingly.
  * Note: "str" will not contain null terminator at the end.
  */
-void str8_init_statically(String_8 *str, const char *string);
+String_8 str8_make_statically(const char *string);
 
 /**
- * Allocates memory located in "arena" to "str", where "length" is new length of the string being allocated in "arena".
- * @Important: This allocated memory, doesn't have to be freed separatly, since when you free the "arena" this memory will be freed automatically.
- * Note: After you free the "arena", "str" will point to invalid memory adress.
+ * @Todo: Write description.
  */
-void str8_init_arena(String_8 *str, Arena *arena, u32 length);
+String_8 str8_make_allocate(u32 length, Allocator *allocator);
 
 /**
- * Allocates memory for the "str" through "malloc()" function, where "length" is new length of the string being allocated.
- * Note: Memory should be freed through "str8_free()" after it is not longer used.
+ * Frees previously allocated memory through "str8_make_allocate()".
  */
-void str8_init_dynamically(String_8 *str, u32 length);
-
-/**
- * Frees previously allocated memory through "malloc()", this includes "str8_init_dynamically()" since it also uses "malloc()" for memory allocation.
- */
-void str8_free(String_8 *str);
+void str8_free(String_8 *str, Allocator *allocator);
 
 void str8_memcopy_from_buffer(String_8 *str, void *buffer, u32 length);
 
@@ -105,7 +123,7 @@ void str8_memcopy_into_buffer(String_8 *str, void *buffer, u32 start, u32 end);
  */
 void str8_substring(String_8 *str, String_8 *output_str, u32 start, u32 end);
 
-bool str8_equals_str8(String_8 *str1, String_8 *str2);
+bool str8_equals(String_8 *str1, String_8 *str2);
 
 bool str8_equals_string(String_8 *str, char *string);
 
@@ -115,7 +133,7 @@ bool str8_equals_string(String_8 *str, char *string);
  * "start" refers to the index where searching begins, character at this index IS included in the search comparising.
  * "end" refers to the index where searching stops, character at this index is NOT included in the search comparising.
  */
-u32 str8_index_of_str8(String_8 *str, String_8 *search_str, u32 start, u32 end);
+u32 str8_index_of(String_8 *str, String_8 *search_str, u32 start, u32 end);
 
 /**
  * Linearly searches for the first occurnse of "search_string" in "str", by comparing them through "str8_equals_string()" function.
@@ -134,7 +152,8 @@ u32 str8_index_of_string(String_8 *str, char *search_string, u32 start, u32 end)
 u32 str8_index_of_char(String_8 *str, char character, u32 start, u32 end);
 
 /**
- * Dynamic array.
+ * @Incomplete: Refactor how data structures are stored and used in memory.
+ *
  * @Robustness: While trying out different strategies for designing array based data structures it became evident that almost all such mechanism seize down to the use of basis buffer manipulation.
  * Strings, Arrays, Lists are very similar data structures, the only difference in all of them is logic behind their use: user doesn't expect to specify capacity for the string or array, or user doesn't expect to have lists and arrays only limited to u8 element size like strings usually are.
  * But their are commonality among all array based data structures and it is the pointer to the first element in the array and array length to safely use this data.
@@ -144,6 +163,8 @@ u32 str8_index_of_char(String_8 *str, char character, u32 start, u32 end);
  * Where size can work as array length or be direct representation of some data set size, as example: if a ptr is a "void *" then size would directly corelate to the count of bytes stored under that pointer.
  * All this said, it might be beneficial to store and access ptr + size data not separately but combined into a fat ptr. It would allow to easily combine specific length to specific ptr.
  * But it is very @Important to not base the whole codebase off of the fat ptr concept, and most importantly try to desing such an interface to easily convert and blend between fat ptr and non-sized ptr, like null terminated strings to sized based strings.
+ *
+ * Dynamic array.
  */
 
 typedef struct dynamic_array_header {
@@ -345,21 +366,22 @@ typedef struct circle {
  */
 
 /**
+ * @Incomplete: Write description.
+ */
+char* read_file_into_string(char *file_name, Allocator *allocator);
+    
+/**
  * Reads contents of the file into the buffer that is preemptivly allocated using malloc.
  * Return pointer to the buffer and sets buffer size in bytes into the file_size.
  * @Important: Buffer should be freed manually when not used anymore.
  */
-void* read_file_into_buffer(char *file_name, u64* file_size);
+void* read_file_into_buffer(char *file_name, u64 *file_size, Allocator *allocator);
 
 /**
  * @Incomplete: Write description.
  */
-char* read_file_into_string_buffer(char *file_name);
-    
-/**
- * @Incomplete: Write description.
- */
-String_8 read_file_into_str8(char *file_name);
+String_8 read_file_into_str8(char *file_name, Allocator *allocator);
+
 
 /**
  * Graphics.

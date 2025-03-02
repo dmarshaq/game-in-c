@@ -23,44 +23,55 @@ void viewport_reset(Plug_State *state);
 
 
 void plug_init(Plug_State *state) {
-    s64 item;
 
-    Hashmap hashmap = hashmap_make(s64, 16);
+    Allocator my_allocator = arena_make(1000 * sizeof(s32));
+
+    s32 *values = allocator_alloc(&my_allocator, 1000 * sizeof(s32));
+    for (u32 i = 0; i < 1000; i++) {
+        printf("at %03d, value: %d;\n", i, values[i]);
+    }
+    // allocator_free(&my_allocator, values);
+
+    arena_destroy(&my_allocator);
+
+    // s64 item;
+
+    // Hashmap hashmap = hashmap_make(s64, 16);
+    // // hashmap_print(&hashmap);
+
+
+    // item = -12;
+    // hashmap_put(&hashmap, "apple", strlen("apple"), &item);
+    // // hashmap_print(&hashmap);
+
+
+    // item = 2;
+    // hashmap_put(&hashmap, "Orange", strlen("orange"), &item);
+    // // hashmap_print(&hashmap);
+
+
+    // item = 6;
+    // hashmap_put(&hashmap, "Banana", strlen("banana"), &item);
+    // // hashmap_print(&hashmap);
+
+
+    // item = 1;
+    // hashmap_put(&hashmap, "strawberry", strlen("strawberry"), &item);
+    // // hashmap_print(&hashmap);
+
+
+    // item = 10;
+    // hashmap_put(&hashmap, "candy", strlen("candy"), &item);
     // hashmap_print(&hashmap);
 
 
-    item = -12;
-    hashmap_put(&hashmap, "apple", strlen("apple"), &item);
-    // hashmap_print(&hashmap);
 
-
-    item = 2;
-    hashmap_put(&hashmap, "Orange", strlen("orange"), &item);
-    // hashmap_print(&hashmap);
-
-
-    item = 6;
-    hashmap_put(&hashmap, "Banana", strlen("banana"), &item);
-    // hashmap_print(&hashmap);
-
-
-    item = 1;
-    hashmap_put(&hashmap, "strawberry", strlen("strawberry"), &item);
-    // hashmap_print(&hashmap);
-
-
-    item = 10;
-    hashmap_put(&hashmap, "candy", strlen("candy"), &item);
-    hashmap_print(&hashmap);
-
-
-
-    s64 *num = hashmap_get(&hashmap, "apple", 5);
-    
-    // memcpy(buffer, (char *)hashmap_get(&hashmap, "candy", 5), 5 );
-    printf("%d\n", *num);
-    
-    hashmap_free(&hashmap);
+    // s64 *num = hashmap_get(&hashmap, "apple", 5);
+    // 
+    // // memcpy(buffer, (char *)hashmap_get(&hashmap, "candy", 5), 5 );
+    // printf("%d\n", *num);
+    // 
+    // hashmap_free(&hashmap);
 }
 
 void plug_load(Plug_State *state) {
@@ -91,7 +102,7 @@ void plug_load(Plug_State *state) {
 
 
     // Font loading.
-    u8* font_data = read_file_into_buffer("res/font/font.ttf", NULL);
+    u8* font_data = read_file_into_buffer("res/font/font.ttf", NULL, &std_allocator);
 
     state->font_baked_medium = font_bake(font_data, 20.0f);
     state->font_baked_small = font_bake(font_data, 16.0f);
@@ -114,7 +125,7 @@ void plug_unload(Plug_State *state) {
 }
 
 void plug_update(Plug_State *state) {
-    // Reset viewport
+    // Reset viewport.
     viewport_reset(state);
 
     // Clear the screen with clear_color.
@@ -122,7 +133,7 @@ void plug_update(Plug_State *state) {
     glClear(GL_COLOR_BUFFER_BIT);
 
     // Updating projection.
-    shader_update_projection(state->drawer.program, &state->main_camera, state->window_width, state->window_height); // @Incomplete: Supply of window dimensions.
+    shader_update_projection(state->drawer.program, &state->main_camera, (float)state->window_width, (float)state->window_height); // @Incomplete: Supply of window dimensions.
     
     Vec2f p0, p1;
     p0 = vec2f_make(-8.0f, -5.0f);
@@ -140,7 +151,7 @@ void plug_update(Plug_State *state) {
 
 
     // Updating projection.
-    shader_update_projection(state->line_drawer.program, &state->main_camera, state->window_width, state->window_height);
+    shader_update_projection(state->line_drawer.program, &state->main_camera, (float)state->window_width, (float)state->window_height);
 
 
     float seconds = (u32)(state->t->current_time) % (u32)(1000 * PI) / 1000.0f;

@@ -19,36 +19,110 @@ const char* debug_ok_str = "\033[32m[OK]\033[0m";
 
 
 /**
- * Arena allocator.
+ * Allocator.
  */
 
-void arena_init(Arena *arena, u64 size) {
-    arena->ptr = malloc(size);
-    if (arena->ptr == NULL) {
-        fprintf(stderr, "%s Couldn't allocate memory for inititing arena of size %lld.\n", debug_error_str, size);
-        arena->size = 0;
-        arena->size_filled = 0;
-        return;
-    }
-    arena->size = size;
-    arena->size_filled = 0;
+void allocator_destroy(Allocator *allocator) {
+    free(allocator->ptr);
+    allocator->ptr = NULL;
+    allocator->alc_alloc = NULL;
+    allocator->alc_free = NULL;
 }
 
-void* arena_allocate(Arena *arena, u64 size) {
-    if (arena->size_filled + size > arena->size) {
-        fprintf(stderr, "%s Couldn't allocate more memory of size: %lld bytes from the arena, which is filled at %lld out of %lld bytes.\n", debug_error_str, size, arena->size_filled, arena->size);
+// Std.
+void * std_malloc(Allocator_Header *header, u64 size) {
+    return malloc(size);
+}
+
+void * std_calloc(Allocator_Header *header, u64 size) {
+    return calloc(1, size);
+}
+
+void * std_realloc(Allocator_Header *header, void *ptr, u64 size) {
+    return realloc(ptr, size);
+}
+
+void std_free(Allocator_Header *header, void *ptr) {
+    free(ptr);
+}
+
+Allocator std_allocator = (Allocator) {
+    .ptr = NULL,
+    .alc_alloc = std_malloc,
+    .alc_zero_alloc = std_calloc,
+    .alc_re_alloc = std_realloc,
+    .alc_free = std_free,
+};
+
+
+// Arena.
+void * arena_alloc(Allocator_Header *header, u64 size) {
+    if (header->size_filled + size > header->capacity) {
+        (void)fprintf(stderr, "%s Couldn't allocate more memory of size: %lld bytes from the arena, which is filled at %lld out of %lld bytes.\n", debug_error_str, size, header->size_filled, header->capacity);
         return NULL;
     }
-    void* ptr = arena->ptr + arena->size_filled;
-    arena->size_filled += size;
+    void* ptr = (void *)header + sizeof(Allocator_Header) + header->size_filled;
+    header->size_filled += size;
     return ptr;
 }
 
-void arena_free(Arena *arena) {
-    free(arena->ptr);
-    arena->ptr = NULL;
-    arena->size = 0;
-    arena->size_filled = 0;
+Arena_Allocator arena_make(u64 capacity) {
+    void *allocation = malloc(sizeof(Allocator_Header) + capacity);
+    ((Allocator_Header *)allocation)->capacity = capacity;
+    ((Allocator_Header *)allocation)->size_filled = 0;
+
+    if (allocation == NULL) {
+        (void)fprintf(stderr, "%s Couldn't allocate.\n", debug_error_str);
+    }
+
+    return (Arena_Allocator) {
+        .ptr = allocation,
+        .alc_alloc = arena_alloc,
+        .alc_zero_alloc = NULL,
+        .alc_re_alloc = NULL,
+        .alc_free = NULL,
+    };
+}
+
+void arena_destroy(Arena_Allocator *arena) {
+    allocator_destroy(arena);
+}
+
+// Allocator interface.
+void * allocator_alloc(Allocator *allocator, u64 size) {
+    if (allocator->alc_alloc == NULL) {
+        (void)fprintf(stderr, "%s Allocator couldn't allocate memory since allocataion function is not defined for the allocator.\n", debug_error_str);
+        return NULL;
+    }
+
+    return allocator->alc_alloc(allocator->ptr, size);
+}
+
+void * allocator_zero_alloc(Allocator *allocator, u64 size) {
+    if (allocator->alc_zero_alloc == NULL) {
+        (void)fprintf(stderr, "%s Allocator couldn't zero allocate memory since zero allocataion function is not defined for the allocator.\n", debug_error_str);
+        return NULL;
+    }
+
+    return allocator->alc_zero_alloc(allocator->ptr, size);
+}
+
+void * allocator_re_alloc(Allocator *allocator, void *ptr, u64 size) {
+    if (allocator->alc_re_alloc == NULL) {
+        (void)fprintf(stderr, "%s Allocator couldn't reallocate memory since reallocataion function is not defined for the allocator.\n", debug_error_str);
+        return NULL;
+    }
+
+    return allocator->alc_re_alloc(allocator->ptr, ptr, size);
+}
+
+void allocator_free(Allocator *allocator, void *ptr) {
+    if (allocator->alc_free == NULL) {
+        (void)fprintf(stderr, "%s Allocator couldn't free memory since free function is not defined for the allocator.\n", debug_error_str);
+        return;
+    }
+
+    return allocator->alc_free(allocator->ptr, ptr);
 }
 
 
@@ -56,25 +130,32 @@ void arena_free(Arena *arena) {
  * String.
  */
 
-void str8_init_statically(String_8 *str, const char *string) {
-    str->ptr = (u8 *)string;
-    str->length = (u32)strlen(string);
+String_8 str8_make_statically(const char *string) {
+    return (String_8) {
+        .ptr = (u8 *)string,
+        .length = (u32)strlen(string),
+    };
 }
 
-void str8_init_arena(String_8 *str, Arena *arena, u32 length) {
-    str->ptr = arena_allocate(arena, length);
-    str->length = length;
+String_8 str8_make_allocate(u32 length, Allocator *allocator) {
+    return (String_8) {
+        .ptr = allocator_alloc(allocator, length),
+        .length = length,
+    };
 }
 
-void str8_init_dynamically(String_8 *str, u32 length) {
-    str->ptr = malloc(length);
-    str->length = length;
-}
-
-void str8_free(String_8 *str) {
-    free(str->ptr);
+void str8_free(String_8 *str, Allocator *allocator) {
+    allocator_free(allocator, str->ptr);
     str->ptr = NULL;
     str->length = 0;
+}
+
+void str8_memcopy_from_buffer(String_8 *str, void *buffer, u32 length) {
+    (void)memcpy(str->ptr, buffer, length);
+}
+
+void str8_memcopy_into_buffer(String_8 *str, void *buffer, u32 start, u32 end) {
+    (void)memcpy(buffer, str->ptr + start, end - start);
 }
 
 void str8_substring(String_8 *str, String_8 *output_str, u32 start, u32 end) {
@@ -82,15 +163,7 @@ void str8_substring(String_8 *str, String_8 *output_str, u32 start, u32 end) {
     output_str->length = end - start;
 }
 
-void str8_memcopy_from_buffer(String_8 *str, void *buffer, u32 length) {
-    memcpy(str->ptr, buffer, length);
-}
-
-void str8_memcopy_into_buffer(String_8 *str, void *buffer, u32 start, u32 end) {
-    memcpy(buffer, str->ptr + start, end - start);
-}
-
-bool str8_equals_str8(String_8 *str1, String_8 *str2) {
+bool str8_equals(String_8 *str1, String_8 *str2) {
     if (str1->length != str2->length) {
         return false;
     }
@@ -104,12 +177,12 @@ bool str8_equals_string(String_8 *str, char *string) {
     return !memcmp(str->ptr, string, str->length);
 }
 
-u32 str8_index_of_str8(String_8 *str, String_8 *search_str, u32 start, u32 end) {
+u32 str8_index_of(String_8 *str, String_8 *search_str, u32 start, u32 end) {
     String_8 substr;
     for (; start < end; start++) {
         if (str->ptr[start] == search_str->ptr[0] && start + search_str->length <= str->length) {
             str8_substring(str, &substr, start, start + search_str->length);
-            if (str8_equals_str8(&substr, search_str)) {
+            if (str8_equals(&substr, search_str)) {
                 return start;
             }
         }
@@ -143,14 +216,12 @@ u32 str8_index_of_char(String_8 *str, char character, u32 start, u32 end) {
 
 /**
  * Dynamic array.
- * @Robustness: It is important to ensure program's safety, for this reason and also for recent bug possibly caused by memory leak, it is important to more carefully check bounds of the buffer which are constantly being used.
- * This would help to debug and fix bugs, the goal is to introduce additional checking for possible memory errors.
  */
 void* _dynamic_array_make(u32 item_size, u32 capacity) {
     Dynamic_Array_Header *ptr = malloc(item_size * capacity + sizeof(Dynamic_Array_Header));
 
     if (ptr == NULL) {
-        fprintf(stderr, "%s Couldn't allocate more memory of size: %lld bytes, for the dynamic array.\n", debug_error_str, item_size * capacity + sizeof(Dynamic_Array_Header));
+        (void)fprintf(stderr, "%s Couldn't allocate more memory of size: %lld bytes, for the dynamic array.\n", debug_error_str, item_size * capacity + sizeof(Dynamic_Array_Header));
         return NULL;
     }
 
@@ -180,7 +251,7 @@ void _dynamic_array_resize(void **list, u32 new_capacity) {
     header = realloc(header, header->item_size * new_capacity + sizeof(Dynamic_Array_Header));
     
     if (header == NULL) {
-        fprintf(stderr, "%s Couldn't reallocate memory of size: %lld bytes, for the dynamic array.\n", debug_error_str, header->item_size * new_capacity + sizeof(Dynamic_Array_Header));
+        (void)fprintf(stderr, "%s Couldn't reallocate memory of size: %lld bytes, for the dynamic array.\n", debug_error_str, header->item_size * new_capacity + sizeof(Dynamic_Array_Header));
         return;
     }
 
@@ -211,7 +282,7 @@ void _array_list_append(void **list, void *item, u32 count) {
     }
 
     if (header->capacity * header->item_size < count * header->item_size) {
-        fprintf(stderr, "%s List capacity is less than size of elements being passed after being resized, capacity size: %d, size of elements: %d.\n", debug_error_str, header->capacity * header->item_size, header->item_size * count);
+        (void)fprintf(stderr, "%s List capacity is less than size of elements being passed after being resized, capacity size: %d, size of elements: %d.\n", debug_error_str, header->capacity * header->item_size, header->item_size * count);
         return;
     }
     
@@ -308,7 +379,7 @@ bool hashmap_readress(Hashmap *map, u32 slot_index) {
         }
 
         if (j >= header->capacity) {
-            fprintf(stderr, "%s Couldn't readress depricated slot in the hashmap.\n", debug_error_str);
+            (void)fprintf(stderr, "%s Couldn't readress depricated slot in the hashmap.\n", debug_error_str);
             return false;
         }
     }
@@ -375,7 +446,7 @@ void _hashmap_put(Hashmap *map, void *key, u32 key_size, void *item, u32 count) 
             }
             
             if (j >= header->capacity) {
-                fprintf(stderr, "%s Couldn't find slot for the element (%d) in the hashmap.\n", debug_error_str, i);
+                (void)fprintf(stderr, "%s Couldn't find slot for the element (%d) in the hashmap.\n", debug_error_str, i);
                 return;
             }
         }
@@ -399,7 +470,7 @@ void* _hashmap_get(Hashmap *map, void *key, u32 key_size) {
         }
 
         if (j >= header->capacity) {
-            fprintf(stderr, "%s Couldn't find element stored under the key: 0x%8p of size: %4d.\n", debug_error_str, key, key_size);
+            (void)fprintf(stderr, "%s Couldn't find element stored under the key: 0x%8p of size: %4d.\n", debug_error_str, key, key_size);
             return NULL;
         }
     }
@@ -411,7 +482,7 @@ void _hashmap_remove(Hashmap *map, void *key, u32 key_size) {
 
 u32 hashf(void *key, u32 key_size) {
     if (key == NULL || key_size == 0) {
-        fprintf(stderr, "%s Couldn't hash a NULL or 0 sized key.\n", debug_error_str);
+        (void)fprintf(stderr, "%s Couldn't hash a NULL or 0 sized key.\n", debug_error_str);
         return 0;
     }
     if (key_size < 2) {
@@ -508,106 +579,99 @@ Transform transform_trs_2d(Vec2f position, float angle, Vec2f scale) {
 
 /**
  * File utils.
- * @Incomplete: Fix error messages format :3 .
  */
 
-char* read_file_into_string_buffer(char *file_name) {
+char* read_file_into_string(char *file_name, Allocator *allocator) {
     FILE *file = fopen(file_name, "rb");
     if (file == NULL) {
-        printf("Error: Couldn't open the file \"%s\".\n", file_name);
+        (void)fprintf(stderr, "%s Couldn't open the file \"%s\".\n", debug_error_str, file_name);
         return NULL;
     }
 
-    fseek(file, 0, SEEK_END);
+    (void)fseek(file, 0, SEEK_END);
     size_t file_size = ftell(file);
     rewind(file);
 
-    char *buffer = (char*) malloc(file_size + 1);
+    char *buffer = allocator_alloc(allocator, file_size + 1);
     if (buffer == NULL) {
-        printf("Error: Memory allocation for string buffer failed while reading the file \"%s\".\n", file_name);
-        fclose(file);
+        (void)fprintf(stderr, "%s Memory allocation for string buffer failed while reading the file \"%s\".\n", debug_error_str, file_name);
+        (void)fclose(file);
         return NULL;
     }
 
     if (fread(buffer, 1, file_size, file) != file_size) {
-        printf("Error: Failure reading the file \"%s\".\n", file_name);
-        fclose(file);
+        (void)fprintf(stderr, "%s Failure reading the file \"%s\".\n", debug_error_str, file_name);
+        (void)fclose(file);
         free(buffer);
         return NULL;
     }
 
     buffer[file_size] = '\0';
-    fclose(file);
+    (void)fclose(file);
 
     return buffer;
 }
 
-void* read_file_into_buffer(char *file_name, u64* file_size) {
+void* read_file_into_buffer(char *file_name, u64 *file_size, Allocator *allocator) {
     FILE *file = fopen(file_name, "rb");
     if (file == NULL) {
-        printf("Error: Couldn't open the file \"%s\".\n", file_name);
+        (void)fprintf(stderr, "%s Couldn't open the file \"%s\".\n", debug_error_str, file_name);
         return NULL;
     }
 
-    fseek(file, 0, SEEK_END);
+    (void)fseek(file, 0, SEEK_END);
     u64 size = ftell(file);
     rewind(file);
 
-    u8 *buffer = (u8*) malloc(size);
+    u8 *buffer = allocator_alloc(allocator, size);
     if (buffer == NULL) {
-        printf("Error: Memory allocation for string buffer failed while reading the file \"%s\".\n", file_name);
-        fclose(file);
+        (void)fprintf(stderr, "%s Memory allocation for string buffer failed while reading the file \"%s\".\n", debug_error_str, file_name);
+        (void)fclose(file);
         return NULL;
     }
 
     if (fread(buffer, 1, size, file) != size) {
-        printf("Error: Failure reading the file \"%s\".\n", file_name);
-        fclose(file);
+        (void)fprintf(stderr, "%s Failure reading the file \"%s\".\n", debug_error_str, file_name);
+        (void)fclose(file);
         free(buffer);
         return NULL;
     }
 
-    fclose(file);
+    (void)fclose(file);
 
-    if (file_size != NULL) {
+    if (file_size != NULL)
         *file_size = size;
-    }
 
     return buffer;
 }
 
-String_8 read_file_into_str8(char *file_name) {
+String_8 read_file_into_str8(char *file_name, Allocator *allocator) {
     FILE *file = fopen(file_name, "rb");
     if (file == NULL) {
-        printf("Error: Couldn't open the file \"%s\".\n", file_name);
+        (void)fprintf(stderr, "%s Couldn't open the file \"%s\".\n", debug_error_str, file_name);
     }
 
-    fseek(file, 0, SEEK_END);
+    (void)fseek(file, 0, SEEK_END);
     size_t file_size = ftell(file);
     rewind(file);
 
-    String_8 str = {
-        .ptr = malloc(file_size),
-        .length = (u32)file_size,
-    };
-    str.ptr = malloc(file_size);
-    str.length = (u32)file_size;
+    String_8 str = str8_make_allocate((u32)file_size, allocator);
 
     if (str.ptr == NULL) {
-        printf("Error: Memory allocation for string buffer failed while reading the file \"%s\".\n", file_name);
-        fclose(file);
+        (void)fprintf(stderr, "%s Memory allocation for string buffer failed while reading the file \"%s\".\n", debug_error_str, file_name);
+        (void)fclose(file);
         str.length = 0;
     }
 
     if (fread(str.ptr, 1, file_size, file) != file_size) {
-        printf("Error: Failure reading the file \"%s\".\n", file_name);
-        fclose(file);
+        (void)fprintf(stderr, "%s Failure reading the file \"%s\".\n", debug_error_str, file_name);
+        (void)fclose(file);
         free(str.ptr);
         str.ptr = NULL;
         str.length = 0;
     }
 
-    fclose(file);
+    (void)fclose(file);
 
     return str;
 }
@@ -625,7 +689,7 @@ void keyboard_state_free() {
 }
 
 void keyboard_state_old_update() {
-    memcpy(keyboard_state_old, keyboard_state_current, keyboard_number_of_keys);
+    (void)memcpy(keyboard_state_old, keyboard_state_current, keyboard_number_of_keys);
 }
 
 void keyboard_state_init() {
@@ -656,7 +720,7 @@ bool is_unpressed_keycode(SDL_KeyCode keycode) {
 bool check_gl_error() {
     s32 error = glGetError();
     if (error != 0) {
-        fprintf(stderr, "%s OpenGL error: %d.\n", debug_error_str, error);
+        (void)fprintf(stderr, "%s OpenGL error: %d.\n", debug_error_str, error);
         return false;
     }
     return true;
@@ -665,15 +729,14 @@ bool check_gl_error() {
 int init_sdl_gl() {
     // Initialize SDL.
     if (SDL_Init(SDL_INIT_VIDEO) < 0 || SDL_Init(SDL_INIT_AUDIO) < 0) {
-        fprintf(stderr, "%s SDL could not initialize! SDL_Error: %s\n", debug_error_str, SDL_GetError());
+        (void)fprintf(stderr, "%s SDL could not initialize! SDL_Error: %s\n", debug_error_str, SDL_GetError());
         return 1;
     }
-    
 
     // Set OpenGL attributes.
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    (void)SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    (void)SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    (void)SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     
     return 0;
 }
@@ -682,25 +745,25 @@ SDL_Window* create_gl_window(const char *title, int x, int y, int width, int hei
     // Create window.
     SDL_Window *window = SDL_CreateWindow(title, x, y, width, height, SDL_WINDOW_OPENGL);
     if (window == NULL) {
-        fprintf(stderr, "%s Window could not be created! SDL_Error: %s\n", debug_error_str, SDL_GetError());
+        (void)fprintf(stderr, "%s Window could not be created! SDL_Error: %s\n", debug_error_str, SDL_GetError());
         return NULL;
     }
 
     // Create OpenGL context.
     SDL_GLContext glContext = SDL_GL_CreateContext(window);
     if (glContext == NULL) {
-        fprintf(stderr, "%s OpenGL context could not be created! SDL_Error: %s\n", debug_error_str, SDL_GetError());
+        (void)fprintf(stderr, "%s OpenGL context could not be created! SDL_Error: %s\n", debug_error_str, SDL_GetError());
         return window;
     }
 
     if (SDL_GL_MakeCurrent(window, glContext) < 0) {
-        fprintf(stderr, "%s OpenGL current could not be created! SDL_Error: %s\n", debug_error_str, SDL_GetError());
+        (void)fprintf(stderr, "%s OpenGL current could not be created! SDL_Error: %s\n", debug_error_str, SDL_GetError());
         return window;
     }
 
     // Initialize GLEW.
     if (glewInit() != GLEW_OK) {
-        fprintf(stderr, "%s GLEW initialization failed!\n", debug_error_str);
+        (void)fprintf(stderr, "%s GLEW initialization failed!\n", debug_error_str);
         return window;
     }
 
@@ -710,11 +773,11 @@ SDL_Window* create_gl_window(const char *title, int x, int y, int width, int hei
 int init_sdl_audio() {
     // Initialize sound.
     if (Mix_Init(MIX_INIT_MP3) < 0) {
-        fprintf(stderr, "%s SDL Mixer could not initialize! SDL_Error: %s\n", debug_error_str, SDL_GetError());
+        (void)fprintf(stderr, "%s SDL Mixer could not initialize! SDL_Error: %s\n", debug_error_str, SDL_GetError());
         return 1;
     }
 
-    Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024);
+    (void)Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024);
     return 0;
 }
 
@@ -750,11 +813,11 @@ void graphics_init() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // Init strings for shader defines.
-    str8_init_statically(&vertex_shader_defines, "#define VERTEX\n");
-    str8_init_statically(&fragment_shader_defines, "#define FRAGMENT\n");
+    vertex_shader_defines = str8_make_statically("#define VERTEX\n");
+    fragment_shader_defines = str8_make_statically("#define FRAGMENT\n");
 
     // Init string for version tage in shader, for shader creation to look for when loading shader.
-    str8_init_statically(&shader_version_tag, "#version");
+    shader_version_tag = str8_make_statically("#version");
 
     // Make stbi flip images vertically when loading.
     stbi_set_flip_vertically_on_load(true);
@@ -772,8 +835,8 @@ void graphics_init() {
         shader_uniform_samplers[i] = i;
 
     // Setting drawing variables.
-    verticies = array_list_make(float, 40); // @Leak.
-    quad_indicies = array_list_make(u32, MAX_QUADS_PER_BATCH * 6); // @Leak.
+    verticies = array_list_make(float, 40); // @Leak
+    quad_indicies = array_list_make(u32, MAX_QUADS_PER_BATCH * 6); // @Leak
     Array_List_Header *header = (void *)(quad_indicies) - sizeof(Array_List_Header);
     header->length = MAX_QUADS_PER_BATCH * 6;
     for (u32 i = 0; i < MAX_QUADS_PER_BATCH * 6; i++) {
@@ -789,7 +852,7 @@ Texture texture_load(char *texture_path) {
     u8 *data = stbi_load(texture_path, &texture.width, &texture.height, &nrChannels, 0);
 
     if (data == NULL) {
-        fprintf(stderr, "%s Stbi couldn't load image.\n", debug_error_str);
+        (void)fprintf(stderr, "%s Stbi couldn't load image.\n", debug_error_str);
     }
 
     // Loading a single image into texture example:
@@ -817,9 +880,9 @@ void texture_unload(Texture *texture) {
 }
 
 
-const char *SHADER_UNIFORM_PR_MATRIX_NAME = "pr_matrix";
-const char *SHADER_UNIFORM_ML_MATRIX_NAME = "ml_matrix";
-const char *SHADER_UNIFORM_SAMPLERS_NAME = "u_textures";
+const char *shader_uniform_pr_matrix_name = "pr_matrix";
+const char *shader_uniform_ml_matrix_name = "ml_matrix";
+const char *shader_uniform_samplers_name = "u_textures";
 
 /**
  * @Temporary: Later, setting uniforms either will be done more automatically, or simplified to be done by uset manually. 
@@ -827,19 +890,19 @@ const char *SHADER_UNIFORM_SAMPLERS_NAME = "u_textures";
  */
 void shader_set_uniforms(Shader *program) {
     // Get uniform's locations based on unifrom's name.
-    s32 quad_shader_pr_matrix_loc = glGetUniformLocation(program->id, SHADER_UNIFORM_PR_MATRIX_NAME);
+    s32 quad_shader_pr_matrix_loc = glGetUniformLocation(program->id, shader_uniform_pr_matrix_name);
     if (quad_shader_pr_matrix_loc == -1) {
-        fprintf(stderr, "%s Couldn't get location of %s uniform, in shader.\n", debug_error_str, SHADER_UNIFORM_PR_MATRIX_NAME);
+        (void)fprintf(stderr, "%s Couldn't get location of %s uniform, in shader.\n", debug_error_str, shader_uniform_pr_matrix_name);
     }
 
-    s32 quad_shader_ml_matrix_loc = glGetUniformLocation(program->id, SHADER_UNIFORM_ML_MATRIX_NAME);
+    s32 quad_shader_ml_matrix_loc = glGetUniformLocation(program->id, shader_uniform_ml_matrix_name);
     if (quad_shader_ml_matrix_loc == -1) {
-        fprintf(stderr, "%s Couldn't get location of %s uniform, in shader.\n", debug_error_str, SHADER_UNIFORM_ML_MATRIX_NAME);
+        (void)fprintf(stderr, "%s Couldn't get location of %s uniform, in shader.\n", debug_error_str, shader_uniform_ml_matrix_name);
     }
 
-    s32 quad_shader_samplers_loc = glGetUniformLocation(program->id, SHADER_UNIFORM_SAMPLERS_NAME);
+    s32 quad_shader_samplers_loc = glGetUniformLocation(program->id, shader_uniform_samplers_name);
     if (quad_shader_samplers_loc == -1) {
-        fprintf(stderr, "%s Couldn't get location of %s uniform, in shader.\n", debug_error_str, SHADER_UNIFORM_SAMPLERS_NAME);
+        (void)fprintf(stderr, "%s Couldn't get location of %s uniform, in shader.\n", debug_error_str, shader_uniform_samplers_name);
     }
     
     // Set uniforms.
@@ -854,7 +917,7 @@ bool check_program(u32 id, char *shader_path) {
     s32 is_linked = 0;
     glGetProgramiv(id, GL_LINK_STATUS, &is_linked); 
     if (is_linked == GL_FALSE) {
-        fprintf(stderr, "%s Program of %s, failed to link.\n", debug_error_str, shader_path);
+        (void)fprintf(stderr, "%s Program of %s, failed to link.\n", debug_error_str, shader_path);
        
         s32 info_log_length;
         glGetProgramiv(id, GL_INFO_LOG_LENGTH, &info_log_length);
@@ -862,7 +925,7 @@ bool check_program(u32 id, char *shader_path) {
         
         s32 buffer_size;
         glGetProgramInfoLog(id, info_log_length, &buffer_size, buffer);
-        fprintf(stderr, "%s\n", buffer);
+        (void)fprintf(stderr, "%s\n", buffer);
         
         free(buffer);
 
@@ -875,7 +938,7 @@ bool check_shader(u32 id, char *shader_path) {
     s32 is_compiled = 0;
     glGetShaderiv(id, GL_COMPILE_STATUS, &is_compiled); 
     if (is_compiled == GL_FALSE) {
-        fprintf(stderr, "%s Shader of %s, failed to compile.\n", debug_error_str, shader_path);
+        (void)fprintf(stderr, "%s Shader of %s, failed to compile.\n", debug_error_str, shader_path);
         
         s32 info_log_length;
         glGetShaderiv(id, GL_INFO_LOG_LENGTH, &info_log_length);
@@ -883,7 +946,7 @@ bool check_shader(u32 id, char *shader_path) {
         
         s32 buffer_size;
         glGetShaderInfoLog(id, info_log_length, &buffer_size, buffer);
-        fprintf(stderr, "%s\n", buffer);
+        (void)fprintf(stderr, "%s\n", buffer);
         
         free(buffer);
 
@@ -901,10 +964,10 @@ Shader shader_load(char *shader_path) {
      */
     String_8 shader_source, shader_version, shader_code;
 
-    shader_source = read_file_into_str8(shader_path);
+    shader_source = read_file_into_str8(shader_path, &std_allocator);
     
     // Splitting on two substrings, "shader_version" and "shader_code".
-    u32 start_of_version_tag = str8_index_of_str8(&shader_source, &shader_version_tag, 0, shader_source.length);
+    u32 start_of_version_tag = str8_index_of(&shader_source, &shader_version_tag, 0, shader_source.length);
     u32 end_of_version_tag = str8_index_of_char(&shader_source, '\n', start_of_version_tag, shader_source.length);
     str8_substring(&shader_source, &shader_version, start_of_version_tag, end_of_version_tag + 1);
     str8_substring(&shader_source, &shader_code, end_of_version_tag + 1, shader_source.length);
@@ -912,9 +975,11 @@ Shader shader_load(char *shader_path) {
     // Passing all parts in the respective shader sources, where defines inserted between version and code parts.
     const char *vertex_shader_source[3] = { (char *)shader_version.ptr, (char *)vertex_shader_defines.ptr, (char *)shader_code.ptr };
     const char *fragment_shader_source[3] = { (char *)shader_version.ptr, (char *)fragment_shader_defines.ptr, (char *)shader_code.ptr };
-
-    // Specifying lengths, because we don't pass null terminated strings.
-    // @Important: Since defines length depends on whether we are loading vertex or fragment shader, we set it's length values separately when loading each.
+    
+    /**
+     * Specifying lengths, because we don't pass null terminated strings.
+     * @Important: Since defines length depends on whether we are loading vertex or fragment shader, we set it's length values separately when loading each.
+     */
     shader_strings_lengths[0] = shader_version.length;
     shader_strings_lengths[2] = shader_code.length;
     
@@ -926,7 +991,7 @@ Shader shader_load(char *shader_path) {
     glCompileShader(vertex_shader);
     
     // Check results for errors.
-    check_shader(vertex_shader, shader_path);
+    (void)check_shader(vertex_shader, shader_path);
 
     shader_strings_lengths[1] = fragment_shader_defines.length;
     u32 fragment_shader;
@@ -935,7 +1000,7 @@ Shader shader_load(char *shader_path) {
     glCompileShader(fragment_shader);
     
     // Check results for errors.
-    check_shader(fragment_shader, shader_path);
+    (void)check_shader(fragment_shader, shader_path);
     
     Shader shader = {
         .id = glCreateProgram(),
@@ -946,13 +1011,13 @@ Shader shader_load(char *shader_path) {
     glLinkProgram(shader.id);
     
     // Check results for errors.
-    check_program(shader.id, shader_path);
+    (void)check_program(shader.id, shader_path);
 
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
     
 
-    str8_free(&shader_source);
+    str8_free(&shader_source, &std_allocator);
 
     return shader;
 }
@@ -978,9 +1043,9 @@ void shader_update_projection(Shader *shader, Camera *camera, float window_width
     float camera_height_offset = (window_height / (float) camera->unit_scale) / 2;
     shader_uniform_pr_matrix = matrix4f_orthographic(camera->center.x - camera_width_offset, camera->center.x + camera_width_offset, camera->center.y - camera_height_offset, camera->center.y + camera_height_offset, -1.0f, 1.0f);
 
-    s32 quad_shader_pr_matrix_loc = glGetUniformLocation(shader->id, SHADER_UNIFORM_PR_MATRIX_NAME);
+    s32 quad_shader_pr_matrix_loc = glGetUniformLocation(shader->id, shader_uniform_pr_matrix_name);
     if (quad_shader_pr_matrix_loc == -1) {
-        fprintf(stderr, "%s Couldn't get location of %s uniform, in quad_shader.\n", debug_error_str, SHADER_UNIFORM_PR_MATRIX_NAME);
+        (void)fprintf(stderr, "%s Couldn't get location of %s uniform, in quad_shader.\n", debug_error_str, shader_uniform_pr_matrix_name);
     }
 
     // Set uniforms.
@@ -1058,7 +1123,7 @@ float add_texture_to_slots(Texture *texture) {
         texture_ids_filled_length++;
         return texture_ids_filled_length - 1;
     }
-    fprintf(stderr, "%s Overflow of 32 texture slots limit, can't add texture id: %d, to current draw call texture slots.\n", debug_error_str, texture->id);
+    (void)fprintf(stderr, "%s Overflow of 32 texture slots limit, can't add texture id: %d, to current draw call texture slots.\n", debug_error_str, texture->id);
     return -1.0f;
 }
 
@@ -1124,15 +1189,15 @@ Font_Baked font_bake(u8 *font_data, float font_size) {
     
     // Init font info.
     stbtt_fontinfo info;
-    stbtt_InitFont(&info, font_data, 0);
+    (void)stbtt_InitFont(&info, font_data, 0);
 
     // Initing needed variables. @Temporary: Maybe move some of this variables into font struct directly and calculate when baking bitmap.
     s32 ascent, descent, line_gap;
     stbtt_GetFontVMetrics(&info, &ascent, &descent, &line_gap);
 
     float scale = stbtt_ScaleForPixelHeight(&info, font_size);
-    result.line_height = (s32)((ascent - descent + line_gap) * scale);
-    result.baseline = (s32)(ascent * -scale);
+    result.line_height = (s32)((float)(ascent - descent + line_gap) * scale);
+    result.baseline = (s32)((float)ascent * -scale);
 
     // Create a bitmap.
     result.bitmap.width    = 512;
@@ -1144,7 +1209,7 @@ Font_Baked font_bake(u8 *font_data, float font_size) {
     result.chars_count      = 96;  // Number of characters to bake.
                          
     result.chars = malloc(result.chars_count * sizeof(stbtt_bakedchar));
-    stbtt_BakeFontBitmap(font_data, 0, font_size, bitmap, result.bitmap.width, result.bitmap.height, result.first_char_code, result.chars_count, result.chars);
+    (void)stbtt_BakeFontBitmap(font_data, 0, font_size, bitmap, result.bitmap.width, result.bitmap.height, result.first_char_code, result.chars_count, result.chars);
 
     // Create an OpenGL texture.
     glGenTextures(1, &result.bitmap.id);
@@ -1169,66 +1234,6 @@ void font_free(Font_Baked *font) {
     font->first_char_code = 0;
     font->chars_count = 0;
     texture_unload(&font->bitmap);
-}
-
-
-
-void test_font() {
-    // Step 1: Load the TTF file into memory
-    FILE* fontFile = fopen("font.ttf", "rb");
-    if (!fontFile) {
-        perror("Failed to open font file");
-    }
-
-    fseek(fontFile, 0, SEEK_END);
-    long fontSize = ftell(fontFile);
-    fseek(fontFile, 0, SEEK_SET);
-
-    unsigned char* fontBuffer = (unsigned char*)malloc(fontSize);
-    if (!fontBuffer) {
-        perror("Failed to allocate memory for font");
-        fclose(fontFile);
-    }
-
-    fread(fontBuffer, 1, fontSize, fontFile);
-    fclose(fontFile);
-
-    // Step 2: Initialize the font
-    stbtt_fontinfo font;
-    if (!stbtt_InitFont(&font, fontBuffer, 0)) {
-        fprintf(stderr, "Failed to initialize font\n");
-        free(fontBuffer);
-    }
-
-    // Step 3: Get some metrics
-    int ascent, descent, lineGap;
-    stbtt_GetFontVMetrics(&font, &ascent, &descent, &lineGap);
-
-    float scale = stbtt_ScaleForPixelHeight(&font, 24.0f); // Scale for 24 pixels tall
-    
-    char* message = "Hello World!";
-    unsigned char* bitmap;
-
-    for (s32 i = 0; i < strlen(message); i++) {
-        // Step 4: Rasterize a glyph
-        int codepoint = message[i];
-        int width, height, xoff, yoff;
-        bitmap = stbtt_GetCodepointBitmap(&font, 0, scale, codepoint, &width, &height, &xoff, &yoff);
-
-        // Step 5: Render the glyph (for simplicity, just print to console)
-        for (int y = 0; y < height; ++y) {
-            for (int x = 0; x < width; ++x) {
-                printf("%c", bitmap[y * width + x] > 128 ? '#' : ' ');
-            }
-            printf("\n");
-        }
-    }
-
- 
-
-    // Clean up
-    stbtt_FreeBitmap(bitmap, NULL);
-    free(fontBuffer);
 }
 
 
@@ -1320,10 +1325,6 @@ void draw_line_data(float *line_data, u32 count) {
 
 
 
-
-
-
-
 void print_verticies() {
     u32 stride = 1;
     if (active_drawer != NULL) {
@@ -1333,39 +1334,39 @@ void print_verticies() {
         stride = active_line_drawer->program->vertex_stride;
     }
 
-    printf("\n---------- VERTICIES -----------\n");
+    (void)printf("\n---------- VERTICIES -----------\n");
     u32 length = array_list_length(&verticies);
     if (length == 0) {
-        printf("[ ]\n");
+        (void)printf("[ ]\n");
     }
     else {
-        printf("[ ");
+        (void)printf("[ ");
         for (u32 i = 0; i < length - 1; i++) {
-            printf("%6.1f, ", verticies[i]);
+            (void)printf("%6.1f, ", verticies[i]);
             if ((i + 1) % stride == 0)
-                printf("\n  ");
+                (void)printf("\n  ");
         }
-        printf("%6.1f  ]\n", verticies[length - 1]);
+        (void)printf("%6.1f  ]\n", verticies[length - 1]);
     }
 
-    printf("Length   : %8d\n", length);
-    printf("Capacity : %8d\n\n", array_list_capacity(&verticies));
+   (void)printf("Length   : %8d\n", length);
+   (void)printf("Capacity : %8d\n\n", array_list_capacity(&verticies));
     
 }
 
 void print_indicies() {
-    printf("\n----------- INDICIES -----------\n");
-    printf("[\n\n  ");
+    (void)printf("\n----------- INDICIES -----------\n");
+    (void)printf("[\n\n  ");
     u32 length = array_list_length(&quad_indicies);
     for (u32 i = 0; i < length; i++) {
         if ((i + 1) % 6 == 0)
-            printf("%4d\n\n  ", quad_indicies[i]);
+            (void)printf("%4d\n\n  ", quad_indicies[i]);
         else if ((i + 1) % 3 == 0)
-            printf("%4d\n  ", quad_indicies[i]);
+            (void)printf("%4d\n  ", quad_indicies[i]);
         else
-            printf("%4d, ", quad_indicies[i]);
+            (void)printf("%4d, ", quad_indicies[i]);
     }
-    printf("\r]\n");
-    printf("Length   : %8d\n", length);
-    printf("Capacity : %8d\n\n", array_list_capacity(&quad_indicies));
+   (void)printf("\r]\n");
+   (void)printf("Length   : %8d\n", length);
+   (void)printf("Capacity : %8d\n\n", array_list_capacity(&quad_indicies));
 }
