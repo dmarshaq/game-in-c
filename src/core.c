@@ -215,14 +215,40 @@ u32 str8_index_of_char(String_8 *str, char character, u32 start, u32 end) {
 
 
 /**
+ * Data strucutres.
+ */
+
+void * buffer_data_struct_resize(void *data, u32 new_size, u32 header_size, Allocator *allocator) {
+    data = allocator_re_alloc(allocator, data - header_size, new_size * header_size);
+
+    if (data == NULL) {
+        (void)fprintf(stderr, "%s Couldn't reallocate memory of size: %u bytes, for the buffer data structure.\n", debug_error_str, new_size + header_size);
+        return NULL;
+    }
+
+    return data + header_size;
+}
+
+void * buffer_data_struct_make(u32 size, u32 header_size, Allocator *allocator) {
+    void *data = allocator_alloc(allocator, size * header_size);
+
+    if (data == NULL) {
+        (void)fprintf(stderr, "%s Couldn't allocate memory of size: %u bytes, for the buffer data structure.\n", debug_error_str, size + header_size);
+        return NULL;
+    }
+
+    return data + header_size;
+}
+
+/**
  * Dynamic array.
  */
 
-void* _dynamic_array_make(u32 item_size, u32 capacity) {
-    Dynamic_Array_Header *ptr = malloc(item_size * capacity + sizeof(Dynamic_Array_Header));
+void * _array_list_make(u32 item_size, u32 capacity) {
+    Array_List_Header *ptr = malloc(item_size * capacity + sizeof(Array_List_Header));
 
     if (ptr == NULL) {
-        (void)fprintf(stderr, "%s Couldn't allocate more memory of size: %lld bytes, for the dynamic array.\n", debug_error_str, item_size * capacity + sizeof(Dynamic_Array_Header));
+        (void)fprintf(stderr, "%s Couldn't allocate more memory of size: %lld bytes, for the array list.\n", debug_error_str, item_size * capacity + sizeof(Array_List_Header));
         return NULL;
     }
 
@@ -230,29 +256,29 @@ void* _dynamic_array_make(u32 item_size, u32 capacity) {
     ptr->item_size = item_size;
     ptr->length = 0;
     
-    // @Important: Because ptr is of type "Dynamic_Array_Header *", compiler will automatically translate "ptr + 1" to "(void*)(ptr) + sizeof(Dynamic_Array_Header)".
+    // @Important: Because ptr is of type "Array_List_Header *", compiler will automatically translate "ptr + 1" to "(void*)(ptr) + sizeof(Array_List_Header)".
     return ptr + 1;
 }
 
-u32 _dynamic_array_length(void *list) {
-    return ((Dynamic_Array_Header *)(list - sizeof(Dynamic_Array_Header)))->length;
+u32 _array_list_length(void *list) {
+    return ((Array_List_Header *)(list - sizeof(Array_List_Header)))->length;
 }
 
-u32 _dynamic_array_capacity(void *list) {
-    return ((Dynamic_Array_Header *)(list - sizeof(Dynamic_Array_Header)))->capacity;
+u32 _array_list_capacity(void *list) {
+    return ((Array_List_Header *)(list - sizeof(Array_List_Header)))->capacity;
 }
 
-u32 _dynamic_array_item_size(void *list) {
-    return ((Dynamic_Array_Header *)(list - sizeof(Dynamic_Array_Header)))->item_size;
+u32 _array_list_item_size(void *list) {
+    return ((Array_List_Header *)(list - sizeof(Array_List_Header)))->item_size;
 }
 
-void _dynamic_array_resize(void **list, u32 new_capacity) {
-    Dynamic_Array_Header *header = *list - sizeof(Dynamic_Array_Header);
+void _array_list_resize(void **list, u32 new_capacity) {
+    Array_List_Header *header = *list - sizeof(Array_List_Header);
     
-    header = realloc(header, header->item_size * new_capacity + sizeof(Dynamic_Array_Header));
+    header = realloc(header, header->item_size * new_capacity + sizeof(Array_List_Header));
     
     if (header == NULL) {
-        (void)fprintf(stderr, "%s Couldn't reallocate memory of size: %lld bytes, for the dynamic array.\n", debug_error_str, header->item_size * new_capacity + sizeof(Dynamic_Array_Header));
+        (void)fprintf(stderr, "%s Couldn't reallocate memory of size: %lld bytes, for the dynamic array.\n", debug_error_str, header->item_size * new_capacity + sizeof(Array_List_Header));
         return;
     }
 
@@ -261,8 +287,8 @@ void _dynamic_array_resize(void **list, u32 new_capacity) {
     *list = header + 1;
 }
 
-void _dynamic_array_free(void **list) {
-    free(*list - sizeof(Dynamic_Array_Header));
+void _array_list_free(void **list) {
+    free(*list - sizeof(Array_List_Header));
     *list = NULL;
 }
 
@@ -276,7 +302,7 @@ void _array_list_resize_to_fit(void **list, u32 requiered_length) {
     if (requiered_length > header->capacity) {
         u32 capacity_multiplier = (u32)powf(2.0f, (float)((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
 
-        _dynamic_array_resize(list, header->capacity * capacity_multiplier);
+        _array_list_resize(list, header->capacity * capacity_multiplier);
         header = *list - sizeof(Array_List_Header); // @Important: Resizing perfomed above changes the pointer to the list, so it is neccessary to reassign header ptr again, otherwise segfault occure.
     }
 
@@ -332,7 +358,7 @@ typedef enum hashmap_slot_state : u8 {
  * Depricates all slots in the hashmap which are occupied.
  */
 void hashmap_depricate(Hashmap *map) {
-    Dynamic_Array_Header *header = map->buffer - sizeof(Dynamic_Array_Header);
+    Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
     void *slot = NULL;
     for (u32 i = 0; i < header->capacity; i++) {
         slot = map->buffer + i * header->item_size;
@@ -348,7 +374,7 @@ void hashmap_depricate(Hashmap *map) {
  * Returns true, if it succesfully readressed a slot.
  */
 bool hashmap_readress(Hashmap *map, u32 slot_index) {
-    Dynamic_Array_Header *header = map->buffer - sizeof(Dynamic_Array_Header);
+    Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
     void *original_slot = map->buffer + slot_index * header->item_size;
 
     // Check of deprication.
@@ -401,7 +427,7 @@ bool hashmap_readress(Hashmap *map, u32 slot_index) {
 }
 
 Hashmap _hashmap_make(u32 item_size, u32 initial_capacity) {
-    void *buffer = _dynamic_array_make(sizeof(u8) + sizeof(u32) + sizeof(void *) + item_size, initial_capacity);
+    void *buffer = _array_list_make(sizeof(u8) + sizeof(u32) + sizeof(void *) + item_size, initial_capacity);
     memset(buffer, 0, initial_capacity * (sizeof(u8) + sizeof(u32) + sizeof(void *) + item_size));
 
     return (Hashmap) {
@@ -411,7 +437,7 @@ Hashmap _hashmap_make(u32 item_size, u32 initial_capacity) {
 }
 
 void _hashmap_put(Hashmap *map, void *key, u32 key_size, void *item, u32 count) {
-    Dynamic_Array_Header *header = map->buffer - sizeof(Dynamic_Array_Header);
+    Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
     
     // Resize first if needed.
     u32 requiered_length = header->length + count;
@@ -423,8 +449,8 @@ void _hashmap_put(Hashmap *map, void *key, u32 key_size, void *item, u32 count) 
         // Resize.
         u32 capacity_multiplier = (u32)powf(2.0f, (float)((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
         
-        _dynamic_array_resize(&map->buffer, header->capacity * capacity_multiplier);
-        header = map->buffer - sizeof(Dynamic_Array_Header);
+        _array_list_resize(&map->buffer, header->capacity * capacity_multiplier);
+        header = map->buffer - sizeof(Array_List_Header);
         
         // Cleaning out new memory.
         memset(map->buffer + header->length * header->item_size, 0, (header->capacity - header->length) * header->item_size);
@@ -469,7 +495,7 @@ void _hashmap_put(Hashmap *map, void *key, u32 key_size, void *item, u32 count) 
 }
 
 void* _hashmap_get(Hashmap *map, void *key, u32 key_size) {
-    Dynamic_Array_Header *header = map->buffer - sizeof(Dynamic_Array_Header);
+    Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
     
     void *slot = NULL;
     u32 index = map->hash_func(key, key_size) % header->capacity;
@@ -483,14 +509,14 @@ void* _hashmap_get(Hashmap *map, void *key, u32 key_size) {
         }
 
         if (j >= header->capacity) {
-            (void)fprintf(stderr, "%s Couldn't find element stored under the key: 0x%016x of size: %4d.\n", debug_error_str, key, key_size);
+            (void)fprintf(stderr, "%s Couldn't find element stored under the key: 0x%16p of size: %4d.\n", debug_error_str, key, key_size);
             return NULL;
         }
     }
 }
 
 void _hashmap_remove(Hashmap *map, void *key, u32 key_size) {
-    Dynamic_Array_Header *header = map->buffer - sizeof(Dynamic_Array_Header);
+    Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
     void *slot = map->buffer + (map->hash_func(key, key_size) % header->capacity) * header->item_size;
     *(u8 *)slot = SLOT_EMPTY;
 }
@@ -515,20 +541,20 @@ u32 hashf(void *key, u32 key_size) {
 }
 
 void hashmap_print_slot(u8 state, u32 key_size, void *key, void *item, u32 item_size) {
-    // Print the state and key_size as hex
-    printf("State: 0x%02x | Key Size: 0x%08x | Key: 0x%016x | Item: ", state, key_size, key);
+    // Print the state and key_size as hex.
+    printf("State: 0x%02x | Key Size: 0x%08x | Key: 0x%16p | Item: ", state, key_size, key);
     
-    // Print the item in hex based on item_size
+    // Print the item in hex based on item_size.
     for (u32 i = 0; i < item_size; i++) {
-        printf("%02x ", *((u8 *)item + i));  // Print each byte of the item
+        printf("%02x ", *((u8 *)item + i));  // Print each byte of the item.
     }
 
-    // Print newline after item
+    // Print newline after item.
     printf("\n");
 }
 
 void hashmap_print(Hashmap *map) {
-    Dynamic_Array_Header *header = map->buffer - sizeof(Dynamic_Array_Header);
+    Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
     void *slot = NULL;
 
     u8 state;

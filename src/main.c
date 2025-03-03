@@ -85,7 +85,6 @@ int main(int argc, char *argv[]) {
         SDL_GL_SwapWindow(window);
 
         if (is_pressed_keycode(SDLK_r)) {
-            printf("hot reload!\n");
             if(!reload_libplug()) {
                 fprintf(stderr, "%s Failed to hot reload plug.dll.\n", debug_error_str);
             }
@@ -106,7 +105,7 @@ bool reload_libplug() {
         plug_unload(&state);
         FreeLibrary(mod);
         int result = system("make -B plug");
-        printf("Compilation result: %d\n", result);
+        printf("Hot reload compilation result: %d\n-----------------------------------------\n\n", result);
     }
 
     mod = LoadLibrary(libplug_path);

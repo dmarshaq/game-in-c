@@ -24,30 +24,7 @@ void viewport_reset(Plug_State *state);
 
 void plug_init(Plug_State *state) {
 
-    Allocator my_allocator = arena_make(1000 * sizeof(s32));
 
-    s32 *values = allocator_alloc(&my_allocator, 1000 * sizeof(s32));
-    for (u32 i = 0; i < 1000; i++) {
-        printf("at %03d, value: %d;\n", i, values[i]);
-    }
-    // allocator_free(&my_allocator, values);
-
-    arena_destroy(&my_allocator);
-
-    printf("test!\n");
-    s32 *nums = array_list_make(s32, 2);
-    array_list_append(&nums, -23);
-    array_list_append(&nums, 16);
-    array_list_append(&nums, -1);
-    array_list_append(&nums, -249);
-    array_list_append(&nums, 100);
-    // printf("%u <- next index?\n", n_index);
-    // nums[1] = 16;
-
-
-    for (u32 i = 0; i < array_list_length(&nums); i++) {
-        printf("%2d -> % -4d\n", i, nums[i]);
-    }
 
     // *(&nums)[_array_list_next_index((void **)(&nums))] = -23;
 
@@ -129,7 +106,24 @@ void plug_load(Plug_State *state) {
     state->font_baked_small = font_bake(font_data, 16.0f);
 
     free(font_data);
+    
 
+    // Testing arrays.
+    s32 *nums = array_list_make(s32, 2);
+    array_list_append(&nums, -23);
+    array_list_append(&nums, 16);
+    array_list_append(&nums, -1);
+    array_list_append(&nums, -249);
+    array_list_append(&nums, 100);
+    // printf("%u <- next index?\n", n_index);
+    // nums[1] = 16;
+
+
+    for (u32 i = 0; i < array_list_length(&nums); i++) {
+        printf("%2d -> % -4d\n", i, nums[i]);
+    }
+
+    array_list_free(&nums);
 }
 
 void plug_unload(Plug_State *state) {

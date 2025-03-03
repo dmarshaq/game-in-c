@@ -163,17 +163,15 @@ u32 str8_index_of_char(String_8 *str, char character, u32 start, u32 end);
  * Where size can work as array length or be direct representation of some data set size, as example: if a ptr is a "void *" then size would directly corelate to the count of bytes stored under that pointer.
  * All this said, it might be beneficial to store and access ptr + size data not separately but combined into a fat ptr. It would allow to easily combine specific length to specific ptr.
  * But it is very @Important to not base the whole codebase off of the fat ptr concept, and most importantly try to desing such an interface to easily convert and blend between fat ptr and non-sized ptr, like null terminated strings to sized based strings.
- *
+ */
+
+
+
+/**
  * Dynamic array.
  */
 
-typedef struct dynamic_array_header {
-    u32 capacity;
-    u32 length;
-    u32 item_size;
-} Dynamic_Array_Header;
-
-void *   _dynamic_array_make(u32 item_size, u32 initial_capacity);
+void *  _dynamic_array_make(u32 item_size, u32 initial_capacity);
 u32     _dynamic_array_length(void *array);
 u32     _dynamic_array_capacity(void *array);
 u32     _dynamic_array_item_size(void *array);
@@ -197,7 +195,12 @@ void    _dynamic_array_free(void **array);
 #define array_list_free(ptr_list)                                   _dynamic_array_free((void **)ptr_list)
 #define array_list_unordered_remove(ptr_list, index)                _array_list_unordered_remove((void *)*ptr_list, index)
 
-typedef Dynamic_Array_Header Array_List_Header;
+typedef struct array_list_header {
+    u32 capacity;
+    u32 length;
+    u32 item_size;
+} Array_List_Header;
+
 
 void    _array_list_resize_to_fit(void **list, u32 requiered_length);
 u32     _array_list_next_index(void **list);
