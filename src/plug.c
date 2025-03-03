@@ -34,6 +34,24 @@ void plug_init(Plug_State *state) {
 
     arena_destroy(&my_allocator);
 
+    printf("test!\n");
+    s32 *nums = array_list_make(s32, 2);
+    array_list_append_auto(&nums, -23);
+    array_list_append_auto(&nums, 16);
+    array_list_append_auto(&nums, -1);
+    array_list_append_auto(&nums, -249);
+    array_list_append_auto(&nums, 100);
+    // printf("%u <- next index?\n", n_index);
+    // nums[1] = 16;
+
+
+    for (u32 i = 0; i < array_list_length(&nums); i++) {
+        printf("%2d -> % -4d\n", i, nums[i]);
+    }
+
+    // *(&nums)[_array_list_next_index((void **)(&nums))] = -23;
+
+
     // s64 item;
 
     // Hashmap hashmap = hashmap_make(s64, 16);
@@ -62,14 +80,17 @@ void plug_init(Plug_State *state) {
 
     // item = 10;
     // hashmap_put(&hashmap, "candy", strlen("candy"), &item);
+
+
+
+    // hashmap_remove(&hashmap, "apple", 5);
     // hashmap_print(&hashmap);
-
-
-
     // s64 *num = hashmap_get(&hashmap, "apple", 5);
     // 
     // // memcpy(buffer, (char *)hashmap_get(&hashmap, "candy", 5), 5 );
-    // printf("%d\n", *num);
+    // printf("0x%016x\n", num);
+
+
     // 
     // hashmap_free(&hashmap);
 }

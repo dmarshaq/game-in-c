@@ -217,6 +217,7 @@ u32 str8_index_of_char(String_8 *str, char character, u32 start, u32 end) {
 /**
  * Dynamic array.
  */
+
 void* _dynamic_array_make(u32 item_size, u32 capacity) {
     Dynamic_Array_Header *ptr = malloc(item_size * capacity + sizeof(Dynamic_Array_Header));
 
@@ -269,13 +270,35 @@ void _dynamic_array_free(void **list) {
  * Array list.
  */
 
+void _array_list_resize_to_fit(void **list, u32 requiered_length) {
+    Array_List_Header *header = *list - sizeof(Array_List_Header);
+
+    if (requiered_length > header->capacity) {
+        printf("resizing!\n");
+        u32 capacity_multiplier = (u32)powf(2.0f, (float)((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
+
+        _dynamic_array_resize(list, header->capacity * capacity_multiplier);
+        header = *list - sizeof(Array_List_Header);
+    }
+
+    if (header->capacity * header->item_size < header->item_size) {
+        (void)fprintf(stderr, "%s List capacity is less than size of elements being passed after being resized, capacity size: %d, size of elements: %d.\n", debug_error_str, header->capacity * header->item_size, header->item_size);
+    }
+}
+
+u32 _array_list_next_index(void **list) {
+    Array_List_Header *header = *list - sizeof(Array_List_Header);
+    header->length += 1;
+    return header->length - 1;
+}
+
 void _array_list_append(void **list, void *item, u32 count) {
 
     Array_List_Header *header = *list - sizeof(Array_List_Header);
     
     u32 requiered_length = header->length + count;
     if (requiered_length > header->capacity) {
-        u32 capacity_multiplier = powf(2.0f, ((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
+        u32 capacity_multiplier = (u32)powf(2.0f, (float)((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
         
         _dynamic_array_resize(list, header->capacity * capacity_multiplier);
         header = *list - sizeof(Array_List_Header);
@@ -331,8 +354,8 @@ void hashmap_depricate(Hashmap *map) {
 
 /**
  * Internal function only.
- * @Important: Recursivly readresses slots if its depricated.
- * Returns true if it succesfully readressed a slot.
+ * @Recursion: Recursivly readresses slots if its depricated.
+ * Returns true, if it succesfully readressed a slot.
  */
 bool hashmap_readress(Hashmap *map, u32 slot_index) {
     Dynamic_Array_Header *header = map->buffer - sizeof(Dynamic_Array_Header);
@@ -408,7 +431,7 @@ void _hashmap_put(Hashmap *map, void *key, u32 key_size, void *item, u32 count) 
 
         
         // Resize.
-        u32 capacity_multiplier = powf(2.0f, ((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
+        u32 capacity_multiplier = (u32)powf(2.0f, (float)((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
         
         _dynamic_array_resize(&map->buffer, header->capacity * capacity_multiplier);
         header = map->buffer - sizeof(Dynamic_Array_Header);
@@ -464,20 +487,22 @@ void* _hashmap_get(Hashmap *map, void *key, u32 key_size) {
     // Trying to get slot that is not occupied.
     for (u32 j = 0; ; j++) {
         slot = map->buffer + (index + j) * header->item_size;
-        printf("Checking index: %d, %d, %d, %d\n", index + j, *(u8 *)slot == SLOT_OCCUPIED, *(u32 *)(slot + sizeof(u8)) == key_size, memcmp(*(void **)(slot + sizeof(u8) + sizeof(u32)), key, key_size) == 0);
+        // printf("Checking index: %d, %d, %d, %d\n", index + j, *(u8 *)slot == SLOT_OCCUPIED, *(u32 *)(slot + sizeof(u8)) == key_size, memcmp(*(void **)(slot + sizeof(u8) + sizeof(u32)), key, key_size) == 0);
         if (*(u8 *)slot == SLOT_OCCUPIED && *(u32 *)(slot + sizeof(u8)) == key_size && memcmp(*(void **)(slot + sizeof(u8) + sizeof(u32)), key, key_size) == 0) {
             return slot + sizeof(u8) + sizeof(u32) + sizeof(void *);
         }
 
         if (j >= header->capacity) {
-            (void)fprintf(stderr, "%s Couldn't find element stored under the key: 0x%8p of size: %4d.\n", debug_error_str, key, key_size);
+            (void)fprintf(stderr, "%s Couldn't find element stored under the key: 0x%016x of size: %4d.\n", debug_error_str, key, key_size);
             return NULL;
         }
     }
 }
 
 void _hashmap_remove(Hashmap *map, void *key, u32 key_size) {
-
+    Dynamic_Array_Header *header = map->buffer - sizeof(Dynamic_Array_Header);
+    void *slot = map->buffer + (map->hash_func(key, key_size) % header->capacity) * header->item_size;
+    *(u8 *)slot = SLOT_EMPTY;
 }
 
 u32 hashf(void *key, u32 key_size) {
@@ -501,7 +526,7 @@ u32 hashf(void *key, u32 key_size) {
 
 void hashmap_print_slot(u8 state, u32 key_size, void *key, void *item, u32 item_size) {
     // Print the state and key_size as hex
-    printf("State: 0x%02x | Key Size: 0x%08x | Key: 0x%8p | Item: ", state, key_size, key);
+    printf("State: 0x%02x | Key Size: 0x%08x | Key: 0x%016x | Item: ", state, key_size, key);
     
     // Print the item in hex based on item_size
     for (u32 i = 0; i < item_size; i++) {

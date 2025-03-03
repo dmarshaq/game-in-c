@@ -189,6 +189,7 @@ void    _dynamic_array_free(void **array);
 #define array_list_length(ptr_list)                                 _dynamic_array_length((void*)*ptr_list)
 #define array_list_capacity(ptr_list)                               _dynamic_array_capacity((void*)*ptr_list)
 #define array_list_item_size(ptr_list)                              _dynamic_array_item_size((void*)*ptr_list)
+#define array_list_append_auto(ptr_list, item)                      _array_list_resize_to_fit((void **)(ptr_list), array_list_length(ptr_list) + 1); (*ptr_list)[_array_list_next_index((void **)(ptr_list))] = item
 #define array_list_append(ptr_list, ptr_item)                       _array_list_append((void**)ptr_list, (void*)ptr_item, 1)
 #define array_list_append_multiple(ptr_list, item_arr, count)       _array_list_append((void**)ptr_list, (void*)item_arr, count)
 #define array_list_pop(ptr_list)                                    _array_list_pop((void*)*ptr_list, 1)
@@ -199,6 +200,8 @@ void    _dynamic_array_free(void **array);
 
 typedef Dynamic_Array_Header Array_List_Header;
 
+void    _array_list_resize_to_fit(void **list, u32 requiered_length);
+u32     _array_list_next_index(void **list);
 void    _array_list_append(void **list, void *item, u32 count);
 void    _array_list_pop(void *list, u32 count);
 void    _array_list_clear(void *list);
