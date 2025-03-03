@@ -173,7 +173,7 @@ typedef struct dynamic_array_header {
     u32 item_size;
 } Dynamic_Array_Header;
 
-void*   _dynamic_array_make(u32 item_size, u32 initial_capacity);
+void *   _dynamic_array_make(u32 item_size, u32 initial_capacity);
 u32     _dynamic_array_length(void *array);
 u32     _dynamic_array_capacity(void *array);
 u32     _dynamic_array_item_size(void *array);
@@ -186,23 +186,22 @@ void    _dynamic_array_free(void **array);
  */
 
 #define array_list_make(type, capacity)                             (type *)_dynamic_array_make(sizeof(type), capacity)
-#define array_list_length(ptr_list)                                 _dynamic_array_length((void*)*ptr_list)
-#define array_list_capacity(ptr_list)                               _dynamic_array_capacity((void*)*ptr_list)
-#define array_list_item_size(ptr_list)                              _dynamic_array_item_size((void*)*ptr_list)
-#define array_list_append_auto(ptr_list, item)                      _array_list_resize_to_fit((void **)(ptr_list), array_list_length(ptr_list) + 1); (*ptr_list)[_array_list_next_index((void **)(ptr_list))] = item
-#define array_list_append(ptr_list, ptr_item)                       _array_list_append((void**)ptr_list, (void*)ptr_item, 1)
-#define array_list_append_multiple(ptr_list, item_arr, count)       _array_list_append((void**)ptr_list, (void*)item_arr, count)
-#define array_list_pop(ptr_list)                                    _array_list_pop((void*)*ptr_list, 1)
-#define array_list_pop_multiple(ptr_list, count)                    _array_list_pop((void*)*ptr_list, count)
-#define array_list_clear(ptr_list)                                  _array_list_clear((void*)*ptr_list)
-#define array_list_free(ptr_list)                                   _dynamic_array_free((void**)ptr_list)
-#define array_list_unordered_remove(ptr_list, index)                _array_list_unordered_remove((void*)*ptr_list, index)
+#define array_list_length(ptr_list)                                 _dynamic_array_length((void *)*ptr_list)
+#define array_list_capacity(ptr_list)                               _dynamic_array_capacity((void *)*ptr_list)
+#define array_list_item_size(ptr_list)                              _dynamic_array_item_size((void *)*ptr_list)
+#define array_list_append(ptr_list, item)                           _array_list_resize_to_fit((void **)(ptr_list), array_list_length(ptr_list) + 1); (*ptr_list)[_array_list_next_index((void **)(ptr_list))] = item
+#define array_list_append_multiple(ptr_list, item_arr, count)       _array_list_append_multiple((void **)ptr_list, (void *)item_arr, count)
+#define array_list_pop(ptr_list)                                    _array_list_pop((void *)*ptr_list, 1)
+#define array_list_pop_multiple(ptr_list, count)                    _array_list_pop((void *)*ptr_list, count)
+#define array_list_clear(ptr_list)                                  _array_list_clear((void *)*ptr_list)
+#define array_list_free(ptr_list)                                   _dynamic_array_free((void **)ptr_list)
+#define array_list_unordered_remove(ptr_list, index)                _array_list_unordered_remove((void *)*ptr_list, index)
 
 typedef Dynamic_Array_Header Array_List_Header;
 
 void    _array_list_resize_to_fit(void **list, u32 requiered_length);
 u32     _array_list_next_index(void **list);
-void    _array_list_append(void **list, void *item, u32 count);
+void    _array_list_append_multiple(void **list, void *items, u32 count);
 void    _array_list_pop(void *list, u32 count);
 void    _array_list_clear(void *list);
 void    _array_list_unordered_remove(void *list, u32 index);
@@ -230,7 +229,7 @@ typedef struct hashmap {
 
 Hashmap _hashmap_make(u32 item_size, u32 initial_capacity);
 void    _hashmap_put(Hashmap *map, void *key, u32 key_size, void *item, u32 count);
-void*   _hashmap_get(Hashmap *map, void *key, u32 key_size);
+void *   _hashmap_get(Hashmap *map, void *key, u32 key_size);
 void    _hashmap_remove(Hashmap *map, void *key, u32 key_size);
 
 u32 hashf(void *key, u32 key_size);
@@ -378,7 +377,7 @@ char* read_file_into_string(char *file_name, Allocator *allocator);
  * Return pointer to the buffer and sets buffer size in bytes into the file_size.
  * @Important: Buffer should be freed manually when not used anymore.
  */
-void* read_file_into_buffer(char *file_name, u64 *file_size, Allocator *allocator);
+void * read_file_into_buffer(char *file_name, u64 *file_size, Allocator *allocator);
 
 /**
  * @Incomplete: Write description.

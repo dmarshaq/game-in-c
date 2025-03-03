@@ -274,15 +274,14 @@ void _array_list_resize_to_fit(void **list, u32 requiered_length) {
     Array_List_Header *header = *list - sizeof(Array_List_Header);
 
     if (requiered_length > header->capacity) {
-        printf("resizing!\n");
         u32 capacity_multiplier = (u32)powf(2.0f, (float)((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
 
         _dynamic_array_resize(list, header->capacity * capacity_multiplier);
-        header = *list - sizeof(Array_List_Header);
+        header = *list - sizeof(Array_List_Header); // @Important: Resizing perfomed above changes the pointer to the list, so it is neccessary to reassign header ptr again, otherwise segfault occure.
     }
 
-    if (header->capacity * header->item_size < header->item_size) {
-        (void)fprintf(stderr, "%s List capacity is less than size of elements being passed after being resized, capacity size: %d, size of elements: %d.\n", debug_error_str, header->capacity * header->item_size, header->item_size);
+    if (header->capacity * header->item_size < requiered_length * header->item_size) {
+        (void)fprintf(stderr, "%s List capacity size is less than requiered length size after being resized, capacity size: %d, size of requiered length: %d.\n", debug_error_str, header->capacity * header->item_size, requiered_length * header->item_size);
     }
 }
 
@@ -292,24 +291,15 @@ u32 _array_list_next_index(void **list) {
     return header->length - 1;
 }
 
-void _array_list_append(void **list, void *item, u32 count) {
-
+void _array_list_append_multiple(void **list, void *items, u32 count) {
     Array_List_Header *header = *list - sizeof(Array_List_Header);
     
     u32 requiered_length = header->length + count;
-    if (requiered_length > header->capacity) {
-        u32 capacity_multiplier = (u32)powf(2.0f, (float)((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
-        
-        _dynamic_array_resize(list, header->capacity * capacity_multiplier);
-        header = *list - sizeof(Array_List_Header);
-    }
 
-    if (header->capacity * header->item_size < count * header->item_size) {
-        (void)fprintf(stderr, "%s List capacity is less than size of elements being passed after being resized, capacity size: %d, size of elements: %d.\n", debug_error_str, header->capacity * header->item_size, header->item_size * count);
-        return;
-    }
+    _array_list_resize_to_fit(list, requiered_length);
+    header = *list - sizeof(Array_List_Header); // @Important: Resizing perfomed above might change the pointer to the list, so it is neccessary to reassign header ptr again, otherwise segfault occure.
     
-    memcpy(*list + header->length * header->item_size, item, header->item_size * count);
+    memcpy(*list + header->length * header->item_size, items, header->item_size * count);
     header->length += count;
 }
 
@@ -328,7 +318,7 @@ void _array_list_unordered_remove(void *list, u32 index) {
 }
 
 /**
- * Hashmap. @Incomplete: Finish implementations.
+ * Hashmap. @Todo: Refactor implementation.
  */
 
 typedef enum hashmap_slot_state : u8 {

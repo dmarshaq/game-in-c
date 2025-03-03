@@ -36,11 +36,11 @@ void plug_init(Plug_State *state) {
 
     printf("test!\n");
     s32 *nums = array_list_make(s32, 2);
-    array_list_append_auto(&nums, -23);
-    array_list_append_auto(&nums, 16);
-    array_list_append_auto(&nums, -1);
-    array_list_append_auto(&nums, -249);
-    array_list_append_auto(&nums, 100);
+    array_list_append(&nums, -23);
+    array_list_append(&nums, 16);
+    array_list_append(&nums, -1);
+    array_list_append(&nums, -249);
+    array_list_append(&nums, 100);
     // printf("%u <- next index?\n", n_index);
     // nums[1] = 16;
 
