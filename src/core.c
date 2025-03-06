@@ -218,34 +218,45 @@ u32 str8_index_of_char(String_8 *str, char character, u32 start, u32 end) {
  * Data strucutres.
  */
 
-void * buffer_data_struct_resize(void *data, u32 new_size, u32 header_size, Allocator *allocator) {
-    data = allocator_re_alloc(allocator, data - header_size, new_size * header_size);
-
-    if (data == NULL) {
-        (void)fprintf(stderr, "%s Couldn't reallocate memory of size: %u bytes, for the buffer data structure.\n", debug_error_str, new_size + header_size);
-        return NULL;
-    }
-
-    return data + header_size;
-}
+typedef struct buffer_data_struct_header {
+    Allocator *allocator;
+} Buffer_Data_Struct_Header;
 
 void * buffer_data_struct_make(u32 size, u32 header_size, Allocator *allocator) {
-    void *data = allocator_alloc(allocator, size * header_size);
+    void *data = allocator_alloc(allocator, size + header_size + sizeof(Buffer_Data_Struct_Header));
+    ((Buffer_Data_Struct_Header *)data)->allocator = allocator;
 
     if (data == NULL) {
-        (void)fprintf(stderr, "%s Couldn't allocate memory of size: %u bytes, for the buffer data structure.\n", debug_error_str, size + header_size);
+        (void)fprintf(stderr, "%s Couldn't allocate memory of size: %llu bytes, for the buffer data structure.\n", debug_error_str, size + header_size + sizeof(Buffer_Data_Struct_Header));
         return NULL;
     }
 
-    return data + header_size;
+    return data + header_size + sizeof(Buffer_Data_Struct_Header);
+}
+
+void * buffer_data_struct_resize(void *data, u32 new_size, u32 header_size) {
+    Allocator *allocator = ((Buffer_Data_Struct_Header *)(data - header_size - sizeof(Buffer_Data_Struct_Header)))->allocator;
+    data = allocator_re_alloc(allocator, data - header_size - sizeof(Buffer_Data_Struct_Header), new_size + header_size + sizeof(Buffer_Data_Struct_Header));
+
+    if (data == NULL) {
+        (void)fprintf(stderr, "%s Couldn't reallocate memory of size: %llu bytes, for the buffer data structure.\n", debug_error_str, new_size + header_size + sizeof(Buffer_Data_Struct_Header));
+        return NULL;
+    }
+
+    return data + header_size + sizeof(Buffer_Data_Struct_Header);
+}
+
+void buffer_data_struct_free(void *data, u32 header_size) {
+    Allocator *allocator = ((Buffer_Data_Struct_Header *)(data - header_size - sizeof(Buffer_Data_Struct_Header)))->allocator;
+    allocator_free(allocator, data - header_size - sizeof(Buffer_Data_Struct_Header));
 }
 
 /**
- * Dynamic array.
+ * Array list.
  */
 
-void * _array_list_make(u32 item_size, u32 capacity) {
-    Array_List_Header *ptr = malloc(item_size * capacity + sizeof(Array_List_Header));
+void * _array_list_make(u32 item_size, u32 capacity, Allocator *allocator) {
+    Array_List_Header *ptr = buffer_data_struct_make(item_size * capacity, sizeof(Array_List_Header), allocator) - sizeof(Array_List_Header);
 
     if (ptr == NULL) {
         (void)fprintf(stderr, "%s Couldn't allocate more memory of size: %lld bytes, for the array list.\n", debug_error_str, item_size * capacity + sizeof(Array_List_Header));
@@ -272,29 +283,10 @@ u32 _array_list_item_size(void *list) {
     return ((Array_List_Header *)(list - sizeof(Array_List_Header)))->item_size;
 }
 
-void _array_list_resize(void **list, u32 new_capacity) {
-    Array_List_Header *header = *list - sizeof(Array_List_Header);
-    
-    header = realloc(header, header->item_size * new_capacity + sizeof(Array_List_Header));
-    
-    if (header == NULL) {
-        (void)fprintf(stderr, "%s Couldn't reallocate memory of size: %lld bytes, for the dynamic array.\n", debug_error_str, header->item_size * new_capacity + sizeof(Array_List_Header));
-        return;
-    }
-
-
-    header->capacity = new_capacity;
-    *list = header + 1;
-}
-
 void _array_list_free(void **list) {
-    free(*list - sizeof(Array_List_Header));
+    buffer_data_struct_free(*list, sizeof(Array_List_Header));
     *list = NULL;
 }
-
-/**
- * Array list.
- */
 
 void _array_list_resize_to_fit(void **list, u32 requiered_length) {
     Array_List_Header *header = *list - sizeof(Array_List_Header);
@@ -302,8 +294,10 @@ void _array_list_resize_to_fit(void **list, u32 requiered_length) {
     if (requiered_length > header->capacity) {
         u32 capacity_multiplier = (u32)powf(2.0f, (float)((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
 
-        _array_list_resize(list, header->capacity * capacity_multiplier);
+        
+        *list = buffer_data_struct_resize(*list, header->capacity * capacity_multiplier * header->item_size, sizeof(Array_List_Header));
         header = *list - sizeof(Array_List_Header); // @Important: Resizing perfomed above changes the pointer to the list, so it is neccessary to reassign header ptr again, otherwise segfault occure.
+        header->capacity *= capacity_multiplier * header->item_size; // @Important: Using "buffer_data_struct_resize" will not update capacity in the header, because this function is only designed to only resize the whole data structure, there for it is needed to manually set capacity to the right value, which was intended.
     }
 
     if (header->capacity * header->item_size < requiered_length * header->item_size) {
@@ -347,235 +341,235 @@ void _array_list_unordered_remove(void *list, u32 index) {
  * Hashmap. @Todo: Refactor implementation.
  */
 
-typedef enum hashmap_slot_state : u8 {
-    SLOT_EMPTY      = 0x00,
-    SLOT_OCCUPIED   = 0x01,
-    SLOT_DEPRICATED = 0x02,
-} Hashmap_Slot_State;
-
-/**
- * Internal function only.
- * Depricates all slots in the hashmap which are occupied.
- */
-void hashmap_depricate(Hashmap *map) {
-    Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
-    void *slot = NULL;
-    for (u32 i = 0; i < header->capacity; i++) {
-        slot = map->buffer + i * header->item_size;
-        if (*(u8 *)slot == SLOT_OCCUPIED) {
-            *(u8 *)slot = SLOT_DEPRICATED;
-        }
-    }
-}
-
-/**
- * Internal function only.
- * @Recursion: Recursivly readresses slots if its depricated.
- * Returns true, if it succesfully readressed a slot.
- */
-bool hashmap_readress(Hashmap *map, u32 slot_index) {
-    Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
-    void *original_slot = map->buffer + slot_index * header->item_size;
-
-    // Check of deprication.
-    if (*(u8 *)original_slot != SLOT_DEPRICATED)
-        return false;
-
-    *(u8 *)original_slot = SLOT_EMPTY;
-
-    
-    // Buffer key_size and key.
-    u32 key_size = *((u32 *)(original_slot + sizeof(u8)));
-    void *key = *((void **)(original_slot + sizeof(u8) + sizeof(u32)));
-    
-    u32 hash = map->hash_func(key, key_size);
-    u32 index = hash % header->capacity;
-    void *slot;
-    // Trying to get slot that is not occupied.
-    for (u32 j = 0; ; j++) {
-        slot = map->buffer + ((index + j) % header->capacity) * header->item_size;
-        if (*(u8 *)slot == SLOT_DEPRICATED) {
-            if (hashmap_readress(map, ((index + j) % header->capacity))) {
-
-                // Copying item to slot.
-                *(u8 *)slot = SLOT_OCCUPIED;
-                *(u32 *)(slot + sizeof(u8)) = key_size;
-                *(void **)(slot + sizeof(u8) + sizeof(u32)) = key;
-                memcpy(slot + sizeof(u8) + sizeof(u32) + sizeof(void *), original_slot + sizeof(u8) + sizeof(u32) + sizeof(void *), (header->item_size - sizeof(u8) - sizeof(u32) - sizeof(void *)));
-
-                break;
-            }
-        }
-        else if (*(u8 *)slot == SLOT_EMPTY) {
-
-            // Copying item to slot.
-            *(u8 *)slot = SLOT_OCCUPIED;
-            *(u32 *)(slot + sizeof(u8)) = key_size;
-            *(void **)(slot + sizeof(u8) + sizeof(u32)) = key;
-            memcpy(slot + sizeof(u8) + sizeof(u32) + sizeof(void *), original_slot + sizeof(u8) + sizeof(u32) + sizeof(void *), (header->item_size - sizeof(u8) - sizeof(u32) - sizeof(void *)));
-
-            break;
-        }
-
-        if (j >= header->capacity) {
-            (void)fprintf(stderr, "%s Couldn't readress depricated slot in the hashmap.\n", debug_error_str);
-            return false;
-        }
-    }
-    
-    return true;
-}
-
-Hashmap _hashmap_make(u32 item_size, u32 initial_capacity) {
-    void *buffer = _array_list_make(sizeof(u8) + sizeof(u32) + sizeof(void *) + item_size, initial_capacity);
-    memset(buffer, 0, initial_capacity * (sizeof(u8) + sizeof(u32) + sizeof(void *) + item_size));
-
-    return (Hashmap) {
-        .buffer = buffer, 
-        .hash_func = hashf,
-    };
-}
-
-void _hashmap_put(Hashmap *map, void *key, u32 key_size, void *item, u32 count) {
-    Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
-    
-    // Resize first if needed.
-    u32 requiered_length = header->length + count;
-    if (requiered_length > header->capacity) {
-        // Fisrt depricate all occupied slots, since after resize, they will not be valid.
-        hashmap_depricate(map);
-
-        
-        // Resize.
-        u32 capacity_multiplier = (u32)powf(2.0f, (float)((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
-        
-        _array_list_resize(&map->buffer, header->capacity * capacity_multiplier);
-        header = map->buffer - sizeof(Array_List_Header);
-        
-        // Cleaning out new memory.
-        memset(map->buffer + header->length * header->item_size, 0, (header->capacity - header->length) * header->item_size);
-
-
-        // Readress all depricated slots.
-        for (u32 i = 0; i < header->length; i++) {
-            hashmap_readress(map, i);
-        }
-    }
-
-    // Copying items one by one since every item needs its own hash.
-    u32 hash = 0;
-    u32 index = 0;
-    void *slot = NULL;
-    for (u32 i = 0; i < count; i++) {
-        hash = map->hash_func(key, key_size);
-        index = hash % header->capacity;
-
-        // Trying to get slot that is not occupied.
-        for (u32 j = 0; ; j++) {
-            slot = map->buffer + ((index + j) % header->capacity) * header->item_size;
-            if (*(u8 *)slot == SLOT_EMPTY) {
-                
-                // Copying item to slot.
-                *(u8 *)slot = SLOT_OCCUPIED;
-                *(u32 *)(slot + sizeof(u8)) = key_size;
-                *(void **)(slot + sizeof(u8) + sizeof(u32)) = key;
-                memcpy(slot + sizeof(u8) + sizeof(u32) + sizeof(void *), item + (header->item_size - sizeof(u8) - sizeof(u32) - sizeof(void *)) * i, (header->item_size - sizeof(u8) - sizeof(u32) - sizeof(void *)));
-                
-                break;
-            }
-            
-            if (j >= header->capacity) {
-                (void)fprintf(stderr, "%s Couldn't find slot for the element (%d) in the hashmap.\n", debug_error_str, i);
-                return;
-            }
-        }
-    }
-
-    header->length += count;
-}
-
-void* _hashmap_get(Hashmap *map, void *key, u32 key_size) {
-    Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
-    
-    void *slot = NULL;
-    u32 index = map->hash_func(key, key_size) % header->capacity;
-
-    // Trying to get slot that is not occupied.
-    for (u32 j = 0; ; j++) {
-        slot = map->buffer + (index + j) * header->item_size;
-        // printf("Checking index: %d, %d, %d, %d\n", index + j, *(u8 *)slot == SLOT_OCCUPIED, *(u32 *)(slot + sizeof(u8)) == key_size, memcmp(*(void **)(slot + sizeof(u8) + sizeof(u32)), key, key_size) == 0);
-        if (*(u8 *)slot == SLOT_OCCUPIED && *(u32 *)(slot + sizeof(u8)) == key_size && memcmp(*(void **)(slot + sizeof(u8) + sizeof(u32)), key, key_size) == 0) {
-            return slot + sizeof(u8) + sizeof(u32) + sizeof(void *);
-        }
-
-        if (j >= header->capacity) {
-            (void)fprintf(stderr, "%s Couldn't find element stored under the key: 0x%16p of size: %4d.\n", debug_error_str, key, key_size);
-            return NULL;
-        }
-    }
-}
-
-void _hashmap_remove(Hashmap *map, void *key, u32 key_size) {
-    Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
-    void *slot = map->buffer + (map->hash_func(key, key_size) % header->capacity) * header->item_size;
-    *(u8 *)slot = SLOT_EMPTY;
-}
-
-u32 hashf(void *key, u32 key_size) {
-    if (key == NULL || key_size == 0) {
-        (void)fprintf(stderr, "%s Couldn't hash a NULL or 0 sized key.\n", debug_error_str);
-        return 0;
-    }
-    if (key_size < 2) {
-        return *(u8 *)(key);
-    }
-    
-    u32 hash = 0;
-    u8 *hash_ptr = (u8 *)&(hash);
-    hash_ptr[0] = *((u8 *)(key) + 0);
-    hash_ptr[1] = *((u8 *)(key) + 1);
-    hash_ptr[2] = *((u8 *)(key) + key_size - 1);
-    hash_ptr[3] = *((u8 *)(key) + key_size - 2);
-
-    return hash;
-}
-
-void hashmap_print_slot(u8 state, u32 key_size, void *key, void *item, u32 item_size) {
-    // Print the state and key_size as hex.
-    printf("State: 0x%02x | Key Size: 0x%08x | Key: 0x%16p | Item: ", state, key_size, key);
-    
-    // Print the item in hex based on item_size.
-    for (u32 i = 0; i < item_size; i++) {
-        printf("%02x ", *((u8 *)item + i));  // Print each byte of the item.
-    }
-
-    // Print newline after item.
-    printf("\n");
-}
-
-void hashmap_print(Hashmap *map) {
-    Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
-    void *slot = NULL;
-
-    u8 state;
-    u32 key_size;
-    void *key;
-    void *item;
-
-    u32 item_size = header->item_size - sizeof(u8) - sizeof(u32) - sizeof(void *);
-
-    printf("\n--------Hashmap--------\n");
-    for (u32 i = 0; i < header->capacity; i++) {
-        slot = map->buffer + i * header->item_size;
-
-        state = *((u8 *)slot);
-        key_size = *((u32 *)(slot + sizeof(u8)));
-        key = *((void **)(slot + sizeof(u8) + sizeof(u32)));
-        item = slot + sizeof(u8) + sizeof(u32) + sizeof(void *);
-
-        hashmap_print_slot(state, key_size, key, item, item_size);
-    }
-}
+// typedef enum hashmap_slot_state : u8 {
+//     SLOT_EMPTY      = 0x00,
+//     SLOT_OCCUPIED   = 0x01,
+//     SLOT_DEPRICATED = 0x02,
+// } Hashmap_Slot_State;
+// 
+// /**
+//  * Internal function only.
+//  * Depricates all slots in the hashmap which are occupied.
+//  */
+// void hashmap_depricate(Hashmap *map) {
+//     Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
+//     void *slot = NULL;
+//     for (u32 i = 0; i < header->capacity; i++) {
+//         slot = map->buffer + i * header->item_size;
+//         if (*(u8 *)slot == SLOT_OCCUPIED) {
+//             *(u8 *)slot = SLOT_DEPRICATED;
+//         }
+//     }
+// }
+// 
+// /**
+//  * Internal function only.
+//  * @Recursion: Recursivly readresses slots if its depricated.
+//  * Returns true, if it succesfully readressed a slot.
+//  */
+// bool hashmap_readress(Hashmap *map, u32 slot_index) {
+//     Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
+//     void *original_slot = map->buffer + slot_index * header->item_size;
+// 
+//     // Check of deprication.
+//     if (*(u8 *)original_slot != SLOT_DEPRICATED)
+//         return false;
+// 
+//     *(u8 *)original_slot = SLOT_EMPTY;
+// 
+//     
+//     // Buffer key_size and key.
+//     u32 key_size = *((u32 *)(original_slot + sizeof(u8)));
+//     void *key = *((void **)(original_slot + sizeof(u8) + sizeof(u32)));
+//     
+//     u32 hash = map->hash_func(key, key_size);
+//     u32 index = hash % header->capacity;
+//     void *slot;
+//     // Trying to get slot that is not occupied.
+//     for (u32 j = 0; ; j++) {
+//         slot = map->buffer + ((index + j) % header->capacity) * header->item_size;
+//         if (*(u8 *)slot == SLOT_DEPRICATED) {
+//             if (hashmap_readress(map, ((index + j) % header->capacity))) {
+// 
+//                 // Copying item to slot.
+//                 *(u8 *)slot = SLOT_OCCUPIED;
+//                 *(u32 *)(slot + sizeof(u8)) = key_size;
+//                 *(void **)(slot + sizeof(u8) + sizeof(u32)) = key;
+//                 memcpy(slot + sizeof(u8) + sizeof(u32) + sizeof(void *), original_slot + sizeof(u8) + sizeof(u32) + sizeof(void *), (header->item_size - sizeof(u8) - sizeof(u32) - sizeof(void *)));
+// 
+//                 break;
+//             }
+//         }
+//         else if (*(u8 *)slot == SLOT_EMPTY) {
+// 
+//             // Copying item to slot.
+//             *(u8 *)slot = SLOT_OCCUPIED;
+//             *(u32 *)(slot + sizeof(u8)) = key_size;
+//             *(void **)(slot + sizeof(u8) + sizeof(u32)) = key;
+//             memcpy(slot + sizeof(u8) + sizeof(u32) + sizeof(void *), original_slot + sizeof(u8) + sizeof(u32) + sizeof(void *), (header->item_size - sizeof(u8) - sizeof(u32) - sizeof(void *)));
+// 
+//             break;
+//         }
+// 
+//         if (j >= header->capacity) {
+//             (void)fprintf(stderr, "%s Couldn't readress depricated slot in the hashmap.\n", debug_error_str);
+//             return false;
+//         }
+//     }
+//     
+//     return true;
+// }
+// 
+// Hashmap _hashmap_make(u32 item_size, u32 initial_capacity) {
+//     void *buffer = _array_list_make(sizeof(u8) + sizeof(u32) + sizeof(void *) + item_size, initial_capacity);
+//     memset(buffer, 0, initial_capacity * (sizeof(u8) + sizeof(u32) + sizeof(void *) + item_size));
+// 
+//     return (Hashmap) {
+//         .buffer = buffer, 
+//         .hash_func = hashf,
+//     };
+// }
+// 
+// void _hashmap_put(Hashmap *map, void *key, u32 key_size, void *item, u32 count) {
+//     Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
+//     
+//     // Resize first if needed.
+//     u32 requiered_length = header->length + count;
+//     if (requiered_length > header->capacity) {
+//         // Fisrt depricate all occupied slots, since after resize, they will not be valid.
+//         hashmap_depricate(map);
+// 
+//         
+//         // Resize.
+//         u32 capacity_multiplier = (u32)powf(2.0f, (float)((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
+//         
+//         _array_list_resize(&map->buffer, header->capacity * capacity_multiplier);
+//         header = map->buffer - sizeof(Array_List_Header);
+//         
+//         // Cleaning out new memory.
+//         memset(map->buffer + header->length * header->item_size, 0, (header->capacity - header->length) * header->item_size);
+// 
+// 
+//         // Readress all depricated slots.
+//         for (u32 i = 0; i < header->length; i++) {
+//             hashmap_readress(map, i);
+//         }
+//     }
+// 
+//     // Copying items one by one since every item needs its own hash.
+//     u32 hash = 0;
+//     u32 index = 0;
+//     void *slot = NULL;
+//     for (u32 i = 0; i < count; i++) {
+//         hash = map->hash_func(key, key_size);
+//         index = hash % header->capacity;
+// 
+//         // Trying to get slot that is not occupied.
+//         for (u32 j = 0; ; j++) {
+//             slot = map->buffer + ((index + j) % header->capacity) * header->item_size;
+//             if (*(u8 *)slot == SLOT_EMPTY) {
+//                 
+//                 // Copying item to slot.
+//                 *(u8 *)slot = SLOT_OCCUPIED;
+//                 *(u32 *)(slot + sizeof(u8)) = key_size;
+//                 *(void **)(slot + sizeof(u8) + sizeof(u32)) = key;
+//                 memcpy(slot + sizeof(u8) + sizeof(u32) + sizeof(void *), item + (header->item_size - sizeof(u8) - sizeof(u32) - sizeof(void *)) * i, (header->item_size - sizeof(u8) - sizeof(u32) - sizeof(void *)));
+//                 
+//                 break;
+//             }
+//             
+//             if (j >= header->capacity) {
+//                 (void)fprintf(stderr, "%s Couldn't find slot for the element (%d) in the hashmap.\n", debug_error_str, i);
+//                 return;
+//             }
+//         }
+//     }
+// 
+//     header->length += count;
+// }
+// 
+// void* _hashmap_get(Hashmap *map, void *key, u32 key_size) {
+//     Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
+//     
+//     void *slot = NULL;
+//     u32 index = map->hash_func(key, key_size) % header->capacity;
+// 
+//     // Trying to get slot that is not occupied.
+//     for (u32 j = 0; ; j++) {
+//         slot = map->buffer + (index + j) * header->item_size;
+//         // printf("Checking index: %d, %d, %d, %d\n", index + j, *(u8 *)slot == SLOT_OCCUPIED, *(u32 *)(slot + sizeof(u8)) == key_size, memcmp(*(void **)(slot + sizeof(u8) + sizeof(u32)), key, key_size) == 0);
+//         if (*(u8 *)slot == SLOT_OCCUPIED && *(u32 *)(slot + sizeof(u8)) == key_size && memcmp(*(void **)(slot + sizeof(u8) + sizeof(u32)), key, key_size) == 0) {
+//             return slot + sizeof(u8) + sizeof(u32) + sizeof(void *);
+//         }
+// 
+//         if (j >= header->capacity) {
+//             (void)fprintf(stderr, "%s Couldn't find element stored under the key: 0x%16p of size: %4d.\n", debug_error_str, key, key_size);
+//             return NULL;
+//         }
+//     }
+// }
+// 
+// void _hashmap_remove(Hashmap *map, void *key, u32 key_size) {
+//     Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
+//     void *slot = map->buffer + (map->hash_func(key, key_size) % header->capacity) * header->item_size;
+//     *(u8 *)slot = SLOT_EMPTY;
+// }
+// 
+// u32 hashf(void *key, u32 key_size) {
+//     if (key == NULL || key_size == 0) {
+//         (void)fprintf(stderr, "%s Couldn't hash a NULL or 0 sized key.\n", debug_error_str);
+//         return 0;
+//     }
+//     if (key_size < 2) {
+//         return *(u8 *)(key);
+//     }
+//     
+//     u32 hash = 0;
+//     u8 *hash_ptr = (u8 *)&(hash);
+//     hash_ptr[0] = *((u8 *)(key) + 0);
+//     hash_ptr[1] = *((u8 *)(key) + 1);
+//     hash_ptr[2] = *((u8 *)(key) + key_size - 1);
+//     hash_ptr[3] = *((u8 *)(key) + key_size - 2);
+// 
+//     return hash;
+// }
+// 
+// void hashmap_print_slot(u8 state, u32 key_size, void *key, void *item, u32 item_size) {
+//     // Print the state and key_size as hex.
+//     printf("State: 0x%02x | Key Size: 0x%08x | Key: 0x%16p | Item: ", state, key_size, key);
+//     
+//     // Print the item in hex based on item_size.
+//     for (u32 i = 0; i < item_size; i++) {
+//         printf("%02x ", *((u8 *)item + i));  // Print each byte of the item.
+//     }
+// 
+//     // Print newline after item.
+//     printf("\n");
+// }
+// 
+// void hashmap_print(Hashmap *map) {
+//     Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
+//     void *slot = NULL;
+// 
+//     u8 state;
+//     u32 key_size;
+//     void *key;
+//     void *item;
+// 
+//     u32 item_size = header->item_size - sizeof(u8) - sizeof(u32) - sizeof(void *);
+// 
+//     printf("\n--------Hashmap--------\n");
+//     for (u32 i = 0; i < header->capacity; i++) {
+//         slot = map->buffer + i * header->item_size;
+// 
+//         state = *((u8 *)slot);
+//         key_size = *((u32 *)(slot + sizeof(u8)));
+//         key = *((void **)(slot + sizeof(u8) + sizeof(u32)));
+//         item = slot + sizeof(u8) + sizeof(u32) + sizeof(void *);
+// 
+//         hashmap_print_slot(state, key_size, key, item, item_size);
+//     }
+// }
 
 
 /**
@@ -876,8 +870,8 @@ void graphics_init() {
         shader_uniform_samplers[i] = i;
 
     // Setting drawing variables.
-    verticies = array_list_make(float, 40); // @Leak
-    quad_indicies = array_list_make(u32, MAX_QUADS_PER_BATCH * 6); // @Leak
+    verticies = array_list_make(float, 40, &std_allocator); // @Leak
+    quad_indicies = array_list_make(u32, MAX_QUADS_PER_BATCH * 6, &std_allocator); // @Leak
     Array_List_Header *header = (void *)(quad_indicies) - sizeof(Array_List_Header);
     header->length = MAX_QUADS_PER_BATCH * 6;
     for (u32 i = 0; i < MAX_QUADS_PER_BATCH * 6; i++) {

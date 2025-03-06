@@ -151,49 +151,22 @@ u32 str8_index_of_string(String_8 *str, char *search_string, u32 start, u32 end)
  */
 u32 str8_index_of_char(String_8 *str, char character, u32 start, u32 end);
 
-/**
- * @Incomplete: Refactor how data structures are stored and used in memory.
- *
- * @Robustness: While trying out different strategies for designing array based data structures it became evident that almost all such mechanism seize down to the use of basis buffer manipulation.
- * Strings, Arrays, Lists are very similar data structures, the only difference in all of them is logic behind their use: user doesn't expect to specify capacity for the string or array, or user doesn't expect to have lists and arrays only limited to u8 element size like strings usually are.
- * But their are commonality among all array based data structures and it is the pointer to the first element in the array and array length to safely use this data.
- * Then List just becomes same array with additional api to resize it. String becomes same array with the limitation to only u8 element sizes, and so on.
- * This idea was initial reason for creation of some "dynamic array header" to generalize all structures which inherit this functionality.
- * But, while designing hashmap it is seen that it is seen that data can be simplified even more, to the most basic array form, ptr and size.
- * Where size can work as array length or be direct representation of some data set size, as example: if a ptr is a "void *" then size would directly corelate to the count of bytes stored under that pointer.
- * All this said, it might be beneficial to store and access ptr + size data not separately but combined into a fat ptr. It would allow to easily combine specific length to specific ptr.
- * But it is very @Important to not base the whole codebase off of the fat ptr concept, and most importantly try to desing such an interface to easily convert and blend between fat ptr and non-sized ptr, like null terminated strings to sized based strings.
- */
-
-
-
-/**
- * Dynamic array.
- */
-
-void *  _dynamic_array_make(u32 item_size, u32 initial_capacity);
-u32     _dynamic_array_length(void *array);
-u32     _dynamic_array_capacity(void *array);
-u32     _dynamic_array_item_size(void *array);
-void    _dynamic_array_resize(void **array, u32 new_capacity);
-void    _dynamic_array_free(void **array);
 
 /**
  * Array list.
- * @Incomplete: Look at the @Robustness comment above.
  */
 
-#define array_list_make(type, capacity)                             (type *)_dynamic_array_make(sizeof(type), capacity)
-#define array_list_length(ptr_list)                                 _dynamic_array_length((void *)*ptr_list)
-#define array_list_capacity(ptr_list)                               _dynamic_array_capacity((void *)*ptr_list)
-#define array_list_item_size(ptr_list)                              _dynamic_array_item_size((void *)*ptr_list)
+#define array_list_make(type, capacity, ptr_allocator)                             (type *)_array_list_make(sizeof(type), capacity, ptr_allocator)
+#define array_list_length(ptr_list)                                 _array_list_length((void *)*ptr_list)
+#define array_list_capacity(ptr_list)                               _array_list_capacity((void *)*ptr_list)
+#define array_list_item_size(ptr_list)                              _array_list_item_size((void *)*ptr_list)
 #define array_list_append(ptr_list, item)                           _array_list_resize_to_fit((void **)(ptr_list), array_list_length(ptr_list) + 1); (*ptr_list)[_array_list_next_index((void **)(ptr_list))] = item
 #define array_list_append_multiple(ptr_list, item_arr, count)       _array_list_append_multiple((void **)ptr_list, (void *)item_arr, count)
 #define array_list_pop(ptr_list)                                    _array_list_pop((void *)*ptr_list, 1)
 #define array_list_pop_multiple(ptr_list, count)                    _array_list_pop((void *)*ptr_list, count)
 #define array_list_clear(ptr_list)                                  _array_list_clear((void *)*ptr_list)
-#define array_list_free(ptr_list)                                   _dynamic_array_free((void **)ptr_list)
 #define array_list_unordered_remove(ptr_list, index)                _array_list_unordered_remove((void *)*ptr_list, index)
+#define array_list_free(ptr_list)                                   _array_list_free((void **)ptr_list)
 
 typedef struct array_list_header {
     u32 capacity;
@@ -201,43 +174,46 @@ typedef struct array_list_header {
     u32 item_size;
 } Array_List_Header;
 
-
+void *  _array_list_make(u32 item_size, u32 initial_capacity, Allocator *allocator);
+u32     _array_list_length(void *list);
+u32     _array_list_capacity(void *list);
+u32     _array_list_item_size(void *list);
 void    _array_list_resize_to_fit(void **list, u32 requiered_length);
 u32     _array_list_next_index(void **list);
 void    _array_list_append_multiple(void **list, void *items, u32 count);
 void    _array_list_pop(void *list, u32 count);
 void    _array_list_clear(void *list);
 void    _array_list_unordered_remove(void *list, u32 index);
+void    _array_list_free(void **list);
 
 /**
  * Hashmap.
- * @Incomplete: Look at the @Robustness comment above.
  */
 
-#define hashmap_make(item_type, capacity)                           _hashmap_make(sizeof(item_type), capacity) 
-#define hashmap_put(ptr_map, ptr_key, key_size, ptr_item)           _hashmap_put(ptr_map, ptr_key, key_size, ptr_item, 1) 
-#define hashmap_get(ptr_map, ptr_key, key_size)                     _hashmap_get(ptr_map, ptr_key, key_size) 
-#define hashmap_remove(ptr_map, ptr_key, key_size)                  _hashmap_remove(ptr_map, ptr_key, key_size) 
-#define hashmap_count(ptr_map)                                      _dynamic_array_length(ptr_map->buffer)
-#define hashmap_capacity(ptr_map)                                   _dynamic_array_capacity(ptr_map->buffer)
-#define hashmap_item_size(ptr_map)                                  _dynamic_array_item_size(ptr_map->buffer)
-#define hashmap_free(ptr_map)                                       _dynamic_array_free(&(ptr_map)->buffer)
-
-typedef u32 (*Hashfunc)(void *, u32);
-
-typedef struct hashmap {
-    void *buffer;
-    Hashfunc hash_func;
-} Hashmap;
-
-Hashmap _hashmap_make(u32 item_size, u32 initial_capacity);
-void    _hashmap_put(Hashmap *map, void *key, u32 key_size, void *item, u32 count);
-void *   _hashmap_get(Hashmap *map, void *key, u32 key_size);
-void    _hashmap_remove(Hashmap *map, void *key, u32 key_size);
-
-u32 hashf(void *key, u32 key_size);
-
-void    hashmap_print(Hashmap *map);
+// #define hashmap_make(item_type, capacity)                           _hashmap_make(sizeof(item_type), capacity) 
+// #define hashmap_put(ptr_map, ptr_key, key_size, ptr_item)           _hashmap_put(ptr_map, ptr_key, key_size, ptr_item, 1) 
+// #define hashmap_get(ptr_map, ptr_key, key_size)                     _hashmap_get(ptr_map, ptr_key, key_size) 
+// #define hashmap_remove(ptr_map, ptr_key, key_size)                  _hashmap_remove(ptr_map, ptr_key, key_size) 
+// #define hashmap_count(ptr_map)                                      _dynamic_array_length(ptr_map->buffer)
+// #define hashmap_capacity(ptr_map)                                   _dynamic_array_capacity(ptr_map->buffer)
+// #define hashmap_item_size(ptr_map)                                  _dynamic_array_item_size(ptr_map->buffer)
+// #define hashmap_free(ptr_map)                                       _dynamic_array_free(&(ptr_map)->buffer)
+// 
+// typedef u32 (*Hashfunc)(void *, u32);
+// 
+// typedef struct hashmap {
+//     void *buffer;
+//     Hashfunc hash_func;
+// } Hashmap;
+// 
+// Hashmap _hashmap_make(u32 item_size, u32 initial_capacity);
+// void    _hashmap_put(Hashmap *map, void *key, u32 key_size, void *item, u32 count);
+// void *   _hashmap_get(Hashmap *map, void *key, u32 key_size);
+// void    _hashmap_remove(Hashmap *map, void *key, u32 key_size);
+// 
+// u32 hashf(void *key, u32 key_size);
+// 
+// void    hashmap_print(Hashmap *map);
 
 
 /**

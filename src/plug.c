@@ -107,22 +107,27 @@ void plug_load(Plug_State *state) {
 
     free(font_data);
     
-
+    
     // Testing arrays.
-    s32 *nums = array_list_make(s32, 2);
+    s32 *nums = array_list_make(s32, 2, &std_allocator);
     array_list_append(&nums, -23);
+    printf("%2d -> % -4d\n", 0, nums[0]);
     array_list_append(&nums, 16);
+    printf("%2d -> % -4d\n", 1, nums[1]);
     array_list_append(&nums, -1);
+    printf("%2d -> % -4d\n", 2, nums[2]);
     array_list_append(&nums, -249);
+    printf("%2d -> % -4d\n", 3, nums[3]);
     array_list_append(&nums, 100);
+    printf("%2d -> % -4d\n", 4, nums[4]);
     // printf("%u <- next index?\n", n_index);
     // nums[1] = 16;
 
 
-    for (u32 i = 0; i < array_list_length(&nums); i++) {
-        printf("%2d -> % -4d\n", i, nums[i]);
-    }
-
+    // for (u32 i = 0; i < array_list_length(&nums); i++) {
+    //     printf("%2d -> % -4d\n", i, nums[i]);
+    // }
+    
     array_list_free(&nums);
 }
 
