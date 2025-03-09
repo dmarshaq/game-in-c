@@ -9,9 +9,9 @@
 
 #include <stdio.h>
 
-extern const char* debug_error_str;
-extern const char* debug_warning_str;
-extern const char* debug_ok_str;
+extern const char *debug_error_str;
+extern const char *debug_warning_str;
+extern const char *debug_ok_str;
 
 /**
  * Integer typedefs.
@@ -20,11 +20,11 @@ extern const char* debug_ok_str;
 #include <stdint.h>
 
 typedef int8_t      s8;
-typedef uint8_t		u8;
-typedef int16_t	    s16;
-typedef uint16_t	u16;
-typedef int32_t		s32;
-typedef uint32_t	u32;
+typedef uint8_t	    u8;
+typedef int16_t     s16;
+typedef uint16_t    u16;
+typedef int32_t     s32;
+typedef uint32_t    u32;
 typedef int64_t     s64;
 typedef uint64_t    u64;
 
@@ -51,18 +51,17 @@ typedef struct allocator_header {
     u64 size_filled;
 } Allocator_Header;
 
-typedef void * (*Allocate)(Allocator_Header *header, u64 size);
-typedef void * (*Zero_Allocate)(Allocator_Header *header, u64 size);
-typedef void * (*Re_Allocate)(Allocator_Header *header, void *ptr, u64 size);
-typedef void   (*Free)(Allocator_Header *header, void *ptr);
+typedef void *(*Allocate)(Allocator_Header *header, u64 size);
+typedef void *(*Zero_Allocate)(Allocator_Header *header, u64 size);
+typedef void *(*Re_Allocate)(Allocator_Header *header, void *ptr, u64 size);
+typedef void  (*Free)(Allocator_Header *header, void *ptr);
 
 typedef struct allocator {
-    Allocator_Header *ptr;
-    
-    Allocate alc_alloc;
-    Zero_Allocate alc_zero_alloc;
-    Re_Allocate alc_re_alloc;
-    Free alc_free;
+    Allocator_Header    *ptr;
+    Allocate            alc_alloc;
+    Zero_Allocate       alc_zero_alloc;
+    Re_Allocate         alc_re_alloc;
+    Free                alc_free;
 } Allocator;
 
 // Std.
@@ -75,10 +74,10 @@ Arena_Allocator arena_make(u64 capacity);
 void arena_destroy(Arena_Allocator *arena);
 
 // Allocator interface.
-void * allocator_alloc(Allocator *allocator, u64 size);
-void * allocator_zero_alloc(Allocator *allocator, u64 size);
-void * allocator_re_alloc(Allocator *allocator, void *ptr, u64 size);
-void allocator_free(Allocator *allocator, void *ptr);
+void *allocator_alloc(Allocator *allocator, u64 size);
+void *allocator_zero_alloc(Allocator *allocator, u64 size);
+void *allocator_re_alloc(Allocator *allocator, void *ptr, u64 size);
+void  allocator_free(Allocator *allocator, void *ptr);
 
 
 /**
@@ -92,7 +91,7 @@ void allocator_free(Allocator *allocator, void *ptr);
  * They are NOT null terminated, but are designed to be compatible with regural C strings, if used correctly.
  */
 typedef struct string_8 {
-    u8 *ptr;
+    u8  *ptr;
     u32 length;
 } String_8;
 
@@ -174,17 +173,17 @@ typedef struct array_list_header {
     u32 item_size;
 } Array_List_Header;
 
-void *  _array_list_make(u32 item_size, u32 initial_capacity, Allocator *allocator);
-u32     _array_list_length(void *list);
-u32     _array_list_capacity(void *list);
-u32     _array_list_item_size(void *list);
-void    _array_list_resize_to_fit(void **list, u32 requiered_length);
-u32     _array_list_next_index(void **list);
-void    _array_list_append_multiple(void **list, void *items, u32 count);
-void    _array_list_pop(void *list, u32 count);
-void    _array_list_clear(void *list);
-void    _array_list_unordered_remove(void *list, u32 index);
-void    _array_list_free(void **list);
+void *_array_list_make(u32 item_size, u32 initial_capacity, Allocator *allocator);
+u32   _array_list_length(void *list);
+u32   _array_list_capacity(void *list);
+u32   _array_list_item_size(void *list);
+void  _array_list_resize_to_fit(void **list, u32 requiered_length);
+u32   _array_list_next_index(void **list);
+void  _array_list_append_multiple(void **list, void *items, u32 count);
+void  _array_list_pop(void *list, u32 count);
+void  _array_list_clear(void *list);
+void  _array_list_unordered_remove(void *list, u32 index);
+void  _array_list_free(void **list);
 
 /**
  * Hashmap.
@@ -356,7 +355,7 @@ char* read_file_into_string(char *file_name, Allocator *allocator);
  * Return pointer to the buffer and sets buffer size in bytes into the file_size.
  * @Important: Buffer should be freed manually when not used anymore.
  */
-void * read_file_into_buffer(char *file_name, u64 *file_size, Allocator *allocator);
+void *read_file_into_buffer(char *file_name, u64 *file_size, Allocator *allocator);
 
 /**
  * @Incomplete: Write description.
@@ -459,11 +458,10 @@ void shader_set_uniforms(Shader *shader);
 
 
 typedef struct quad_drawer {
-    u32 vao;            // OpenGL id of Vertex Array Object.
-    u32 vbo;            // OpenGL id of Vertex Buffer Object.
-    u32 ebo;            // OpenGL id of Element Buffer Object.
-
-    Shader *program;    // Pointer to shader that will be used to draw.
+    u32     vao;         // OpenGL id of Vertex Array Object.
+    u32     vbo;         // OpenGL id of Vertex Buffer Object.
+    u32     ebo;         // OpenGL id of Element Buffer Object.
+    Shader  *program;    // Pointer to shader that will be used to draw.
 } Quad_Drawer;
 
 #define MAX_QUADS_PER_BATCH     32
@@ -507,8 +505,8 @@ void print_indicies();
 
 
 typedef struct camera {
-    Vec2f center;       // World center.
-    u32 unit_scale;     // Pixels per 1 world unit.
+    Vec2f   center;         // World center.
+    u32     unit_scale;     // Pixels per 1 world unit.
 } Camera;
 
 Camera camera_make(Vec2f center, u32 unit_scale);
@@ -523,11 +521,11 @@ void shader_update_projection(Shader *shader, Camera *camera, float window_width
 
 typedef struct font_baked {
     stbtt_bakedchar *chars;
-    s32 chars_count;                // Number of chars baked.
-    s32 first_char_code;            // ASCII value of the first character baked.
-    s32 baseline;
-    s32 line_height;
-    Texture bitmap;
+    s32             chars_count;                // Number of chars baked.
+    s32             first_char_code;            // ASCII value of the first character baked.
+    s32             baseline;
+    s32             line_height;
+    Texture         bitmap;
 } Font_Baked;
 
 Font_Baked font_bake(u8 *font_data, float font_size);
@@ -536,10 +534,9 @@ void font_free(Font_Baked *font);
 
 
 typedef struct line_drawer {
-    u32 vao;            // OpenGL id of Vertex Array Object.
-    u32 vbo;            // OpenGL id of Vertex Buffer Object.
-
-    Shader *program;    // Pointer to shader that will be used to draw.
+    u32     vao;         // OpenGL id of Vertex Array Object.
+    u32     vbo;         // OpenGL id of Vertex Buffer Object.
+    Shader  *program;    // Pointer to shader that will be used to draw.
 } Line_Drawer;
 
 #define MAX_LINES_PER_BATCH     1024

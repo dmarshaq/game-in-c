@@ -927,17 +927,17 @@ void shader_set_uniforms(Shader *program) {
     // Get uniform's locations based on unifrom's name.
     s32 quad_shader_pr_matrix_loc = glGetUniformLocation(program->id, shader_uniform_pr_matrix_name);
     if (quad_shader_pr_matrix_loc == -1) {
-        (void)fprintf(stderr, "%s Couldn't get location of %s uniform, in shader.\n", debug_error_str, shader_uniform_pr_matrix_name);
+        (void)fprintf(stderr, "%s Couldn't get location of %s uniform, in shader with id: %d.\n", debug_warning_str, shader_uniform_pr_matrix_name, program->id);
     }
 
     s32 quad_shader_ml_matrix_loc = glGetUniformLocation(program->id, shader_uniform_ml_matrix_name);
     if (quad_shader_ml_matrix_loc == -1) {
-        (void)fprintf(stderr, "%s Couldn't get location of %s uniform, in shader.\n", debug_error_str, shader_uniform_ml_matrix_name);
+        (void)fprintf(stderr, "%s Couldn't get location of %s uniform, in shader with id: %d.\n", debug_warning_str, shader_uniform_ml_matrix_name, program->id);
     }
 
     s32 quad_shader_samplers_loc = glGetUniformLocation(program->id, shader_uniform_samplers_name);
     if (quad_shader_samplers_loc == -1) {
-        (void)fprintf(stderr, "%s Couldn't get location of %s uniform, in shader.\n", debug_error_str, shader_uniform_samplers_name);
+        (void)fprintf(stderr, "%s Couldn't get location of %s uniform, in shader with id: %d.\n", debug_warning_str, shader_uniform_samplers_name, program->id);
     }
     
     // Set uniforms.
