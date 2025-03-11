@@ -122,13 +122,28 @@ void plug_load(Plug_State *state) {
     printf("%d -> % -4d\n", 4, nums[4]);
     // printf("%u <- next index?\n", n_index);
     // nums[1] = 16;
-
-
-    // for (u32 i = 0; i < array_list_length(&nums); i++) {
-    //     printf("%2d -> % -4d\n", i, nums[i]);
-    // }
+    
     
     array_list_free(&nums);
+
+
+    u8 *table = hash_table_make(u8, 8, &std_allocator);
+
+    hash_table_put(&table, 8, "cherry", 6);
+    hash_table_put(&table, 2, "apple", 5);
+    hash_table_put(&table, 4, "potato", 6);
+    hash_table_put(&table, 5, "orange", 6);
+
+    hash_table_put(&table, 16, "joystick", 8);
+
+    s32 key = -298;
+    hash_table_put(&table, 1, &key, 4);
+
+    hash_table_put(&table, 9, "orange", 6);
+    
+    hash_table_print((void **)&table);
+
+    hash_table_free(&table);
 }
 
 void plug_unload(Plug_State *state) {

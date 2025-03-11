@@ -155,10 +155,13 @@ u32 str8_index_of_char(String_8 *str, char character, u32 start, u32 end);
  * Array list.
  */
 
-#define array_list_make(type, capacity, ptr_allocator)                             (type *)_array_list_make(sizeof(type), capacity, ptr_allocator)
+#define array_list_make(type, capacity, ptr_allocator)              (type *)_array_list_make(sizeof(type), capacity, ptr_allocator)
+
+// @Todo: Make these macro wrappers into simple function like macros.
 #define array_list_length(ptr_list)                                 _array_list_length((void *)*ptr_list)
 #define array_list_capacity(ptr_list)                               _array_list_capacity((void *)*ptr_list)
 #define array_list_item_size(ptr_list)                              _array_list_item_size((void *)*ptr_list)
+
 #define array_list_append(ptr_list, item)                           _array_list_resize_to_fit((void **)(ptr_list), array_list_length(ptr_list) + 1); (*ptr_list)[_array_list_next_index((void **)(ptr_list))] = item
 #define array_list_append_multiple(ptr_list, item_arr, count)       _array_list_append_multiple((void **)ptr_list, (void *)item_arr, count)
 #define array_list_pop(ptr_list)                                    _array_list_pop((void *)*ptr_list, 1)
@@ -179,7 +182,7 @@ u32   _array_list_capacity(void *list);
 u32   _array_list_item_size(void *list);
 void  _array_list_resize_to_fit(void **list, u32 requiered_length);
 u32   _array_list_next_index(void **list);
-void  _array_list_append_multiple(void **list, void *items, u32 count);
+u32   _array_list_append_multiple(void **list, void *items, u32 count);
 void  _array_list_pop(void *list, u32 count);
 void  _array_list_clear(void *list);
 void  _array_list_unordered_remove(void *list, u32 index);
@@ -189,30 +192,46 @@ void  _array_list_free(void **list);
  * Hashmap.
  */
 
-// #define hashmap_make(item_type, capacity)                           _hashmap_make(sizeof(item_type), capacity) 
-// #define hashmap_put(ptr_map, ptr_key, key_size, ptr_item)           _hashmap_put(ptr_map, ptr_key, key_size, ptr_item, 1) 
-// #define hashmap_get(ptr_map, ptr_key, key_size)                     _hashmap_get(ptr_map, ptr_key, key_size) 
-// #define hashmap_remove(ptr_map, ptr_key, key_size)                  _hashmap_remove(ptr_map, ptr_key, key_size) 
-// #define hashmap_count(ptr_map)                                      _dynamic_array_length(ptr_map->buffer)
-// #define hashmap_capacity(ptr_map)                                   _dynamic_array_capacity(ptr_map->buffer)
-// #define hashmap_item_size(ptr_map)                                  _dynamic_array_item_size(ptr_map->buffer)
-// #define hashmap_free(ptr_map)                                       _dynamic_array_free(&(ptr_map)->buffer)
-// 
-// typedef u32 (*Hashfunc)(void *, u32);
-// 
-// typedef struct hashmap {
-//     void *buffer;
-//     Hashfunc hash_func;
-// } Hashmap;
-// 
-// Hashmap _hashmap_make(u32 item_size, u32 initial_capacity);
-// void    _hashmap_put(Hashmap *map, void *key, u32 key_size, void *item, u32 count);
-// void *   _hashmap_get(Hashmap *map, void *key, u32 key_size);
-// void    _hashmap_remove(Hashmap *map, void *key, u32 key_size);
-// 
-// u32 hashf(void *key, u32 key_size);
-// 
-// void    hashmap_print(Hashmap *map);
+
+#define hash_table_make(type, capacity, allocator_ptr)              (type *)_hash_table_make(sizeof(type), capacity, allocator_ptr) 
+
+// @Todo: Make these macro wrappers into simple function like macros.
+#define hash_table_count(ptr_list)                                  _hash_table_count((void *)*ptr_list)
+#define hash_table_capacity(ptr_list)                               _hash_table_capacity((void *)*ptr_list)
+#define hash_table_item_size(ptr_list)                              _hash_table_item_size((void *)*ptr_list)
+
+#define hash_table_put(ptr_table, item, key_ptr, key_size)          _hash_table_resize_to_fit((void **)(ptr_table), hash_table_count(ptr_table) + 1); (*ptr_table)[_hash_table_push_key((void **)(ptr_table), key_ptr, key_size)] = item
+
+#define hash_table_free(ptr_table)                                  _hash_table_free((void **)(ptr_table))
+
+// #define hash_table_put(ptr_map, ptr_key, key_size, ptr_item)           _hash_table_put(ptr_map, ptr_key, key_size, ptr_item, 1) 
+// #define hash_table_get(ptr_map, ptr_key, key_size)                     _hash_table_get(ptr_map, ptr_key, key_size) 
+// #define hash_table_remove(ptr_map, ptr_key, key_size)                  _hash_table_remove(ptr_map, ptr_key, key_size) 
+// #define hash_table_count(ptr_map)                                      _dynamic_array_length(ptr_map->buffer)
+// #define hash_table_capacity(ptr_map)                                   _dynamic_array_capacity(ptr_map->buffer)
+// #define hash_table_item_size(ptr_map)                                  _dynamic_array_item_size(ptr_map->buffer)
+
+typedef u32 (*Hashfunc)(void *, u32);
+
+typedef struct hash_table_header {
+    u32 capacity;
+    u32 count;
+    u32 item_size;
+    Hashfunc hash_func;
+    u8 *keys;
+} Hash_Table_Header;
+
+void *_hash_table_make(u32 item_size, u32 initial_capacity, Allocator *allocator);
+u32   _hash_table_count(void *table);
+u32   _hash_table_capacity(void *table);
+u32   _hash_table_item_size(void *table);
+void  _hash_table_resize_to_fit(void **table, u32 requiered_length);
+u32   _hash_table_push_key(void **table, void *key, u32 key_size);
+void  _hash_table_free(void **table);
+
+u32 hashf(void *key, u32 key_size);
+
+void hash_table_print(void **table);
 
 
 /**
