@@ -430,8 +430,34 @@ typedef struct hash_table_slot {
     String_8 key;
 } Hash_Table_Slot;
 
+/**
+ * Internal function.
+ */
 Hash_Table_Slot *hash_table_get_slot(void **table, u32 index) {
     return *table + hash_table_header(table)->capacity * hash_table_header(table)->item_size + index * sizeof(Hash_Table_Slot);
+}
+
+/**
+ * Internal function.
+ * Sets all occupied slots to depricated.
+ */
+void hash_table_depricate_slots(void **table) {
+    u32 cap = hash_table_capacity(table);
+    Hash_Table_Slot *slot = NULL;
+    for (u32 i = 0; i < cap; i++) {
+        slot = hash_table_get_slot(table, i);
+        if (slot->state == SLOT_OCCUPIED)
+            slot->state = SLOT_DEPRICATED;
+    }
+}
+
+/**
+ * Internal function.
+ * @Recursion: Recursivly readresses slots if they are depricated.
+ * Returns true, if it succesfully readressed a slot.
+ */
+bool hash_table_readress(void **table, u32 index) {
+
 }
 
 void *_hash_table_make(u32 item_size, u32 capacity, Allocator *allocator) {
@@ -502,6 +528,11 @@ void _hash_table_resize_to_fit(void **table, u32 requiered_length) {
     }
 }
 
+/**
+ * Internal function.
+ * Returns index of the corresponding key by calculating hash.
+ * @Careful: Doesn't perfom any slot checks.
+ */
 u32 hash_table_hash_index_of(void **table, void *key, u32 key_size) {
     Hash_Table_Header *header = hash_table_header(table);
     return header->hash_func(key, key_size) % header->capacity;
@@ -514,7 +545,7 @@ u32 _hash_table_push_key(void **table, void *key, u32 key_size) {
     for (u32 i = 0; i < header->capacity; i++) {
         Hash_Table_Slot *slot = hash_table_get_slot(table, (index + i) % header->capacity);
         if (slot->state == SLOT_EMPTY) {
-            // @Incomplete: Push key... .
+            // Write all data to hash table by corresponding index.
             slot->state = SLOT_OCCUPIED;
 
             slot->key.length = key_size;
