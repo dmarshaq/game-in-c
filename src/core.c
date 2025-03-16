@@ -318,8 +318,8 @@ u32 _array_list_append_multiple(void **list, void *items, u32 count) {
 
     _array_list_resize_to_fit(list, requiered_length);
     header = *list - sizeof(Array_List_Header); // @Important: Resizing perfomed above might change the pointer to the list, so it is neccessary to reassign header ptr again, otherwise segfault occure.
-    
-    memcpy(*list + header->length * header->item_size, items, header->item_size * count);
+
+    (void)memcpy(*list + header->length * header->item_size, items, header->item_size * count);
     header->length += count;
 
     return header->length - count;
@@ -351,80 +351,6 @@ typedef enum hash_table_slot_state : u8 {
     SLOT_DEPRICATED = 0x02,
 } Hash_Table_Slot_State;
 
-// /**
-//  * Internal function only.
-//  * Depricates all slots in the hashmap which are occupied.
-//  */
-// void hashmap_depricate(Hashmap *map) {
-//     Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
-//     void *slot = NULL;
-//     for (u32 i = 0; i < header->capacity; i++) {
-//         slot = map->buffer + i * header->item_size;
-//         if (*(u8 *)slot == SLOT_OCCUPIED) {
-//             *(u8 *)slot = SLOT_DEPRICATED;
-//         }
-//     }
-// }
-// 
-// /**
-//  * Internal function only.
-//  * @Recursion: Recursivly readresses slots if its depricated.
-//  * Returns true, if it succesfully readressed a slot.
-//  */
-// bool hashmap_readress(Hashmap *map, u32 slot_index) {
-//     Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
-//     void *original_slot = map->buffer + slot_index * header->item_size;
-// 
-//     // Check of deprication.
-//     if (*(u8 *)original_slot != SLOT_DEPRICATED)
-//         return false;
-// 
-//     *(u8 *)original_slot = SLOT_EMPTY;
-// 
-//     
-//     // Buffer key_size and key.
-//     u32 key_size = *((u32 *)(original_slot + sizeof(u8)));
-//     void *key = *((void **)(original_slot + sizeof(u8) + sizeof(u32)));
-//     
-//     u32 hash = map->hash_func(key, key_size);
-//     u32 index = hash % header->capacity;
-//     void *slot;
-//     // Trying to get slot that is not occupied.
-//     for (u32 j = 0; ; j++) {
-//         slot = map->buffer + ((index + j) % header->capacity) * header->item_size;
-//         if (*(u8 *)slot == SLOT_DEPRICATED) {
-//             if (hashmap_readress(map, ((index + j) % header->capacity))) {
-// 
-//                 // Copying item to slot.
-//                 *(u8 *)slot = SLOT_OCCUPIED;
-//                 *(u32 *)(slot + sizeof(u8)) = key_size;
-//                 *(void **)(slot + sizeof(u8) + sizeof(u32)) = key;
-//                 memcpy(slot + sizeof(u8) + sizeof(u32) + sizeof(void *), original_slot + sizeof(u8) + sizeof(u32) + sizeof(void *), (header->item_size - sizeof(u8) - sizeof(u32) - sizeof(void *)));
-// 
-//                 break;
-//             }
-//         }
-//         else if (*(u8 *)slot == SLOT_EMPTY) {
-// 
-//             // Copying item to slot.
-//             *(u8 *)slot = SLOT_OCCUPIED;
-//             *(u32 *)(slot + sizeof(u8)) = key_size;
-//             *(void **)(slot + sizeof(u8) + sizeof(u32)) = key;
-//             memcpy(slot + sizeof(u8) + sizeof(u32) + sizeof(void *), original_slot + sizeof(u8) + sizeof(u32) + sizeof(void *), (header->item_size - sizeof(u8) - sizeof(u32) - sizeof(void *)));
-// 
-//             break;
-//         }
-// 
-//         if (j >= header->capacity) {
-//             (void)fprintf(stderr, "%s Couldn't readress depricated slot in the hashmap.\n", debug_error_str);
-//             return false;
-//         }
-//     }
-//     
-//     return true;
-// }
-
-
 typedef struct hash_table_slot {
     Hash_Table_Slot_State state;
     String_8 key;
@@ -439,6 +365,16 @@ Hash_Table_Slot *hash_table_get_slot(void **table, u32 index) {
 
 /**
  * Internal function.
+ * Returns index of the corresponding key by calculating hash.
+ * @Careful: Doesn't perfom any slot checks.
+ */
+u32 hash_table_hash_index_of(void **table, void *key, u32 key_size) {
+    Hash_Table_Header *header = hash_table_header(table);
+    return header->hash_func(key, key_size) % header->capacity;
+}
+
+/**
+ * Internal function.
  * Sets all occupied slots to depricated.
  */
 void hash_table_depricate_slots(void **table) {
@@ -446,9 +382,32 @@ void hash_table_depricate_slots(void **table) {
     Hash_Table_Slot *slot = NULL;
     for (u32 i = 0; i < cap; i++) {
         slot = hash_table_get_slot(table, i);
-        if (slot->state == SLOT_OCCUPIED)
+        if (slot->state == SLOT_OCCUPIED) {
             slot->state = SLOT_DEPRICATED;
+        }
     }
+}
+
+/**
+ * @Internal function.
+ */
+void hash_table_print_slot(void *item, u32 item_size, Hash_Table_Slot *slot) {
+    
+    // Print the item in hex based on item_size.
+    printf("Item: 0x");
+    for (u32 i = 0; i < item_size; i++) {
+        (void)printf("%02x", *((u8 *)item + i));  // Print each byte of the item.
+    }
+
+    // Print the state and key_size as hex.
+    (void)printf(" | State: 0x%02x | Key Size: 0x%08x | Key Ptr: 0x%16p -> ", slot->state, slot->key.length, slot->key.ptr);
+
+    if (slot->state == SLOT_OCCUPIED) {
+        
+        // Print key itself
+        (void)printf("%.*s", slot->key.length, slot->key.ptr);
+    }
+    (void)printf("\n");
 }
 
 /**
@@ -457,6 +416,46 @@ void hash_table_depricate_slots(void **table) {
  * Returns true, if it succesfully readressed a slot.
  */
 bool hash_table_readress(void **table, u32 index) {
+    Hash_Table_Header *header = hash_table_header(table);
+    Hash_Table_Slot *target_slot = hash_table_get_slot(table, index);
+
+    u32 new_index = hash_table_hash_index_of(table, target_slot->key.ptr, target_slot->key.length);
+    target_slot->state = SLOT_EMPTY;
+
+    Hash_Table_Slot *slot = NULL;
+    for (u32 i = 0; i < header->capacity; i++) {
+        slot = hash_table_get_slot(table, (new_index + i) % header->capacity);
+        if (slot->state == SLOT_EMPTY) {
+            // Copy data to a new slot.
+            slot->state = SLOT_OCCUPIED;
+
+            slot->key.length = target_slot->key.length;
+            slot->key.ptr = target_slot->key.ptr;
+
+            memmove(*table + ((new_index + i) % header->capacity) * header->item_size, *table + index * header->item_size, header->item_size);
+
+            return true;
+        }
+        else if (slot->state == SLOT_DEPRICATED && hash_table_readress(table, (new_index + i) % header->capacity)) {
+
+            // @Important: There is an additional is SLOT_OCCUPIED check, because hash_table_readress can possbily readress slot to the same index as it was before, therefore additional check is needed.
+            if (slot->state != SLOT_OCCUPIED) {
+                // Copy data to a new slot.
+                slot->state = SLOT_OCCUPIED;
+
+                slot->key.length = target_slot->key.length;
+                slot->key.ptr = target_slot->key.ptr;
+
+                memmove(*table + ((new_index + i) % header->capacity) * header->item_size, *table + index * header->item_size, header->item_size);
+
+                return true;
+            }
+        }
+    }
+
+    
+    (void)fprintf(stderr, "%s Couldn't find new free hash slot when readressing.\n", debug_error_str);
+    return false;
 
 }
 
@@ -515,12 +514,72 @@ void _hash_table_resize_to_fit(void **table, u32 requiered_length) {
     Hash_Table_Header *header = hash_table_header(table);
 
     if (requiered_length > header->capacity) {
+        // Before resizing, depricate slots.
+        hash_table_depricate_slots(table);
+
         u32 capacity_multiplier = (u32)powf(2.0f, (float)((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
 
-        
         *table = buffer_data_struct_resize(*table, header->capacity * capacity_multiplier * (header->item_size + sizeof(Hash_Table_Slot)), sizeof(Hash_Table_Header));
         header = hash_table_header(table); // @Important: Resizing perfomed above changes the pointer to the table, so it is neccessary to reassign header ptr again, otherwise segfault occure.
         header->capacity *= capacity_multiplier; // @Important: Using "buffer_data_struct_resize" will not update capacity in the header, because this function is only designed to only resize the whole data structure, there for it is needed to manually set capacity to the right value, which was intended.
+        
+        /**
+         * After resize, all data is copied and buffer is expanded to the right.
+         * But due to the nature of hash table structure the slot area of the buffer would not be properly shifter in the resulting array.
+         * For example diagrams (NOT TO SCALE):
+         *
+         *      BEFORE:
+         *                  
+         *                  |-----------------------------Buffer-Capacity-4-------------------------------|
+         *                  |                                                                             |
+         *                  |------Array-of-Data-------|-----------------Array-of-Slots-------------------|
+         *      Indicies:   | 0     1     2     3      | 0           1           2           3            |
+         *      Data:       | [1111][1111][1111][____] | [10][0x2342][01][0x2344][11][0x2348][__][______] |
+         *                  ^
+         *                  |
+         *                  *table
+         *
+         *
+         *      AFTER RESIZE (BAD):
+         *                  
+         *                  |-------------------------------------------------------------------Buffer-Capacity-8-----------------------------------------------------------------------|
+         *                  |                                                                                                                                                           |
+         *                  |------Array-of-Data-------|-----------------Array-of-Slots-------------------|--------------------------|--------------------------------------------------|
+         *      Indicies:   | 0     1     2     3      | 0           1           2           3            |                          |                                                  |
+         *      Data:       | [1111][1111][1111][____] | [10][0x2342][01][0x2344][11][0x2348][__][______] | [____][____][____][____] | [__][______][__][______][__][______][__][______] |
+         *                  ^
+         *                  |
+         *                  *table
+         *
+         *
+         *      WHAT IS EXPECTED / NEEDED (GOOD):
+         *                  
+         *                  |----------------------------------------------------------------Buffer-Capacity-8--------------------------------------------------------------------|
+         *                  |                                                                                                                                                     |
+         *                  |------------------Array-of-Data-------------------|------------------------------------------Array-of-Slots------------------------------------------|
+         *      Indicies:   | 0     1     2     3     4     5     6     7      | 0           1           2           3           4           5           6           7            |
+         *      Data:       | [1111][1111][1111][____][____][____][____][____] | [10][0x2342][01][0x2344][11][0x2348][__][______][__][______][__][______][__][______][__][______] |
+         *                  ^
+         *                  |
+         *                  *table
+         *
+         * To achieve this good layout, it is needed to shift array of slots to the right.
+         * Should be done with memmove cause, destination and source can overlap.
+         */
+
+        memmove(*table + header->capacity * header->item_size, *table + (header->capacity / capacity_multiplier) * header->item_size, (header->capacity / capacity_multiplier) * sizeof(Hash_Table_Slot));
+
+        // Set new slots to SLOT_EMPTY.
+        for (u32 i = header->capacity / capacity_multiplier; i < header->capacity; i++) {
+            hash_table_get_slot(table, i)->state = SLOT_EMPTY;
+        }
+
+        // Readress slots after resizing.
+        for (u32 i = 0; i < header->capacity; i++) {
+            if (hash_table_get_slot(table, i)->state == SLOT_DEPRICATED) {
+                (void)hash_table_readress(table, i);
+            }
+        }
     }
 
     if (header->capacity * (header->item_size + sizeof(Hash_Table_Slot)) < requiered_length * (header->item_size + sizeof(Hash_Table_Slot))) {
@@ -528,28 +587,27 @@ void _hash_table_resize_to_fit(void **table, u32 requiered_length) {
     }
 }
 
-/**
- * Internal function.
- * Returns index of the corresponding key by calculating hash.
- * @Careful: Doesn't perfom any slot checks.
- */
-u32 hash_table_hash_index_of(void **table, void *key, u32 key_size) {
-    Hash_Table_Header *header = hash_table_header(table);
-    return header->hash_func(key, key_size) % header->capacity;
-}
-
 u32 _hash_table_push_key(void **table, void *key, u32 key_size) {
     u32 index = hash_table_hash_index_of(table, key, key_size);
     Hash_Table_Header *header = hash_table_header(table);
-    
+
+    Hash_Table_Slot *slot = NULL;
     for (u32 i = 0; i < header->capacity; i++) {
-        Hash_Table_Slot *slot = hash_table_get_slot(table, (index + i) % header->capacity);
+        slot = hash_table_get_slot(table, (index + i) % header->capacity);
         if (slot->state == SLOT_EMPTY) {
             // Write all data to hash table by corresponding index.
             slot->state = SLOT_OCCUPIED;
 
             slot->key.length = key_size;
-            slot->key.ptr = header->keys + array_list_append_multiple(&(header->keys), key, key_size);
+            
+            /**
+             * @Important: "array_list_append_multiple" is not inlined because it might change the "header->keys" value when resizing array list.
+             * So it is neccessary to call this macro like function in a separate line, otherwise undefined behaviour will occure.
+             */
+            u32 key_index = array_list_append_multiple(&(header->keys), key, key_size);
+            slot->key.ptr = header->keys + key_index;
+
+            header->count++;
            
             return (index + i) % header->capacity;
         }
@@ -557,7 +615,6 @@ u32 _hash_table_push_key(void **table, void *key, u32 key_size) {
             // Key already exists, return index of that slot.
             return (index + i) % header->capacity;
         }
-        (void)printf("Slot collision!\n");
     }
 
     
@@ -565,92 +622,46 @@ u32 _hash_table_push_key(void **table, void *key, u32 key_size) {
     return UINT_MAX;
 }
 
+u32 _hash_table_index_of(void **table, void *key, u32 key_size) {
+    u32 index = hash_table_hash_index_of(table, key, key_size);
+    Hash_Table_Header *header = hash_table_header(table);
 
-// void _hashmap_put(Hashmap *map, void *key, u32 key_size, void *item, u32 count) {
-//     Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
-//     
-//     // Resize first if needed.
-//     u32 requiered_length = header->length + count;
-//     if (requiered_length > header->capacity) {
-//         // Fisrt depricate all occupied slots, since after resize, they will not be valid.
-//         hashmap_depricate(map);
-// 
-//         
-//         // Resize.
-//         u32 capacity_multiplier = (u32)powf(2.0f, (float)((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
-//         
-//         _array_list_resize(&map->buffer, header->capacity * capacity_multiplier);
-//         header = map->buffer - sizeof(Array_List_Header);
-//         
-//         // Cleaning out new memory.
-//         memset(map->buffer + header->length * header->item_size, 0, (header->capacity - header->length) * header->item_size);
-// 
-// 
-//         // Readress all depricated slots.
-//         for (u32 i = 0; i < header->length; i++) {
-//             hashmap_readress(map, i);
-//         }
-//     }
-// 
-//     // Copying items one by one since every item needs its own hash.
-//     u32 hash = 0;
-//     u32 index = 0;
-//     void *slot = NULL;
-//     for (u32 i = 0; i < count; i++) {
-//         hash = map->hash_func(key, key_size);
-//         index = hash % header->capacity;
-// 
-//         // Trying to get slot that is not occupied.
-//         for (u32 j = 0; ; j++) {
-//             slot = map->buffer + ((index + j) % header->capacity) * header->item_size;
-//             if (*(u8 *)slot == SLOT_EMPTY) {
-//                 
-//                 // Copying item to slot.
-//                 *(u8 *)slot = SLOT_OCCUPIED;
-//                 *(u32 *)(slot + sizeof(u8)) = key_size;
-//                 *(void **)(slot + sizeof(u8) + sizeof(u32)) = key;
-//                 memcpy(slot + sizeof(u8) + sizeof(u32) + sizeof(void *), item + (header->item_size - sizeof(u8) - sizeof(u32) - sizeof(void *)) * i, (header->item_size - sizeof(u8) - sizeof(u32) - sizeof(void *)));
-//                 
-//                 break;
-//             }
-//             
-//             if (j >= header->capacity) {
-//                 (void)fprintf(stderr, "%s Couldn't find slot for the element (%d) in the hashmap.\n", debug_error_str, i);
-//                 return;
-//             }
-//         }
-//     }
-// 
-//     header->length += count;
-// }
-// 
-// void* _hashmap_get(Hashmap *map, void *key, u32 key_size) {
-//     Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
-//     
-//     void *slot = NULL;
-//     u32 index = map->hash_func(key, key_size) % header->capacity;
-// 
-//     // Trying to get slot that is not occupied.
-//     for (u32 j = 0; ; j++) {
-//         slot = map->buffer + (index + j) * header->item_size;
-//         // printf("Checking index: %d, %d, %d, %d\n", index + j, *(u8 *)slot == SLOT_OCCUPIED, *(u32 *)(slot + sizeof(u8)) == key_size, memcmp(*(void **)(slot + sizeof(u8) + sizeof(u32)), key, key_size) == 0);
-//         if (*(u8 *)slot == SLOT_OCCUPIED && *(u32 *)(slot + sizeof(u8)) == key_size && memcmp(*(void **)(slot + sizeof(u8) + sizeof(u32)), key, key_size) == 0) {
-//             return slot + sizeof(u8) + sizeof(u32) + sizeof(void *);
-//         }
-// 
-//         if (j >= header->capacity) {
-//             (void)fprintf(stderr, "%s Couldn't find element stored under the key: 0x%16p of size: %4d.\n", debug_error_str, key, key_size);
-//             return NULL;
-//         }
-//     }
-// }
-// 
-// void _hashmap_remove(Hashmap *map, void *key, u32 key_size) {
-//     Array_List_Header *header = map->buffer - sizeof(Array_List_Header);
-//     void *slot = map->buffer + (map->hash_func(key, key_size) % header->capacity) * header->item_size;
-//     *(u8 *)slot = SLOT_EMPTY;
-// }
-// 
+    Hash_Table_Slot *slot = NULL;
+    for (u32 i = 0; i < header->capacity; i++) {
+        slot = hash_table_get_slot(table, (index + i) % header->capacity);
+        if (slot->state == SLOT_EMPTY) {
+            return UINT_MAX;
+        }
+        else if (slot->key.length == key_size && !memcmp(slot->key.ptr, key, key_size)) {
+            // Right key is found, return.
+            return (index + i) % header->capacity;
+        }
+    }
+
+    return UINT_MAX;
+}
+
+void _hash_table_remove(void **table, void *key, u32 key_size) {
+    u32 index = hash_table_hash_index_of(table, key, key_size);
+    Hash_Table_Header *header = hash_table_header(table);
+
+    Hash_Table_Slot *slot = NULL;
+    for (u32 i = 0; i < header->capacity; i++) {
+        slot = hash_table_get_slot(table, (index + i) % header->capacity);
+        if (slot->state == SLOT_EMPTY) {
+            return;
+        }
+        else if (slot->key.length == key_size && !memcmp(slot->key.ptr, key, key_size)) {
+            // Right key is found.
+            // @Incomplete: Doesn't delete key.
+            header->count--;
+            slot->state = SLOT_EMPTY;
+            return;
+        }
+    }
+}
+
+
 u32 hashf(void *key, u32 key_size) {
     if (key == NULL || key_size == 0) {
         (void)fprintf(stderr, "%s Couldn't hash a NULL or 0 sized key.\n", debug_error_str);
@@ -668,24 +679,6 @@ u32 hashf(void *key, u32 key_size) {
     hash_ptr[3] = *((u8 *)(key) + key_size - 2);
 
     return hash;
-}
-
-void hash_table_print_slot(void *item, u32 item_size, Hash_Table_Slot *slot) {
-    
-    // Print the item in hex based on item_size.
-    printf("Item: 0x");
-    for (u32 i = 0; i < item_size; i++) {
-        (void)printf("%02x", *((u8 *)item + i));  // Print each byte of the item.
-    }
-
-    // Print the state and key_size as hex.
-    (void)printf(" | State: 0x%02x | Key Size: 0x%08x | Key Ptr: 0x%16p -> ", slot->state, slot->key.length, slot->key.ptr);
-
-    if (slot->state == SLOT_OCCUPIED) {
-        // Print key itself
-        (void)printf("%.*s", slot->key.length, slot->key.ptr);
-    }
-    (void)printf("\n");
 }
 
 void hash_table_print(void **table) {
