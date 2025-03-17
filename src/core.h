@@ -9,9 +9,14 @@
 
 #include <stdio.h>
 
+
 extern const char *debug_error_str;
 extern const char *debug_warning_str;
 extern const char *debug_ok_str;
+
+#define printf_err(format, ...)                 (void)fprintf(stderr, "%s " format, debug_error_str, ##__VA_ARGS__);
+#define printf_warning(format, ...)             (void)fprintf(stderr, "%s " format, debug_warning_str, ##__VA_ARGS__);
+#define printf_ok(format, ...)                  (void)fprintf(stderr, "%s " format, debug_ok_str, ##__VA_ARGS__);
 
 /**
  * Integer typedefs.
@@ -95,11 +100,9 @@ typedef struct string_8 {
     u32 length;
 } String_8;
 
-/**
- * Points "str" to statically created string, and modified "str" length accordingly.
- * Note: "str" will not contain null terminator at the end.
- */
-String_8 str8_make_statically(const char *string);
+
+#define str8_make(cstring)                                 ((String_8) { .ptr = (u8 *)cstring, .length = (u32)strlen(cstring) } )
+#define str8_make_ptr(ptr, length)                         ((String_8) { .ptr = (u8 *)ptr, .length = (u32)length } )
 
 /**
  * @Todo: Write description.
@@ -108,6 +111,7 @@ String_8 str8_make_allocate(u32 length, Allocator *allocator);
 
 /**
  * Frees previously allocated memory through "str8_make_allocate()".
+ * @Important: Only use on strings that were allocated.
  */
 void str8_free(String_8 *str, Allocator *allocator);
 
@@ -116,11 +120,11 @@ void str8_memcopy_from_buffer(String_8 *str, void *buffer, u32 length);
 void str8_memcopy_into_buffer(String_8 *str, void *buffer, u32 start, u32 end);
 
 /**
- * Modifies "output_str", so it points to the memory of original "str" at index "start" with length up untill index "end".
- * Note: Character at index "end" is not included in "output_str", domain for resulting substring is always [ start, end ).
- * @Important: DOESN'T COPY MEMORY. If "str" memory is freed later, "output_str" will not point to valid adress anymore.
+ * Returns String_8 that points to the memory of original "str" at index "start" with length up untill index "end".
+ * Note: Character at index "end" is not included in the returned String_8, domain for resulting substring is always [ start, end ).
+ * @Important: DOESN'T COPY MEMORY. If "str" memory is freed later, returned string will not point to valid adress anymore.
  */
-void str8_substring(String_8 *str, String_8 *output_str, u32 start, u32 end);
+#define str8_substring(ptr_str8, start, end)                    ((String_8) { .ptr = (u8 *)((ptr_str8)->ptr) + (start), .length = (u32)((end) - (start)) } )
 
 bool str8_equals(String_8 *str1, String_8 *str2);
 
@@ -157,7 +161,6 @@ u32 str8_index_of_char(String_8 *str, char character, u32 start, u32 end);
 
 #define array_list_make(type, capacity, ptr_allocator)              (type *)_array_list_make(sizeof(type), capacity, ptr_allocator)
 
-// @Todo: Make these macro wrappers into simple function like macros.
 #define array_list_length(ptr_list)                                 _array_list_length((void *)*ptr_list)
 #define array_list_capacity(ptr_list)                               _array_list_capacity((void *)*ptr_list)
 #define array_list_item_size(ptr_list)                              _array_list_item_size((void *)*ptr_list)
@@ -195,7 +198,6 @@ void  _array_list_free(void **list);
 
 #define hash_table_make(type, capacity, allocator_ptr)              (type *)_hash_table_make(sizeof(type), capacity, allocator_ptr) 
 
-// @Todo: Make these macro wrappers into simple function like macros.
 #define hash_table_count(ptr_list)                                  _hash_table_count((void *)*ptr_list)
 #define hash_table_capacity(ptr_list)                               _hash_table_capacity((void *)*ptr_list)
 #define hash_table_item_size(ptr_list)                              _hash_table_item_size((void *)*ptr_list)
@@ -207,11 +209,6 @@ void  _array_list_free(void **list);
 #define hash_table_remove(ptr_table, ptr_key, key_size)             _hash_table_remove((void **)(ptr_table), ptr_key, key_size) 
 
 #define hash_table_free(ptr_table)                                  _hash_table_free((void **)(ptr_table))
-
-// #define hash_table_put(ptr_map, ptr_key, key_size, ptr_item)           _hash_table_put(ptr_map, ptr_key, key_size, ptr_item, 1) 
-// #define hash_table_count(ptr_map)                                      _dynamic_array_length(ptr_map->buffer)
-// #define hash_table_capacity(ptr_map)                                   _dynamic_array_capacity(ptr_map->buffer)
-// #define hash_table_item_size(ptr_map)                                  _dynamic_array_item_size(ptr_map->buffer)
 
 typedef u32 (*Hashfunc)(void *, u32);
 

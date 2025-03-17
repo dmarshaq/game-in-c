@@ -19,7 +19,6 @@ Plug_State state;
 
 int main(int argc, char *argv[]) {
 
-
     if (init_sdl_gl()) {
         fprintf(stderr, "%s Couldn't init SDL and GL.\n", debug_error_str);
         return 1;
