@@ -5,7 +5,6 @@
 #include <string.h>
 
 
-
 void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle);
 void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale);
 void draw_line(Vec2f p0, Vec2f p1, Vec4f color);
@@ -23,53 +22,12 @@ void viewport_reset(Plug_State *state);
 
 
 void plug_init(Plug_State *state) {
-
-
-
-    // *(&nums)[_array_list_next_index((void **)(&nums))] = -23;
-
-
-    // s64 item;
-
-    // Hashmap hashmap = hashmap_make(s64, 16);
-    // // hashmap_print(&hashmap);
-
-
-    // item = -12;
-    // hashmap_put(&hashmap, "apple", strlen("apple"), &item);
-    // // hashmap_print(&hashmap);
-
-
-    // item = 2;
-    // hashmap_put(&hashmap, "Orange", strlen("orange"), &item);
-    // // hashmap_print(&hashmap);
-
-
-    // item = 6;
-    // hashmap_put(&hashmap, "Banana", strlen("banana"), &item);
-    // // hashmap_print(&hashmap);
-
-
-    // item = 1;
-    // hashmap_put(&hashmap, "strawberry", strlen("strawberry"), &item);
-    // // hashmap_print(&hashmap);
-
-
-    // item = 10;
-    // hashmap_put(&hashmap, "candy", strlen("candy"), &item);
-
-
-
-    // hashmap_remove(&hashmap, "apple", 5);
-    // hashmap_print(&hashmap);
-    // s64 *num = hashmap_get(&hashmap, "apple", 5);
-    // 
-    // // memcpy(buffer, (char *)hashmap_get(&hashmap, "candy", 5), 5 );
-    // printf("0x%016x\n", num);
-
-
-    // 
-    // hashmap_free(&hashmap);
+    /**
+     * Setting hash tables for resources. 
+     * Since they are dynamically allocated pointers will not change after hot reloading.
+     */
+    state->shader_table = hash_table_make(Shader, 8, &std_allocator);
+    state->font_table = hash_table_make(Font_Baked, 8, &std_allocator);
 }
 
 void plug_load(Plug_State *state) {
@@ -79,93 +37,59 @@ void plug_load(Plug_State *state) {
     state->main_camera = camera_make(VEC2F_ORIGIN, 64);
 
     // Shader loading.
-    state->quad_shader = shader_load("res/shader/quad.glsl");
-    state->quad_shader.vertex_stride = 11;
+    Shader quad_shader = shader_load("res/shader/quad.glsl");
+    quad_shader.vertex_stride = 11;
+    hash_table_put(&state->shader_table, quad_shader, "quad", 4);
 
+    Shader grid_shader = shader_load("res/shader/grid.glsl");
+    grid_shader.vertex_stride = 11;
+    shader_set_uniforms(&grid_shader);
+    hash_table_put(&state->shader_table, grid_shader, "grid", 4);
 
-    state->grid_shader = shader_load("res/shader/grid.glsl");
-    state->grid_shader.vertex_stride = 11;
-    shader_set_uniforms(&state->grid_shader);
-
-    // Drawer init.
-    drawer_init(&state->drawer, &state->quad_shader);
-
-
-    // Shader loading.
-    state->line_shader = shader_load("res/shader/line.glsl");
-    state->line_shader.vertex_stride = 7;
+    Shader line_shader = shader_load("res/shader/line.glsl");
+    line_shader.vertex_stride = 7;
+    hash_table_put(&state->shader_table, line_shader, "line", 4);
 
     // Drawer init.
-    line_drawer_init(&state->line_drawer, &state->line_shader);
+    drawer_init(&state->drawer, &(state->shader_table[hash_table_get_index_of(&state->shader_table, "quad", 4)]));
+
+    // Drawer init.
+    line_drawer_init(&state->line_drawer, &(state->shader_table[hash_table_get_index_of(&state->shader_table, "line", 4)]));
 
 
     // Font loading.
     u8* font_data = read_file_into_buffer("res/font/font.ttf", NULL, &std_allocator);
 
-    state->font_baked_medium = font_bake(font_data, 20.0f);
-    state->font_baked_small = font_bake(font_data, 16.0f);
+    Font_Baked font_baked_medium = font_bake(font_data, 20.0f);
+    hash_table_put(&state->font_table, font_baked_medium, "medium", 6);
+
+    Font_Baked font_baked_small = font_bake(font_data, 16.0f);
+    hash_table_put(&state->font_table, font_baked_small, "small", 5);
 
     free(font_data);
-    
-
-    // Testing arrays.
-    s32 *nums = array_list_make(s32, 2, &std_allocator);
-    array_list_append(&nums, -23);
-    printf("%d -> % -4d\n", 0, nums[0]);
-    array_list_append(&nums, 16);
-    printf("%d -> % -4d\n", 1, nums[1]);
-    array_list_append(&nums, -1);
-    printf("%d -> % -4d\n", 2, nums[2]);
-    array_list_append(&nums, -249);
-    printf("%d -> % -4d\n", 3, nums[3]);
-    array_list_append(&nums, 100);
-    printf("%d -> % -4d\n", 4, nums[4]);
-    // printf("%u <- next index?\n", n_index);
-    // nums[1] = 16;
-    
-    
-    array_list_free(&nums);
-
-
-    u8 *table = hash_table_make(u8, 4, &std_allocator);
-
-    hash_table_put(&table, 8, "cherry", 6);
-    hash_table_put(&table, 2, "apple", 5);
-    hash_table_put(&table, 4, "potato", 6);
-    hash_table_put(&table, 5, "orange", 6);
-    hash_table_put(&table, 16, "joystick", 8);
-
-    s32 key = 239;
-
-    hash_table_put(&table, 1, &key, 4);
-    hash_table_put(&table, 12, "orange", 6);
-    hash_table_put(&table, 12, "oiefss", 6);
-    hash_table_put(&table, 32, "comnat", 6);
-    hash_table_put(&table, 32, "bereta", 6);
-
-    hash_table_put(&table, 3, &key, 4);
-    hash_table_put(&table, 8, &key, 4);
-    hash_table_remove(&table, &key, 4);
-    hash_table_remove(&table, "oiefss", 6);
-    
-
-    hash_table_free(&table);
 }
 
 void plug_unload(Plug_State *state) {
-    shader_unload(&state->quad_shader);
-    shader_unload(&state->line_shader);
-    shader_unload(&state->grid_shader);
+    shader_unload(&(state->shader_table[hash_table_get_index_of(&state->shader_table, "quad", 4)]));
+    shader_unload(&(state->shader_table[hash_table_get_index_of(&state->shader_table, "grid", 4)]));
+    shader_unload(&(state->shader_table[hash_table_get_index_of(&state->shader_table, "line", 4)]));
     
     drawer_free(&state->drawer);
     line_drawer_free(&state->line_drawer);
     
-
-    font_free(&state->font_baked_medium);
-    font_free(&state->font_baked_small);
+    font_free(&state->font_table[hash_table_get_index_of(&state->font_table, "medium", 6)]);
+    font_free(&state->font_table[hash_table_get_index_of(&state->font_table, "small", 5)]);
 }
 
 void plug_update(Plug_State *state) {
+    // Get shaders and fonts.
+    Shader *quad_shader = &(state->shader_table[hash_table_get_index_of(&state->shader_table, "quad", 4)]);
+    Shader *grid_shader = &(state->shader_table[hash_table_get_index_of(&state->shader_table, "grid", 4)]);
+    Shader *line_shader = &(state->shader_table[hash_table_get_index_of(&state->shader_table, "line", 4)]);
+
+    // Font_Baked *font_medium = &state->font_table[hash_table_get_index_of(&state->font_table, "medium", 6)];
+    // Font_Baked *font_small = &state->font_table[hash_table_get_index_of(&state->font_table, "small", 5)];
+
     // Reset viewport.
     viewport_reset(state);
 
@@ -174,14 +98,14 @@ void plug_update(Plug_State *state) {
     glClear(GL_COLOR_BUFFER_BIT);
 
     // Updating projection.
-    shader_update_projection(state->drawer.program, &state->main_camera, (float)state->window_width, (float)state->window_height); // @Incomplete: Supply of window dimensions.
+    shader_update_projection(grid_shader, &state->main_camera, (float)state->window_width, (float)state->window_height);
     
     Vec2f p0, p1;
     p0 = vec2f_make(-8.0f, -5.0f);
     p1 = vec2f_make(8.0f, 5.0f);
 
     // Draw background grid.
-    state->drawer.program = &state->grid_shader;
+    state->drawer.program = grid_shader;
     draw_begin(&state->drawer);
     
     draw_quad(p0, p1, vec4f_make(0.9f, 0.9f, 0.9f, 0.2f), NULL, p0, p1, NULL, 0.0f);
@@ -192,88 +116,49 @@ void plug_update(Plug_State *state) {
 
 
     // Updating projection.
-    shader_update_projection(state->line_drawer.program, &state->main_camera, (float)state->window_width, (float)state->window_height);
+    shader_update_projection(line_shader, &state->main_camera, (float)state->window_width, (float)state->window_height);
 
 
     float seconds = (u32)(state->t->current_time) % (u32)(1000 * PI) / 1000.0f;
 
     // Drawing: Always between draw_begin() and draw_end().
-    state->drawer.program = &state->quad_shader;
+    state->drawer.program = quad_shader;
     draw_begin(&state->drawer);
 
-    // draw_area_function(-2*PI, seconds - 2*PI, func_expr(sinf(x)), (u32)(32.0f * seconds), VEC4F_GREEN);
-
-    // draw_area_polar(0, seconds, func_expr(2*cosf(3*x)), 32.0f * seconds, VEC4F_BLUE);
-    // draw_area_polar((5*PI) / 6, 2*PI + PI / 6, func_expr(3), 32.0f * seconds, VEC4F_BLUE);
-
-    // draw_area_parametric(-2*PI, seconds - 2*PI, func_expr(cosf(x)), func_expr(sinf(x)), 32.0f * seconds, VEC4F_RED);
-
-    // draw_area_polar(0, (seconds / 12.0f), func_expr(1 - 2 * cosf(x)), 8.0f * seconds, VEC4F_BLUE);
+    draw_area_polar(0, (seconds / 12.0f), func_expr(1 - 2 * cosf(x)), 8.0f * seconds, VEC4F_BLUE);
 
     draw_end();
 
-    // Line Drawing
-    line_draw_begin(&state->line_drawer);
-    
-    // printf("%u\n", (u32)(32.0f * seconds));
-
-    // draw_function(-2*PI, seconds - 2*PI, func_expr(sinf(x)), (u32)(32.0f * seconds), VEC4F_YELLOW);
-
-    //draw_polar(0, seconds, func_expr(2*cosf(3*x)), 32.0f * seconds, VEC4F_GREEN);
-    draw_polar(0, seconds, func_expr(2*cosf(x)-1), 128, VEC4F_GREEN);
-    // draw_polar(0, 2*PI, func_expr(3), 64, VEC4F_GREEN);
-
-    // draw_parametric(-2*PI, seconds - 2*PI, func_expr(cosf(x)), func_expr(sinf(x)), 32.0f * seconds, VEC4F_GREEN);
-    
-    // draw_polar(0, (seconds / 4.0f), func_expr(1 - 2 * cosf(x)), 8.0f * seconds, VEC4F_YELLOW);
-
-    line_draw_end();
-
-
-    // Drawing labels for vectors.
-    // draw_begin(&state->drawer);
-
-    // draw_text(" ( 1.00, 0.00 )", VEC2F_RIGHT,  VEC4F_WHITE, &state->font_baked_small, state->main_camera.unit_scale);
-    // draw_text(" ( 0.00, 1.00 )", VEC2F_UP,     VEC4F_WHITE, &state->font_baked_small, state->main_camera.unit_scale);
-
-    // char buffer[50];
-    // sprintf(buffer, " ( %2.2f, %2.2f )", cyan_vec.x, cyan_vec.y);
-    // draw_text(buffer, cyan_vec, VEC4F_WHITE, &state->font_baked_small, state->main_camera.unit_scale);
-
-
-    // draw_end();
-
-    
     // Separate viewport example
     state->main_camera.unit_scale = 64;
     u32 height, width;
     height = state->window_height / 3; 
     width = state->window_width / 3; 
 
-    shader_update_projection(state->drawer.program, &state->main_camera, width, height);
-    shader_update_projection(state->line_drawer.program, &state->main_camera, width, height);
-    shader_update_projection(&state->grid_shader, &state->main_camera, width, height);
+    shader_update_projection(quad_shader, &state->main_camera, width, height);
+    shader_update_projection(line_shader, &state->main_camera, width, height);
+    shader_update_projection(grid_shader, &state->main_camera, width, height);
 
-    state->drawer.program = &state->grid_shader;
+    state->drawer.program = grid_shader;
     draw_begin(&state->drawer);
 
-    // draw_viewport(25, 25, width, height, vec4f_make(0.3f, 0.3f, 0.3f, 1.0f), &state->main_camera);
+    draw_viewport(25, 25, width, height, vec4f_make(0.3f, 0.3f, 0.3f, 1.0f), &state->main_camera);
 
     draw_end();
-    state->drawer.program = &state->quad_shader;
+    state->drawer.program = quad_shader;
 
     // Line Drawing
     line_draw_begin(&state->line_drawer);
 
-    // draw_parametric(-2*PI, seconds - 4*PI, func_expr(pow(cosf(x), 4)), func_expr(sinf(x)), 64, VEC4F_GREEN);
-    // draw_polar(0, seconds - PI, func_expr(2*sinf(3*x)), 128, VEC4F_GREEN);
+    draw_parametric(-2*PI, seconds - 4*PI, func_expr(pow(cosf(x), 4)), func_expr(sinf(x)), 64, VEC4F_GREEN);
+    draw_polar(0, seconds - PI, func_expr(2*sinf(3*x)), 128, VEC4F_GREEN);
 
     line_draw_end();
 
     state->main_camera.unit_scale = 64;
-    shader_update_projection(state->drawer.program, &state->main_camera, state->window_width, state->window_height);
-    shader_update_projection(state->line_drawer.program, &state->main_camera, state->window_width, state->window_height);
-    shader_update_projection(&state->grid_shader, &state->main_camera, state->window_width, state->window_height);
+    shader_update_projection(quad_shader, &state->main_camera, state->window_width, state->window_height);
+    shader_update_projection(line_shader, &state->main_camera, state->window_width, state->window_height);
+    shader_update_projection(grid_shader, &state->main_camera, state->window_width, state->window_height);
 
 }
 

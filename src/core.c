@@ -1170,7 +1170,7 @@ void shader_update_projection(Shader *shader, Camera *camera, float window_width
 
     s32 quad_shader_pr_matrix_loc = glGetUniformLocation(shader->id, shader_uniform_pr_matrix_name);
     if (quad_shader_pr_matrix_loc == -1) {
-        printf_err("Couldn't get location of %s uniform, in quad_shader, when updating projection.\n", shader_uniform_pr_matrix_name);
+        printf_err("Couldn't get location of %s uniform, in shader, when updating projection.\n", shader_uniform_pr_matrix_name);
     }
 
     // Set uniforms.

@@ -10,6 +10,7 @@ const char* APP_NAME = "Game in C";
 Time_Data t;
 
 bool reload_libplug();
+bool plug_inited = false;
 
 Plug_Init plug_init = NULL;
 Plug_Load plug_load = NULL;
@@ -46,9 +47,6 @@ int main(int argc, char *argv[]) {
     state.window_height = WINDOW_HEIGHT;
 
     reload_libplug();
-
-    plug_init(&state);
-
 
     SDL_Event event;
 
@@ -135,6 +133,11 @@ bool reload_libplug() {
     if (plug_update == NULL) {
         fprintf(stderr, "%s Couldn't get adress plug_update function from %s.\n", debug_error_str, libplug_path);
         return false;
+    }
+
+    if (!plug_inited) {
+        plug_init(&state);
+        plug_inited = true;
     }
 
     plug_load(&state);

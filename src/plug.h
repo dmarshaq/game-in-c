@@ -14,15 +14,16 @@ typedef struct {
      */
     Vec4f clear_color;
     Camera main_camera;
-    float angle;
     
-    Shader quad_shader;
-    Shader grid_shader;
+    Shader *shader_table;
+    Font_Baked *font_table;
+
     Quad_Drawer drawer;
-    Font_Baked font_baked_medium;
-    Font_Baked font_baked_small;
-    Shader line_shader;
     Line_Drawer line_drawer;
+    /**
+     * Unsorted.
+     */
+    float angle;
 } Plug_State;
 
 typedef void (*Plug_Init)(Plug_State *state);
