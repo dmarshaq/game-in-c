@@ -3,13 +3,17 @@
 
 #include "core.h"
 
+typedef struct impulse {
+    Vec2f delta_force;
+    u32 milliseconds;
+    Rigid_Body_2D *target;
+} Impulse;
+
 // Game entities.
 typedef struct player {
-    Vec2f center;
-    float width;
-    float height;
+    AABB bound_box;
+    Rigid_Body_2D body;
     float speed;
-    Vec2f velocity;
 } Player;
 
 /**
@@ -33,6 +37,8 @@ typedef struct plug_state {
 
     Quad_Drawer drawer;
     Line_Drawer line_drawer;
+
+    Impulse *impulses;
 
     /**
      * Unsorted.

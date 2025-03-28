@@ -25,25 +25,77 @@ void viewport_reset(Plug_State *state);
 
 Plug_State *global_state;
 
-const Vec2f gravity_force = vec2f_make(0.0f, -9.0f);
-const float jump_input_leeway = 0.2f;
+const Vec2f gravity_acceleration = vec2f_make(0.0f, -9.81f);
+const float jump_input_leeway = 0.4f;
+
+u32 time_slow_factor = 1;
+
+
+/**
+ * Physics.
+ */
+#define MAX_IMPULSES        16
+
+void phys_init() {
+    // Setting physics variables.
+    global_state->impulses = array_list_make(Impulse, MAX_IMPULSES, &std_allocator); // @Leak
+}
+
+void phys_add_impulse(Vec2f force, u32 milliseconds, Rigid_Body_2D *rb) {
+    Impulse impulse = (Impulse) { 
+        .delta_force = vec2f_divide_constant(force, (float)milliseconds), 
+        .milliseconds = milliseconds, 
+        .target = rb 
+    };
+    array_list_append(&global_state->impulses, impulse);
+}
+
+#define phys_newton_force(force, ptr_rb)                                phys_add_impulse(force, 1000, ptr_rb)
+
+
+void phys_apply_forces() {
+    for (u32 i = 0; i < array_list_length(&global_state->impulses); i++) {
+        u32 force_time_multi = global_state->t->delta_time_milliseconds;
+
+        if (global_state->impulses[i].milliseconds < global_state->t->delta_time_milliseconds) {
+            force_time_multi = global_state->impulses[i].milliseconds;
+            global_state->impulses[i].milliseconds = 0;
+        }
+        else {
+            global_state->impulses[i].milliseconds -= global_state->t->delta_time_milliseconds;
+        }
+
+        global_state->impulses[i].target->velocity = vec2f_sum(global_state->impulses[i].target->velocity, vec2f_multi_constant(vec2f_divide_constant(global_state->impulses[i].delta_force, global_state->impulses[i].target->mass), (float)force_time_multi));
+
+        if (global_state->impulses[i].milliseconds == 0) {
+            array_list_unordered_remove(&global_state->impulses, i);
+            i--;
+        }
+    }
+}
+
+
+
 
 
 
 void plug_init(Plug_State *state) {
+    global_state = state;
+
     /**
      * Setting hash tables for resources. 
      * Since they are dynamically allocated pointers will not change after hot reloading.
      */
     state->shader_table = hash_table_make(Shader, 8, &std_allocator);
     state->font_table = hash_table_make(Font_Baked, 8, &std_allocator);
-
+    
     state->player = (Player) {
-        .center = VEC2F_ORIGIN,
-        .width = 1.0f,
-        .height = 1.25f,
-        .velocity = VEC2F_ORIGIN,
+        .bound_box = aabb_make_dimensions(vec2f_make(0.0f, 0.0f), 1.0f, 1.8f),
+        .body = rb_2d_make(vec2f_make(0.0f, 0.0f), 64.0f),
+        .speed = 0.0f,
     };
+
+    phys_init();
 }
 
 
@@ -51,7 +103,7 @@ void plug_load(Plug_State *state) {
     state->clear_color = vec4f_make(0.1f, 0.1f, 0.4f, 1.0f);
 
     // Main camera init.
-    state->main_camera = camera_make(VEC2F_ORIGIN, 64);
+    state->main_camera = camera_make(VEC2F_ORIGIN, 48);
 
     // Shader loading.
     Shader quad_shader = shader_load("res/shader/quad.glsl");
@@ -86,12 +138,10 @@ void plug_load(Plug_State *state) {
     free(font_data);
 
     // Player loading.
-    state->player.speed = 8.0f;
+    state->player.speed = 10.0f;
 
     global_state = state;
 }
-
-
 
 
 
@@ -103,8 +153,14 @@ void update_player(Player *p);
 void draw_player(Player *p);
 
 
-
 void plug_update(Plug_State *state) {
+    if (is_pressed_keycode(SDLK_t)) {
+        time_slow_factor++;
+        state->t->delta_time_multi = 1.0f / (time_slow_factor % 5);
+        printf_ok("Delta Time Multiplier: %f\n", state->t->delta_time_multi);
+    }
+
+
     // Get shaders and fonts.
     Shader *quad_shader = &(state->shader_table[hash_table_get_index_of(&state->shader_table, "quad", 4)]);
     Shader *grid_shader = &(state->shader_table[hash_table_get_index_of(&state->shader_table, "grid", 4)]);
@@ -120,10 +176,17 @@ void plug_update(Plug_State *state) {
     glClearColor(state->clear_color.x, state->clear_color.y, state->clear_color.z, state->clear_color.w);
     glClear(GL_COLOR_BUFFER_BIT);
 
+    // Lerp camera.
+    state->main_camera.center = vec2f_lerp(state->main_camera.center, state->player.body.center_mass, 0.025f);
+    
+
+    shader_update_projection(line_shader, &state->main_camera, (float)state->window_width, (float)state->window_height);
+
+
     // Draw grid background.
     shader_update_projection(grid_shader, &state->main_camera, (float)state->window_width, (float)state->window_height);
 
-
+    
 
 
     state->drawer.program = grid_shader;
@@ -140,6 +203,7 @@ void plug_update(Plug_State *state) {
     state->drawer.program = quad_shader;
     shader_update_projection(quad_shader, &state->main_camera, (float)state->window_width, (float)state->window_height);
     
+
     // Player logic.
     update_player(&state->player);
 
@@ -154,44 +218,57 @@ void plug_update(Plug_State *state) {
 }
 
 void update_player(Player *p) {
-    Vec2f vel = VEC2F_ORIGIN;
+    float vel_x = 0.0f;
 
-    
     if (is_hold_keycode(SDLK_d)) {
-        vel.x += 1.0f;
+        vel_x = 1.0f;
     }
+
     if (is_hold_keycode(SDLK_a)) {
-        vel.x -= 1.0f;
+        vel_x = -1.0f;
     }
-
-    // Just for testing, this code is not properly working 2d movement, rewrite it late.
-    vel = vec2f_multi_constant(vec2f_normalize(vel), p->speed);
-    vel = vec2f_sum(vel, gravity_force);
-    p->velocity = vec2f_lerp(p->velocity, vel, 0.1f);
-
-    if (p->center.y - p->height / 2 <= 0 + jump_input_leeway && is_pressed_keycode(SDLK_SPACE)) {
-        p->velocity.y += p->speed * 6;
-    }
-
-    p->center = vec2f_sum(p->center, vec2f_multi_constant(p->velocity, global_state->t->delta_time));
-
-    if (p->center.y - p->height / 2 < 0) {
-        p->center.y = p->height / 2;
-    }
-
     
+    vel_x *= p->speed;
+    p->body.velocity.x = lerp(p->body.velocity.x, vel_x, 0.1f);
+
+    if (p->bound_box.p0.y <= jump_input_leeway && is_pressed_keycode(SDLK_SPACE)) {
+        phys_add_impulse(vec2f_make(0.0f, 500.0f), 5, &p->body);
+        p->body.center_mass.y -= p->bound_box.p0.y;
+        p->bound_box.p1.y -= p->bound_box.p0.y;
+        p->bound_box.p0.y -= p->bound_box.p0.y;
+        p->body.velocity.y = 0;
+    }
+
+    // Apply gravity.
+    if (p->bound_box.p0.y > 0) {
+        p->body.velocity = vec2f_sum(p->body.velocity, vec2f_multi_constant(gravity_acceleration, (float)global_state->t->delta_time));
+    }
+
+    // Update physics.
+    phys_apply_forces();
+
+    // Applying calculated velocities. For both AABB and Rigid Body 2D.
+    aabb_move(&p->bound_box, vec2f_multi_constant(p->body.velocity, global_state->t->delta_time));
+    p->body.center_mass = vec2f_sum(p->body.center_mass, vec2f_multi_constant(p->body.velocity, global_state->t->delta_time));
+
+    // Ground collision resolution.
+    if (p->bound_box.p0.y < 0) {
+        p->body.center_mass.y -= p->bound_box.p0.y;
+        p->bound_box.p1.y -= p->bound_box.p0.y;
+        p->bound_box.p0.y -= p->bound_box.p0.y;
+        p->body.velocity.y = 0;
+    }
 
     // Debug draw lines.
     line_draw_begin(&global_state->line_drawer);
-    draw_line(p->center, vec2f_sum(p->center, vel), VEC4F_CYAN);
-    draw_line(p->center, vec2f_sum(p->center, p->velocity), VEC4F_RED);
+    draw_line(p->body.center_mass, vec2f_sum(p->body.center_mass, p->body.velocity), VEC4F_RED);
     line_draw_end();
 
 }
 
 void draw_player(Player *p) {
     // Drawing player as a quad.
-   draw_quad(vec2f_make(p->center.x - p->width / 2, p->center.y - p->height / 2), vec2f_make(p->center.x + p->width / 2, p->center.y + p->height / 2), VEC4F_YELLOW, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f);
+   draw_quad(p->bound_box.p0, p->bound_box.p1, VEC4F_YELLOW, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f);
 }
 
 

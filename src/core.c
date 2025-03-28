@@ -30,15 +30,15 @@ void allocator_destroy(Allocator *allocator) {
 }
 
 // Std.
-void * std_malloc(Allocator_Header *header, u64 size) {
+void *std_malloc(Allocator_Header *header, u64 size) {
     return malloc(size);
 }
 
-void * std_calloc(Allocator_Header *header, u64 size) {
+void *std_calloc(Allocator_Header *header, u64 size) {
     return calloc(1, size);
 }
 
-void * std_realloc(Allocator_Header *header, void *ptr, u64 size) {
+void *std_realloc(Allocator_Header *header, void *ptr, u64 size) {
     return realloc(ptr, size);
 }
 
@@ -717,6 +717,12 @@ Transform transform_trs_2d(Vec2f position, float angle, Vec2f scale) {
 
     r = matrix4f_multiplication(&s, &r);
     return matrix4f_multiplication(&r, &t);
+}
+
+
+void aabb_move(AABB *box, Vec2f move) {
+    box->p0 = vec2f_sum(box->p0, move);
+    box->p1 = vec2f_sum(box->p1, move);
 }
 
 
@@ -1495,3 +1501,22 @@ void print_indicies() {
    (void)printf("Length   : %8d\n", length);
    (void)printf("Capacity : %8d\n\n", array_list_capacity(&quad_indicies));
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

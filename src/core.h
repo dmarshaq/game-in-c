@@ -350,7 +350,7 @@ typedef float (*Function)(float);
 /**
  * This macro uses [ domain_start, domain_end ] to specify domain boundaries, and checks if value inside that domain.
  */
-#define value_inside_domain(domain_start, domain_end, value) (domain_start <= value && value <= domain_end)
+#define value_inside_domain(domain_start, domain_end, value) ((domain_start) <= (value) && (value) <= (domain_end))
 
 
 typedef struct axis_aligned_bounding_box {
@@ -370,6 +370,24 @@ typedef struct circle {
     Vec2f center;
     float radius;
 } Circle;
+
+
+typedef struct rigid_body_2d {
+    Vec2f center_mass;
+    Vec2f velocity;
+    float mass;
+} Rigid_Body_2D;
+
+#define aabb_make(p0, p1)                                               ((AABB) { p0, p1 } )   
+#define aabb_make_dimensions(center, width, height)                     ((AABB) { .p0 = vec2f_make((center).x - (width) / 2, (center).y - (height) / 2), .p1 = vec2f_make((center).x + (width) / 2, (center).y + (height) / 2) } )   
+
+#define rb_2d_make(center_mass, mass)                                   ((Rigid_Body_2D) { center_mass, VEC2F_ORIGIN, mass } )   
+
+#define aabb_center(aabb)                                               vec2f_make(aabb.p0.x + (aabb.p1.x - aabb.p0.x) / 2, aabb.p0.y + (aabb.p1.y - aabb.p0.y) / 2)
+
+void aabb_move(AABB *box, Vec2f move);
+
+
 
 /**
  * File utils.
@@ -606,10 +624,13 @@ typedef struct time_data {
     u32 delta_time_milliseconds;
     float delta_time;
 
+    float delta_time_multi;
+
     u32 last_update_time;
     u32 accumilated_time;
     u32 update_step_time;
 } Time_Data;
+
 
 
 

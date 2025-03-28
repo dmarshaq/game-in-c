@@ -39,7 +39,8 @@ int main(int argc, char *argv[]) {
     keyboard_state_init();
 
     graphics_init();
-
+    
+    t.delta_time_multi = 1.0f;
 
     state.t = &t;
     state.quit = false;
@@ -62,7 +63,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
         
-        t.delta_time_milliseconds = t.accumilated_time;
+        t.delta_time_milliseconds = (u32)((float)t.accumilated_time * t.delta_time_multi);
         t.delta_time = (float)(t.delta_time_milliseconds) / 1000.0f;
         t.accumilated_time = t.accumilated_time % t.update_step_time;
 
