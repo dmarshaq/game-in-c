@@ -329,7 +329,7 @@ void _array_list_unordered_remove(void *list, u32 index) {
 }
 
 /**
- * Hash Table. @Todo: Refactor implementation.
+ * Hash Table. 
  */
 
 #define hash_table_header(table_ptr)        ((Hash_Table_Header *)(*(table_ptr) - sizeof(Hash_Table_Header)))

@@ -3,7 +3,20 @@
 
 #include "core.h"
 
-typedef struct {
+// Game entities.
+typedef struct player {
+    Vec2f center;
+    float width;
+    float height;
+    float speed;
+    Vec2f velocity;
+} Player;
+
+/**
+ * Definition of plug_state.
+ * @Important: All global variables should be saved and organized in the struct.
+ */
+typedef struct plug_state {
     bool quit;
     Time_Data *t;
     u32 window_width;
@@ -20,10 +33,11 @@ typedef struct {
 
     Quad_Drawer drawer;
     Line_Drawer line_drawer;
+
     /**
      * Unsorted.
      */
-    float angle;
+    Player player;
 } Plug_State;
 
 typedef void (*Plug_Init)(Plug_State *state);

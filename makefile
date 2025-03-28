@@ -13,7 +13,7 @@
 
 # Compiler and flags
 CC = gcc
-CFLAGS = -std=gnu11 -g -Wall 
+CFLAGS = -std=gnu11 -g -DIGNORE_WARNING
 LIBFLAGS = -lmingw32 -lSDL2main -lSDL2 -lSDL2_mixer -lopengl32 -lglew32
 
 # Directories

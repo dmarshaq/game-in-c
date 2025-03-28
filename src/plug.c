@@ -1,10 +1,11 @@
 #include "plug.h"
+#include "SDL2/SDL_keycode.h"
 #include "core.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
-
+// Helper functions interface.
 void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle);
 void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale);
 void draw_line(Vec2f p0, Vec2f p1, Vec4f color);
@@ -21,6 +22,14 @@ void draw_viewport(u32 x, u32 y, u32 width, u32 height, Vec4f color, Camera *cam
 void viewport_reset(Plug_State *state);
 
 
+
+Plug_State *global_state;
+
+const Vec2f gravity_force = vec2f_make(0.0f, -9.0f);
+const float jump_input_leeway = 0.2f;
+
+
+
 void plug_init(Plug_State *state) {
     /**
      * Setting hash tables for resources. 
@@ -28,10 +37,18 @@ void plug_init(Plug_State *state) {
      */
     state->shader_table = hash_table_make(Shader, 8, &std_allocator);
     state->font_table = hash_table_make(Font_Baked, 8, &std_allocator);
+
+    state->player = (Player) {
+        .center = VEC2F_ORIGIN,
+        .width = 1.0f,
+        .height = 1.25f,
+        .velocity = VEC2F_ORIGIN,
+    };
 }
 
+
 void plug_load(Plug_State *state) {
-    state->clear_color = vec4f_make(0.1f, 0.1f, 0.1f, 1.0f);
+    state->clear_color = vec4f_make(0.1f, 0.1f, 0.4f, 1.0f);
 
     // Main camera init.
     state->main_camera = camera_make(VEC2F_ORIGIN, 64);
@@ -40,7 +57,7 @@ void plug_load(Plug_State *state) {
     Shader quad_shader = shader_load("res/shader/quad.glsl");
     quad_shader.vertex_stride = 11;
     hash_table_put(&state->shader_table, quad_shader, "quad", 4);
-
+    
     Shader grid_shader = shader_load("res/shader/grid.glsl");
     grid_shader.vertex_stride = 11;
     shader_set_uniforms(&grid_shader);
@@ -67,8 +84,121 @@ void plug_load(Plug_State *state) {
     hash_table_put(&state->font_table, font_baked_small, "small", 5);
 
     free(font_data);
+
+    // Player loading.
+    state->player.speed = 8.0f;
+
+    global_state = state;
 }
 
+
+
+
+
+/**
+ * Interface for functions.
+ */
+void update_player(Player *p);
+
+void draw_player(Player *p);
+
+
+
+void plug_update(Plug_State *state) {
+    // Get shaders and fonts.
+    Shader *quad_shader = &(state->shader_table[hash_table_get_index_of(&state->shader_table, "quad", 4)]);
+    Shader *grid_shader = &(state->shader_table[hash_table_get_index_of(&state->shader_table, "grid", 4)]);
+    Shader *line_shader = &(state->shader_table[hash_table_get_index_of(&state->shader_table, "line", 4)]);
+
+    Font_Baked *font_medium = &state->font_table[hash_table_get_index_of(&state->font_table, "medium", 6)];
+    Font_Baked *font_small = &state->font_table[hash_table_get_index_of(&state->font_table, "small", 5)];
+
+    // Reset viewport.
+    viewport_reset(state);
+
+    // Clear the screen with clear_color.
+    glClearColor(state->clear_color.x, state->clear_color.y, state->clear_color.z, state->clear_color.w);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    // Draw grid background.
+    shader_update_projection(grid_shader, &state->main_camera, (float)state->window_width, (float)state->window_height);
+
+
+
+
+    state->drawer.program = grid_shader;
+    draw_begin(&state->drawer);
+
+    Vec2f p0, p1;
+    p0 = vec2f_make(-8.0f, -5.0f);
+    p1 = vec2f_make(8.0f, 5.0f);
+    draw_quad(p0, p1, vec4f_make(0.8f, 0.8f, 0.8f, 0.6f), NULL, p0, p1, NULL, 0.0f);
+
+    draw_end();
+
+    // Updating projection, regular quad drawing.
+    state->drawer.program = quad_shader;
+    shader_update_projection(quad_shader, &state->main_camera, (float)state->window_width, (float)state->window_height);
+    
+    // Player logic.
+    update_player(&state->player);
+
+    // Drawing.
+    draw_begin(&state->drawer);
+
+    draw_player(&state->player);
+
+    draw_end();
+
+    
+}
+
+void update_player(Player *p) {
+    Vec2f vel = VEC2F_ORIGIN;
+
+    
+    if (is_hold_keycode(SDLK_d)) {
+        vel.x += 1.0f;
+    }
+    if (is_hold_keycode(SDLK_a)) {
+        vel.x -= 1.0f;
+    }
+
+    // Just for testing, this code is not properly working 2d movement, rewrite it late.
+    vel = vec2f_multi_constant(vec2f_normalize(vel), p->speed);
+    vel = vec2f_sum(vel, gravity_force);
+    p->velocity = vec2f_lerp(p->velocity, vel, 0.1f);
+
+    if (p->center.y - p->height / 2 <= 0 + jump_input_leeway && is_pressed_keycode(SDLK_SPACE)) {
+        p->velocity.y += p->speed * 6;
+    }
+
+    p->center = vec2f_sum(p->center, vec2f_multi_constant(p->velocity, global_state->t->delta_time));
+
+    if (p->center.y - p->height / 2 < 0) {
+        p->center.y = p->height / 2;
+    }
+
+    
+
+    // Debug draw lines.
+    line_draw_begin(&global_state->line_drawer);
+    draw_line(p->center, vec2f_sum(p->center, vel), VEC4F_CYAN);
+    draw_line(p->center, vec2f_sum(p->center, p->velocity), VEC4F_RED);
+    line_draw_end();
+
+}
+
+void draw_player(Player *p) {
+    // Drawing player as a quad.
+   draw_quad(vec2f_make(p->center.x - p->width / 2, p->center.y - p->height / 2), vec2f_make(p->center.x + p->width / 2, p->center.y + p->height / 2), VEC4F_YELLOW, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f);
+}
+
+
+
+
+
+// Plug unload.
 void plug_unload(Plug_State *state) {
     shader_unload(&(state->shader_table[hash_table_get_index_of(&state->shader_table, "quad", 4)]));
     shader_unload(&(state->shader_table[hash_table_get_index_of(&state->shader_table, "grid", 4)]));
@@ -81,87 +211,10 @@ void plug_unload(Plug_State *state) {
     font_free(&state->font_table[hash_table_get_index_of(&state->font_table, "small", 5)]);
 }
 
-void plug_update(Plug_State *state) {
-    // Get shaders and fonts.
-    Shader *quad_shader = &(state->shader_table[hash_table_get_index_of(&state->shader_table, "quad", 4)]);
-    Shader *grid_shader = &(state->shader_table[hash_table_get_index_of(&state->shader_table, "grid", 4)]);
-    Shader *line_shader = &(state->shader_table[hash_table_get_index_of(&state->shader_table, "line", 4)]);
 
-    // Font_Baked *font_medium = &state->font_table[hash_table_get_index_of(&state->font_table, "medium", 6)];
-    // Font_Baked *font_small = &state->font_table[hash_table_get_index_of(&state->font_table, "small", 5)];
-
-    // Reset viewport.
-    viewport_reset(state);
-
-    // Clear the screen with clear_color.
-    glClearColor(state->clear_color.x, state->clear_color.y, state->clear_color.z, state->clear_color.w);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    // Updating projection.
-    shader_update_projection(grid_shader, &state->main_camera, (float)state->window_width, (float)state->window_height);
-    
-    Vec2f p0, p1;
-    p0 = vec2f_make(-8.0f, -5.0f);
-    p1 = vec2f_make(8.0f, 5.0f);
-
-    // Draw background grid.
-    state->drawer.program = grid_shader;
-    draw_begin(&state->drawer);
-    
-    draw_quad(p0, p1, vec4f_make(0.9f, 0.9f, 0.9f, 0.2f), NULL, p0, p1, NULL, 0.0f);
-
-
-    draw_end();
-    
-
-
-    // Updating projection.
-    shader_update_projection(line_shader, &state->main_camera, (float)state->window_width, (float)state->window_height);
-
-
-    float seconds = (u32)(state->t->current_time) % (u32)(1000 * PI) / 1000.0f;
-
-    // Drawing: Always between draw_begin() and draw_end().
-    state->drawer.program = quad_shader;
-    draw_begin(&state->drawer);
-
-    draw_area_polar(0, (seconds / 12.0f), func_expr(1 - 2 * cosf(x)), 8.0f * seconds, VEC4F_BLUE);
-
-    draw_end();
-
-    // Separate viewport example
-    state->main_camera.unit_scale = 64;
-    u32 height, width;
-    height = state->window_height / 3; 
-    width = state->window_width / 3; 
-
-    shader_update_projection(quad_shader, &state->main_camera, width, height);
-    shader_update_projection(line_shader, &state->main_camera, width, height);
-    shader_update_projection(grid_shader, &state->main_camera, width, height);
-
-    state->drawer.program = grid_shader;
-    draw_begin(&state->drawer);
-
-    draw_viewport(25, 25, width, height, vec4f_make(0.3f, 0.3f, 0.3f, 1.0f), &state->main_camera);
-
-    draw_end();
-    state->drawer.program = quad_shader;
-
-    // Line Drawing
-    line_draw_begin(&state->line_drawer);
-
-    draw_parametric(-2*PI, seconds - 4*PI, func_expr(pow(cosf(x), 4)), func_expr(sinf(x)), 64, VEC4F_GREEN);
-    draw_polar(0, seconds - PI, func_expr(2*sinf(3*x)), 128, VEC4F_GREEN);
-
-    line_draw_end();
-
-    state->main_camera.unit_scale = 64;
-    shader_update_projection(quad_shader, &state->main_camera, state->window_width, state->window_height);
-    shader_update_projection(line_shader, &state->main_camera, state->window_width, state->window_height);
-    shader_update_projection(grid_shader, &state->main_camera, state->window_width, state->window_height);
-
-}
-
+/**
+ * Helper drawing functions.
+ */
 void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle) {
     float texture_slot = -1.0f; // @Important: -1.0f slot signifies shader to use color, not texture.
     float mask_slot = -1.0f;

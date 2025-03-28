@@ -9,13 +9,23 @@
 
 #include <stdio.h>
 
-
 extern const char *debug_error_str;
 extern const char *debug_warning_str;
 extern const char *debug_ok_str;
 
+
 #define printf_err(format, ...)                 (void)fprintf(stderr, "%s " format, debug_error_str, ##__VA_ARGS__);
+
+#ifdef IGNORE_WARNING
+
+#define printf_warning(format, ...)
+
+#else
+
 #define printf_warning(format, ...)             (void)fprintf(stderr, "%s " format, debug_warning_str, ##__VA_ARGS__);
+
+#endif
+
 #define printf_ok(format, ...)                  (void)fprintf(stderr, "%s " format, debug_ok_str, ##__VA_ARGS__);
 
 /**
@@ -242,6 +252,7 @@ void hash_table_print(void **table);
 #define TAU (PI * 2)
 
 #define right_triangle_hypotenuse(a, b)     (sqrtf((a) * (a) + (b) * (b)))
+#define lerp(a, b, t)                       ( (a) + ((b) - (a)) * (t))
 
 typedef struct vec2f {
     float x;
@@ -269,6 +280,8 @@ typedef struct vec2f {
 #define vec2f_magnitude(v1)                 right_triangle_hypotenuse(v1.x, v1.y)
 #define vec2f_distance(v1, v2)              right_triangle_hypotenuse(v1.x - v2.x, v1.y - v2.y)
 #define vec2f_negate(v1)                    vec2f_make(-v1.x, -v1.y)
+#define vec2f_normalize(v1)                 (((v1).x == 0.0f && (v1).y == 0.0f) ? VEC2F_ORIGIN : vec2f_divide_constant(v1, vec2f_magnitude(v1)))
+#define vec2f_lerp(v1, v2, t)               vec2f_make(lerp(v1.x, v2.x, t), lerp(v1.y, v2.y, t))
 
 
 typedef struct vec3f {
