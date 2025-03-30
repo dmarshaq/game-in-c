@@ -14,6 +14,7 @@ typedef struct player {
     AABB bound_box;
     Rigid_Body_2D body;
     float speed;
+    bool in_air;
 } Player;
 
 /**

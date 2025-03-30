@@ -56,7 +56,7 @@ Allocator std_allocator = (Allocator) {
 
 
 // Arena.
-void * arena_alloc(Allocator_Header *header, u64 size) {
+void *arena_alloc(Allocator_Header *header, u64 size) {
     if (header->size_filled + size > header->capacity) {
         printf_err("Couldn't allocate more memory of size: %lld bytes from the arena, which is filled at %lld out of %lld bytes.\n", size, header->size_filled, header->capacity);
         return NULL;
@@ -611,7 +611,7 @@ u32 _hash_table_push_key(void **table, void *key, u32 key_size) {
     return UINT_MAX;
 }
 
-u32 _hash_table_index_of(void **table, void *key, u32 key_size) {
+void *_hash_table_get(void **table, void *key, u32 key_size) {
     u32 index = hash_table_hash_index_of(table, key, key_size);
     Hash_Table_Header *header = hash_table_header(table);
 
@@ -619,15 +619,15 @@ u32 _hash_table_index_of(void **table, void *key, u32 key_size) {
     for (u32 i = 0; i < header->capacity; i++) {
         slot = hash_table_get_slot(table, (index + i) % header->capacity);
         if (slot->state == SLOT_EMPTY) {
-            return UINT_MAX;
+            return NULL;
         }
         else if (slot->key.length == key_size && !memcmp(slot->key.ptr, key, key_size)) {
             // Right key is found, return.
-            return (index + i) % header->capacity;
+            return *table + ((index + i) % header->capacity) * header->item_size;
         }
     }
 
-    return UINT_MAX;
+    return NULL;
 }
 
 void _hash_table_remove(void **table, void *key, u32 key_size) {

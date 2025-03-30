@@ -213,7 +213,7 @@ void  _array_list_free(void **list);
 #define hash_table_item_size(ptr_list)                              _hash_table_item_size((void *)*ptr_list)
 
 #define hash_table_put(ptr_table, item, key_ptr, key_size)          _hash_table_resize_to_fit((void **)(ptr_table), hash_table_count(ptr_table) + 1); (*ptr_table)[_hash_table_push_key((void **)(ptr_table), key_ptr, key_size)] = item
-#define hash_table_get_index_of(ptr_table, ptr_key, key_size)       _hash_table_index_of((void **)(ptr_table), ptr_key, key_size) 
+#define hash_table_get(ptr_table, ptr_key, key_size)                _hash_table_get((void **)(ptr_table), ptr_key, key_size)
 #define hash_table_remove(ptr_table, ptr_key, key_size)             _hash_table_remove((void **)(ptr_table), ptr_key, key_size) 
 #define hash_table_free(ptr_table)                                  _hash_table_free((void **)(ptr_table))
 
@@ -233,7 +233,7 @@ u32   _hash_table_capacity(void *table);
 u32   _hash_table_item_size(void *table);
 void  _hash_table_resize_to_fit(void **table, u32 requiered_length);
 u32   _hash_table_push_key(void **table, void *key, u32 key_size);
-u32   _hash_table_index_of(void **table, void *key, u32 key_size);
+void *_hash_table_get(void **table, void *key, u32 key_size);
 void  _hash_table_remove(void **table, void *key, u32 key_size);
 void  _hash_table_free(void **table);
 

@@ -25,8 +25,9 @@ void viewport_reset(Plug_State *state);
 
 Plug_State *global_state;
 
-const Vec2f gravity_acceleration = vec2f_make(0.0f, -9.81f);
+const Vec2f gravity_acceleration = vec2f_make(0.0f, -12.0f);
 const float jump_input_leeway = 0.4f;
+const float air_control_percent = 0.5f;
 
 u32 time_slow_factor = 1;
 
@@ -120,10 +121,10 @@ void plug_load(Plug_State *state) {
     hash_table_put(&state->shader_table, line_shader, "line", 4);
 
     // Drawer init.
-    drawer_init(&state->drawer, &(state->shader_table[hash_table_get_index_of(&state->shader_table, "quad", 4)]));
+    drawer_init(&state->drawer, hash_table_get(&state->shader_table, "quad", 4));
 
     // Drawer init.
-    line_drawer_init(&state->line_drawer, &(state->shader_table[hash_table_get_index_of(&state->shader_table, "line", 4)]));
+    line_drawer_init(&state->line_drawer, hash_table_get(&state->shader_table, "line", 4));
 
 
     // Font loading.
@@ -162,12 +163,12 @@ void plug_update(Plug_State *state) {
 
 
     // Get shaders and fonts.
-    Shader *quad_shader = &(state->shader_table[hash_table_get_index_of(&state->shader_table, "quad", 4)]);
-    Shader *grid_shader = &(state->shader_table[hash_table_get_index_of(&state->shader_table, "grid", 4)]);
-    Shader *line_shader = &(state->shader_table[hash_table_get_index_of(&state->shader_table, "line", 4)]);
+    Shader *quad_shader = hash_table_get(&state->shader_table, "quad", 4);
+    Shader *grid_shader = hash_table_get(&state->shader_table, "grid", 4);
+    Shader *line_shader = hash_table_get(&state->shader_table, "line", 4);
 
-    Font_Baked *font_medium = &state->font_table[hash_table_get_index_of(&state->font_table, "medium", 6)];
-    Font_Baked *font_small = &state->font_table[hash_table_get_index_of(&state->font_table, "small", 5)];
+    Font_Baked *font_medium = hash_table_get(&state->font_table, "medium", 6);
+    Font_Baked *font_small  = hash_table_get(&state->font_table, "small", 5);
 
     // Reset viewport.
     viewport_reset(state);
@@ -217,7 +218,17 @@ void plug_update(Plug_State *state) {
     
 }
 
+
+/**
+ * Refactor this approach.
+ * Remove unnecessary if branching.
+ */
 void update_player(Player *p) {
+    if (p->bound_box.p0.y > 0)
+        p->in_air = true;
+    else
+        p->in_air = false;
+    
     float vel_x = 0.0f;
 
     if (is_hold_keycode(SDLK_d)) {
@@ -229,8 +240,8 @@ void update_player(Player *p) {
     }
     
     vel_x *= p->speed;
-    p->body.velocity.x = lerp(p->body.velocity.x, vel_x, 0.1f);
-
+    p->body.velocity.x = lerp(p->body.velocity.x, vel_x, p->in_air ? 10.0f * air_control_percent * global_state->t->delta_time : 10.0f * global_state->t->delta_time );
+ 
     if (p->bound_box.p0.y <= jump_input_leeway && is_pressed_keycode(SDLK_SPACE)) {
         phys_add_impulse(vec2f_make(0.0f, 500.0f), 5, &p->body);
         p->body.center_mass.y -= p->bound_box.p0.y;
@@ -240,7 +251,7 @@ void update_player(Player *p) {
     }
 
     // Apply gravity.
-    if (p->bound_box.p0.y > 0) {
+    if (p->in_air) {
         p->body.velocity = vec2f_sum(p->body.velocity, vec2f_multi_constant(gravity_acceleration, (float)global_state->t->delta_time));
     }
 
@@ -257,6 +268,10 @@ void update_player(Player *p) {
         p->bound_box.p1.y -= p->bound_box.p0.y;
         p->bound_box.p0.y -= p->bound_box.p0.y;
         p->body.velocity.y = 0;
+        p->in_air = false;
+    }
+    else {
+        p->in_air = true;
     }
 
     // Debug draw lines.
@@ -277,15 +292,15 @@ void draw_player(Player *p) {
 
 // Plug unload.
 void plug_unload(Plug_State *state) {
-    shader_unload(&(state->shader_table[hash_table_get_index_of(&state->shader_table, "quad", 4)]));
-    shader_unload(&(state->shader_table[hash_table_get_index_of(&state->shader_table, "grid", 4)]));
-    shader_unload(&(state->shader_table[hash_table_get_index_of(&state->shader_table, "line", 4)]));
+    shader_unload(hash_table_get(&state->shader_table, "quad", 4));
+    shader_unload(hash_table_get(&state->shader_table, "grid", 4));
+    shader_unload(hash_table_get(&state->shader_table, "line", 4));
     
     drawer_free(&state->drawer);
     line_drawer_free(&state->line_drawer);
     
-    font_free(&state->font_table[hash_table_get_index_of(&state->font_table, "medium", 6)]);
-    font_free(&state->font_table[hash_table_get_index_of(&state->font_table, "small", 5)]);
+    font_free(hash_table_get(&state->font_table, "medium", 6));
+    font_free(hash_table_get(&state->font_table, "small", 5));
 }
 
 
