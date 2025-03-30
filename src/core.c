@@ -940,10 +940,10 @@ String_8 fragment_shader_defines = str8_make("#define FRAGMENT\n");
 s32 shader_strings_lengths[3];
 
 // Texture params.
-s32 texture_min_filter = GL_CLAMP_TO_EDGE;
-s32 texture_max_filter = GL_CLAMP_TO_EDGE;
-s32 texture_wrap_s = GL_LINEAR;
-s32 texture_wrap_t = GL_LINEAR;
+s32 texture_wrap_s = GL_CLAMP_TO_EDGE;
+s32 texture_wrap_t = GL_CLAMP_TO_EDGE;
+s32 texture_min_filter = GL_LINEAR;
+s32 texture_max_filter = GL_LINEAR;
 
 // Shader unifroms.
 Matrix4f shader_uniform_pr_matrix = MATRIX4F_IDENTITY;
@@ -1316,6 +1316,7 @@ void draw_quad_data(float *quad_data, u32 count) {
 
 
 Font_Baked font_bake(u8 *font_data, float font_size) {
+
     Font_Baked result;
     
     // Init font info.
@@ -1344,7 +1345,9 @@ Font_Baked font_bake(u8 *font_data, float font_size) {
 
     // Create an OpenGL texture.
     glGenTextures(1, &result.bitmap.id);
+    
     glBindTexture(GL_TEXTURE_2D, result.bitmap.id);
+
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, texture_wrap_s);	
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, texture_wrap_t);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texture_min_filter);  

@@ -5,21 +5,29 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Helper functions interface.
+/**
+ * Helper functions interface.
+ */
+
+// Drawing basics.
 void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle);
 void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale);
 void draw_line(Vec2f p0, Vec2f p1, Vec4f color);
 
+// Drawing function.
 void draw_function(float x0, float x1, Function y, u32 detail, Vec4f color);
 void draw_polar(float t0, float t1, Function r, u32 detail, Vec4f color);
 void draw_parametric(float t0, float t1, Function x, Function y, u32 detail, Vec4f color);
 
+// Drawing area under the curve.
 void draw_area_function(float x0, float x1, Function y, u32 rect_count, Vec4f color);
 void draw_area_polar(float t0, float t1, Function r, u32 rect_count, Vec4f color);
 void draw_area_parametric(float t0, float t1, Function x, Function y, u32 rect_count, Vec4f color);
 
+// Viewport manipulation.
 void draw_viewport(u32 x, u32 y, u32 width, u32 height, Vec4f color, Camera *camera);
 void viewport_reset(Plug_State *state);
+
 
 
 
@@ -78,8 +86,6 @@ void phys_apply_forces() {
 
 
 
-
-
 void plug_init(Plug_State *state) {
     global_state = state;
 
@@ -129,6 +135,8 @@ void plug_load(Plug_State *state) {
 
     // Font loading.
     u8* font_data = read_file_into_buffer("res/font/font.ttf", NULL, &std_allocator);
+
+
 
     Font_Baked font_baked_medium = font_bake(font_data, 20.0f);
     hash_table_put(&state->font_table, font_baked_medium, "medium", 6);
@@ -212,6 +220,7 @@ void plug_update(Plug_State *state) {
     draw_begin(&state->drawer);
 
     draw_player(&state->player);
+    draw_text("Hello World!", VEC2F_UNIT, VEC4F_WHITE, font_small, state->main_camera.unit_scale);
 
     draw_end();
 
