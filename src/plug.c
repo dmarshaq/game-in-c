@@ -2,6 +2,7 @@
 #include "SDL2/SDL_keycode.h"
 #include "core.h"
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -38,6 +39,56 @@ const float jump_input_leeway = 0.4f;
 const float air_control_percent = 0.3f;
 
 u32 time_slow_factor = 1;
+
+
+
+
+/**
+ * Pop up message.
+ */
+
+char pop_up_buffer[256];
+u32 pop_up_buffer_start = 0;
+float pop_up_lerp_t = 0.0f;
+
+
+void pop_up_log(char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    s32 bytes_written = vsnprintf(pop_up_buffer + pop_up_buffer_start, sizeof(pop_up_buffer) - pop_up_buffer_start, format, args);
+    va_end(args);
+    pop_up_lerp_t = 0.0f;
+
+    if (bytes_written > 0)
+        pop_up_buffer_start += bytes_written;
+}
+
+
+/**
+ * Draws pop_up text that is stored in "pop_up_mesg", doesn't draw anything if it is NULL.
+ * Use "pop_up_log(char *format, ...)" to log message;
+ */
+void draw_pop_up(Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale) {
+    if (pop_up_buffer[0] == '\0')
+        return;
+    
+    color.w = lerp(color.w, 0.0f, pop_up_lerp_t);
+    position.y = lerp(position.y, position.y + 25.0f, pop_up_lerp_t);
+
+    draw_text(pop_up_buffer, position, color, font, unit_scale);
+
+    pop_up_lerp_t += 0.002f;
+
+    if (pop_up_lerp_t >= 1.0f) {
+        pop_up_buffer[0] = '\0';
+        pop_up_lerp_t = 0.0f;
+    }
+
+    pop_up_buffer_start = 0;
+}
+
+
+
 
 
 /**
@@ -206,12 +257,20 @@ void plug_update(Plug_State *state) {
      *  Updating
      * -----------------------------------
      */
+
+    // Random pop up.
+    if (is_pressed_keycode(SDLK_e)) {
+        for (s32 i = 0; i < 4; i++) {
+            pop_up_log("Pop up: i = %d\n", i);
+        }
+    }
     
     // Time slow down input.
     if (is_pressed_keycode(SDLK_t)) {
         time_slow_factor++;
         state->t->delta_time_multi = 1.0f / (time_slow_factor % 5);
-        printf_ok("Delta Time Multiplier: %f\n", state->t->delta_time_multi);
+        
+        pop_up_log("Delta Time Multiplier: %f\n", state->t->delta_time_multi);
     }
 
     // Player logic.
@@ -294,7 +353,8 @@ void plug_update(Plug_State *state) {
     state->drawer.program = quad_shader;
     draw_begin(&state->drawer);
 
-    draw_text("Hello World!", vec2f_make(10.0f, 50.0f), VEC4F_WHITE, font_small, 1);
+    // draw_text("Hello World!", vec2f_make(10.0f, 50.0f), VEC4F_WHITE, font_small, 1);
+    draw_pop_up(vec2f_make(10.0f, 80.0f), VEC4F_WHITE, font_medium, 1);
 
     draw_end();
     check_gl_error();
