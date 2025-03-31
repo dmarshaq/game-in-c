@@ -1,5 +1,4 @@
 #include "plug.h"
-#include "core.h"
 #include <windows.h>
 
 #define WINDOW_WIDTH 800

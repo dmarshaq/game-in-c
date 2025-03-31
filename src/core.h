@@ -502,7 +502,7 @@ Shader shader_load(char *shader_path);
  */
 void shader_unload(Shader *shader);
 
-void shader_set_uniforms(Shader *shader);
+void shader_init_uniforms(Shader *shader);
 
 
 typedef struct quad_drawer {
@@ -560,11 +560,16 @@ typedef struct camera {
 Camera camera_make(Vec2f center, u32 unit_scale);
 
 /**
- * @Incomplete: Replace with more dynamic way of setting uniform by its name.
- * At this point it is fairly reasonable to implement hashmap and enchance overall resource management situation, to not introduce unnecesary "loop holes", "hacks" to ignore resource management issue.
- * @Incomplete: Write description.
+ * Calculate 4x4 projection matrix that can be used by shaders to correctly transform then draw elements to the screen.
  */
-void shader_update_projection(Shader *shader, Camera *camera, float window_width, float window_height);
+Matrix4f camera_calculate_projection(Camera *camera, float window_width, float window_height);
+
+#define screen_calculate_projection(window_width, window_height) ((Matrix4f) { .array = { 2.0f / (float)(window_width), 0.0f, 0.0f, -1.0f,    0.0f, 2.0f / (float)(window_height), 0.0f, -1.0f,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f } })
+
+/**
+ * Sets shader uniform projection matrix to the specified 4x4 matrix.
+ */
+void shader_update_projection(Shader *shader, Matrix4f *projection);
 
 
 typedef struct font_baked {

@@ -1016,10 +1016,10 @@ const char *shader_uniform_ml_matrix_name = "ml_matrix";
 const char *shader_uniform_samplers_name = "u_textures";
 
 /**
- * @Temporary: Later, setting uniforms either will be done more automatically, or simplified to be done by uset manually. 
+ * @Temporary: Later, setting uniforms either will be done more automatically, or simplified to be done by user manually. 
  * But right now it is not neccassary to care about too much, since only one shader is used anyway.
  */
-void shader_set_uniforms(Shader *program) {
+void shader_init_uniforms(Shader *program) {
     // Get uniform's locations based on unifrom's name.
     s32 quad_shader_pr_matrix_loc = glGetUniformLocation(program->id, shader_uniform_pr_matrix_name);
     if (quad_shader_pr_matrix_loc == -1) {
@@ -1038,8 +1038,8 @@ void shader_set_uniforms(Shader *program) {
     
     // Set uniforms.
     glUseProgram(program->id);
-    glUniformMatrix4fv(quad_shader_pr_matrix_loc, 1, GL_FALSE, shader_uniform_pr_matrix.array);
-    glUniformMatrix4fv(quad_shader_ml_matrix_loc, 1, GL_FALSE, shader_uniform_ml_matrix.array);
+    glUniformMatrix4fv(quad_shader_pr_matrix_loc, 1, GL_TRUE, shader_uniform_pr_matrix.array);
+    glUniformMatrix4fv(quad_shader_ml_matrix_loc, 1, GL_TRUE, shader_uniform_ml_matrix.array);
     glUniform1iv(quad_shader_samplers_loc, 32, shader_uniform_samplers);
     glUseProgram(0);
 }
@@ -1147,7 +1147,6 @@ Shader shader_load(char *shader_path) {
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
     
-
     str8_free(&shader_source, &std_allocator);
 
     return shader;
@@ -1169,11 +1168,16 @@ Camera camera_make(Vec2f center, u32 unit_scale) {
     };
 }
 
-void shader_update_projection(Shader *shader, Camera *camera, float window_width, float window_height) {
+Matrix4f camera_calculate_projection(Camera *camera, float window_width, float window_height) {
     float camera_width_offset = (window_width / (float) camera->unit_scale) / 2;
     float camera_height_offset = (window_height / (float) camera->unit_scale) / 2;
-    shader_uniform_pr_matrix = matrix4f_orthographic(camera->center.x - camera_width_offset, camera->center.x + camera_width_offset, camera->center.y - camera_height_offset, camera->center.y + camera_height_offset, -1.0f, 1.0f);
+    return matrix4f_orthographic(camera->center.x - camera_width_offset, camera->center.x + camera_width_offset, camera->center.y - camera_height_offset, camera->center.y + camera_height_offset, -1.0f, 1.0f);
+}
 
+/**
+ * @Todo: When shader loading would be more deterministic, optimize glGetUniformLocation use.
+ */
+void shader_update_projection(Shader *shader, Matrix4f *projection) {
     s32 quad_shader_pr_matrix_loc = glGetUniformLocation(shader->id, shader_uniform_pr_matrix_name);
     if (quad_shader_pr_matrix_loc == -1) {
         printf_err("Couldn't get location of %s uniform, in shader, when updating projection.\n", shader_uniform_pr_matrix_name);
@@ -1181,7 +1185,7 @@ void shader_update_projection(Shader *shader, Camera *camera, float window_width
 
     // Set uniforms.
     glUseProgram(shader->id);
-    glUniformMatrix4fv(quad_shader_pr_matrix_loc, 1, GL_FALSE, shader_uniform_pr_matrix.array);
+    glUniformMatrix4fv(quad_shader_pr_matrix_loc, 1, GL_TRUE, projection->array);
     glUseProgram(0);
 }
 
@@ -1225,8 +1229,6 @@ void drawer_init(Quad_Drawer *drawer, Shader *shader) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-
-    shader_set_uniforms(drawer->program);
 }
 
 void drawer_free(Quad_Drawer *drawer) {
@@ -1397,8 +1399,6 @@ void line_drawer_init(Line_Drawer *drawer, Shader *shader) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-
-    shader_set_uniforms(drawer->program);
 }
 
 void line_drawer_free(Line_Drawer *drawer) {

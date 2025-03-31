@@ -33,16 +33,48 @@ void viewport_reset(Plug_State *state);
 
 Plug_State *global_state;
 
-const Vec2f gravity_acceleration = vec2f_make(0.0f, -12.0f);
+const Vec2f gravity_acceleration = vec2f_make(0.0f, -9.81f);
 const float jump_input_leeway = 0.4f;
-const float air_control_percent = 0.5f;
+const float air_control_percent = 0.3f;
 
 u32 time_slow_factor = 1;
 
 
 /**
  * Physics.
+ *
+ * Standard units used:
+ *      Mass -> kg
+ *      Speed -> m/s
+ *      Acceleration -> m/s^2
+ *      Force -> m/s^2 * kg -> N
+ *
+ * Important formulas:
+ *  
+ *  Instanteneous acceleration and force.
+ *      Vi + a = Vf
+ *      Vi + (F / m) = Vf
+ *  
+ *  Acceleration and force over period of time / continuous.
+ *      Vi + a * dt = Vf
+ *      Vi + (F / m) * dt = Vf
  */
+
+/**
+ * Applies instanteneous force to rigid body.
+ */
+void phys_apply_force(Rigid_Body_2D *rb, Vec2f force) {
+    rb->velocity = vec2f_sum(rb->velocity, vec2f_divide_constant(force, rb->mass));
+}
+
+/**
+ * Applies instanteneous acceleration to rigid body.
+ */
+void phys_apply_acceleration(Rigid_Body_2D *rb, Vec2f acceleration) {
+    rb->velocity = vec2f_sum(rb->velocity, acceleration);
+}
+
+
 #define MAX_IMPULSES        16
 
 void phys_init() {
@@ -59,10 +91,7 @@ void phys_add_impulse(Vec2f force, u32 milliseconds, Rigid_Body_2D *rb) {
     array_list_append(&global_state->impulses, impulse);
 }
 
-#define phys_newton_force(force, ptr_rb)                                phys_add_impulse(force, 1000, ptr_rb)
-
-
-void phys_apply_forces() {
+void phys_apply_impulses() {
     for (u32 i = 0; i < array_list_length(&global_state->impulses); i++) {
         u32 force_time_multi = global_state->t->delta_time_milliseconds;
 
@@ -98,7 +127,7 @@ void plug_init(Plug_State *state) {
     
     state->player = (Player) {
         .bound_box = aabb_make_dimensions(vec2f_make(0.0f, 0.0f), 1.0f, 1.8f),
-        .body = rb_2d_make(vec2f_make(0.0f, 0.0f), 64.0f),
+        .body = rb_2d_make(vec2f_make(0.0f, 0.0f), 70.0f),
         .speed = 0.0f,
     };
 
@@ -114,15 +143,17 @@ void plug_load(Plug_State *state) {
 
     // Shader loading.
     Shader quad_shader = shader_load("res/shader/quad.glsl");
+    shader_init_uniforms(&quad_shader);
     quad_shader.vertex_stride = 11;
     hash_table_put(&state->shader_table, quad_shader, "quad", 4);
     
     Shader grid_shader = shader_load("res/shader/grid.glsl");
+    shader_init_uniforms(&grid_shader);
     grid_shader.vertex_stride = 11;
-    shader_set_uniforms(&grid_shader);
     hash_table_put(&state->shader_table, grid_shader, "grid", 4);
 
     Shader line_shader = shader_load("res/shader/line.glsl");
+    shader_init_uniforms(&line_shader);
     line_shader.vertex_stride = 7;
     hash_table_put(&state->shader_table, line_shader, "line", 4);
 
@@ -162,15 +193,42 @@ void update_player(Player *p);
 void draw_player(Player *p);
 
 
+/**
+ * @Important: In game update loops the order of procedures is: Updating -> Drawing.
+ * Where in updating all logic of the game loop is contained including inputs, sound and so on.
+ * Drawing part is only responsible for putting pixels accrodingly with calculated data in "Updating" part.
+ */
 void plug_update(Plug_State *state) {
+
+
+    /**
+     * -----------------------------------
+     *  Updating
+     * -----------------------------------
+     */
+    
+    // Time slow down input.
     if (is_pressed_keycode(SDLK_t)) {
         time_slow_factor++;
         state->t->delta_time_multi = 1.0f / (time_slow_factor % 5);
         printf_ok("Delta Time Multiplier: %f\n", state->t->delta_time_multi);
     }
 
+    // Player logic.
+    update_player(&state->player);
+    
+    // Lerp camera.
+    state->main_camera.center = vec2f_lerp(state->main_camera.center, state->player.body.center_mass, 0.025f);
 
-    // Get shaders and fonts.
+
+
+    /**
+     * -----------------------------------
+     *  Drawing
+     * -----------------------------------
+     */
+
+    // Get neccessary to draw resource: (Shaders, Fonts, Textures, etc.).
     Shader *quad_shader = hash_table_get(&state->shader_table, "quad", 4);
     Shader *grid_shader = hash_table_get(&state->shader_table, "grid", 4);
     Shader *line_shader = hash_table_get(&state->shader_table, "line", 4);
@@ -178,26 +236,27 @@ void plug_update(Plug_State *state) {
     Font_Baked *font_medium = hash_table_get(&state->font_table, "medium", 6);
     Font_Baked *font_small  = hash_table_get(&state->font_table, "small", 5);
 
+    
     // Reset viewport.
     viewport_reset(state);
+
 
     // Clear the screen with clear_color.
     glClearColor(state->clear_color.x, state->clear_color.y, state->clear_color.z, state->clear_color.w);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // Lerp camera.
-    state->main_camera.center = vec2f_lerp(state->main_camera.center, state->player.body.center_mass, 0.025f);
-    
 
-    shader_update_projection(line_shader, &state->main_camera, (float)state->window_width, (float)state->window_height);
+    // Load camera's projection into all shaders to correctly draw elements according to camera view.
+    Matrix4f projection;
 
+    projection = camera_calculate_projection(&state->main_camera, (float)state->window_width, (float)state->window_height);
 
-    // Draw grid background.
-    shader_update_projection(grid_shader, &state->main_camera, (float)state->window_width, (float)state->window_height);
-
-    
+    shader_update_projection(quad_shader, &projection);
+    shader_update_projection(grid_shader, &projection);
+    shader_update_projection(line_shader, &projection);
 
 
+    // Grid quad drawing.
     state->drawer.program = grid_shader;
     draw_begin(&state->drawer);
 
@@ -208,28 +267,42 @@ void plug_update(Plug_State *state) {
 
     draw_end();
 
-    // Updating projection, regular quad drawing.
+
+    // Regular quad drawing.
     state->drawer.program = quad_shader;
-    shader_update_projection(quad_shader, &state->main_camera, (float)state->window_width, (float)state->window_height);
-    
-
-    // Player logic.
-    update_player(&state->player);
-
-    // Drawing.
     draw_begin(&state->drawer);
 
     draw_player(&state->player);
-    draw_text("Hello World!", VEC2F_UNIT, VEC4F_WHITE, font_small, state->main_camera.unit_scale);
 
     draw_end();
 
-    
+
+    // Line drawing.
+    line_draw_begin(&state->line_drawer);
+
+    draw_line(state->player.body.center_mass, vec2f_sum(state->player.body.center_mass, state->player.body.velocity), VEC4F_RED);
+
+    line_draw_end();
+
+
+    // Testing to screen matrix.
+    projection = screen_calculate_projection(state->window_width, state->window_height);
+
+    shader_update_projection(quad_shader, &projection);
+
+
+    state->drawer.program = quad_shader;
+    draw_begin(&state->drawer);
+
+    draw_text("Hello World!", vec2f_make(10.0f, 50.0f), VEC4F_WHITE, font_small, 1);
+
+    draw_end();
+    check_gl_error();
 }
 
 
 /**
- * Refactor this approach.
+ * @Todo: Refactor this approach.
  * Remove unnecessary if branching.
  */
 void update_player(Player *p) {
@@ -252,20 +325,24 @@ void update_player(Player *p) {
     p->body.velocity.x = lerp(p->body.velocity.x, vel_x, p->in_air ? 10.0f * air_control_percent * global_state->t->delta_time : 10.0f * global_state->t->delta_time );
  
     if (p->bound_box.p0.y <= jump_input_leeway && is_pressed_keycode(SDLK_SPACE)) {
-        phys_add_impulse(vec2f_make(0.0f, 500.0f), 5, &p->body);
         p->body.center_mass.y -= p->bound_box.p0.y;
         p->bound_box.p1.y -= p->bound_box.p0.y;
         p->bound_box.p0.y -= p->bound_box.p0.y;
         p->body.velocity.y = 0;
+        
+        // p->body.velocity = vec2f_sum(p->body.velocity, vec2f_divide_constant(vec2f_make(0.0f, sqrtf(0.75f) * 566.4f), p->body.mass));
+        phys_apply_force(&p->body, vec2f_make(0.0f, 500.0f));
+
+        // Update physics.
+        phys_apply_impulses();
     }
 
     // Apply gravity.
     if (p->in_air) {
-        p->body.velocity = vec2f_sum(p->body.velocity, vec2f_multi_constant(gravity_acceleration, (float)global_state->t->delta_time));
+        // Vi + a * dt = Vf . 
+        p->body.velocity = vec2f_sum(p->body.velocity, vec2f_multi_constant(gravity_acceleration, global_state->t->delta_time));
     }
 
-    // Update physics.
-    phys_apply_forces();
 
     // Applying calculated velocities. For both AABB and Rigid Body 2D.
     aabb_move(&p->bound_box, vec2f_multi_constant(p->body.velocity, global_state->t->delta_time));
@@ -283,10 +360,6 @@ void update_player(Player *p) {
         p->in_air = true;
     }
 
-    // Debug draw lines.
-    line_draw_begin(&global_state->line_drawer);
-    draw_line(p->body.center_mass, vec2f_sum(p->body.center_mass, p->body.velocity), VEC4F_RED);
-    line_draw_end();
 
 }
 

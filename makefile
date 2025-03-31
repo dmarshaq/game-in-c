@@ -1,19 +1,6 @@
-# CC = gcc
-# CFLAGS = -g
-# LIBFLAGS = -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lglew32
-# 
-# TARGET = main3.exe
-# SRC = src\test.c
-# 
-# all: $(TARGET)
-# 
-# $(TARGET): $(SRC)
-# 	$(CC) $(CFLAGS) -o $(TARGET) $(SRC) $(LIBFLAGS)
-
-
 # Compiler and flags
 CC = gcc
-CFLAGS = -std=gnu11 -g -DIGNORE_WARNING
+CFLAGS = -std=gnu11 -g
 LIBFLAGS = -lmingw32 -lSDL2main -lSDL2 -lSDL2_mixer -lopengl32 -lglew32
 
 # Directories
