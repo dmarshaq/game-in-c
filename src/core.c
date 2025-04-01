@@ -1010,6 +1010,14 @@ void texture_unload(Texture *texture) {
     texture->height = 0;
 }
 
+UV_Region uv_slice(u32 rows, u32 cols, u32 index) {
+    UV_Region uv = {
+        .uv0 = vec2f_make((1.0f / (float)cols) * (float)(index % cols), (1.0f / (float)rows) * (float)((rows - 1) - (u32)(index / rows)))
+    };
+    uv.uv1 = vec2f_make(uv.uv0.x + 1.0f / (float)cols, uv.uv0.y + 1.0f / (float)rows);
+    return uv;
+}
+
 
 const char *shader_uniform_pr_matrix_name = "pr_matrix";
 const char *shader_uniform_ml_matrix_name = "ml_matrix";

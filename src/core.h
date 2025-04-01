@@ -476,6 +476,13 @@ typedef struct texture {
     s32 height;         // Pixel height of texture.
 } Texture;
 
+typedef struct uv_region {
+    Vec2f uv0;
+    Vec2f uv1;
+} UV_Region;
+
+#define UV_DEFAULT          ((UV_Region)({ .uv0 = VEC2F_ORIGIN, .uv1 = VEC2F_UNIT }))
+
 /**
  * Loads texture from image file and returns struct that contains it's OpenGL id with other texture parameters.
  */
@@ -485,6 +492,27 @@ Texture texture_load(char *texture_path);
  * Deletes loaded OpenGL texture.
  */
 void texture_unload(Texture *texture);
+
+/**
+ * Returns uv region that corresponds to the slice index of the texture that is sliced on grid of specified rows and cols.
+ *
+ *  If texture_example:
+ *      |-------|-------|-------|
+ *      |   0   |   1   |   2   |
+ *      |-------|-------|-------|
+ *      |   3   |   4   |   5   |
+ *      |-------|-------|-------|
+ *      |   6   |   7   |   8   |
+ *      |-------|-------|-------|
+ *  Where 0, 1, 2, ... , 8 are indexes of each slice.
+ *  rows = 3, cols = 3, total count of slices is always rows * cols, 3 * 3 = 9.
+ *  
+ *  For example:
+ *      UV_Region uv_reg = texture_slice(3, 3, 4);
+ *
+ *  Will return UV_Region that can be used to extract UV coordinates of center slice in the example_texture above.
+ */
+UV_Region uv_slice(u32 rows, u32 cols, u32 index);
 
 
 typedef struct shader {
