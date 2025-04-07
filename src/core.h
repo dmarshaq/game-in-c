@@ -282,7 +282,7 @@ typedef struct vec2f {
 #define vec2f_negate(v1)                    vec2f_make(-v1.x, -v1.y)
 #define vec2f_normalize(v1)                 (((v1).x == 0.0f && (v1).y == 0.0f) ? VEC2F_ORIGIN : vec2f_divide_constant(v1, vec2f_magnitude(v1)))
 #define vec2f_lerp(v1, v2, t)               vec2f_make(lerp(v1.x, v2.x, t), lerp(v1.y, v2.y, t))
-
+#define vec2f_rotate(v1, angle)             vec2f_make(cosf(angle) * v1.x - sinf(angle) * v1.y, sinf(angle) * v1.x + cosf(angle) * v1.y)
 
 typedef struct vec3f {
     float x;
@@ -342,9 +342,11 @@ Transform transform_srt_2d(Vec2f position, float angle, Vec2f scale);
 Transform transform_trs_2d(Vec2f position, float angle, Vec2f scale);
 
 
+
 typedef float (*Function)(float);
 
 #define func_expr(expr) ({ float __fn(float x) { return (expr); } (Function)__fn; })
+
 
 
 /**
@@ -353,17 +355,64 @@ typedef float (*Function)(float);
 #define value_inside_domain(domain_start, domain_end, value) ((domain_start) <= (value) && (value) <= (domain_end))
 
 
+/**
+ * Normals and verticies for all boxes, without rotation.
+ *
+ *                         up
+ *                         ^
+ *                         |
+ *                         |
+ *                         |
+ *                p3----------------p1
+ *                |                 |
+ *                |                 | 
+ *  left <--------|        o        |--------> right
+ *                |                 |
+ *                |                 |
+ *                p0----------------p2
+ *                         |
+ *                         |
+ *                         |
+ *                         !
+ *                         down
+ *
+ */
+
+
 typedef struct axis_aligned_bounding_box {
     Vec2f p0;
     Vec2f p1;
 } AABB;
 
+#define aabb_make(p0, p1)                                               ((AABB) { p0, p1 } )   
+#define aabb_make_dimensions(center, width, height)                     ((AABB) { .p0 = vec2f_make((center).x - (width) / 2, (center).y - (height) / 2), .p1 = vec2f_make((center).x + (width) / 2, (center).y + (height) / 2) } )   
+#define aabb_center(aabb)                                               vec2f_make(aabb.p0.x + (aabb.p1.x - aabb.p0.x) / 2, aabb.p0.y + (aabb.p1.y - aabb.p0.y) / 2)
+
+void aabb_move(AABB *box, Vec2f move);
+
 
 typedef struct oriented_bounding_box {
     Vec2f center;
     Vec2f dimensions;
-    float rotation;
+    float rot;
 } OBB;
+
+#define obb_make(center, width, height, rotation)                       ((OBB) { center, vec2f_make(width, height), rotation })
+
+#define obb_p0(obb_ptr)                                                 vec2f_sum((obb_ptr)->center, vec2f_rotate(vec2f_make((obb_ptr)->dimensions.x / 2, (obb_ptr)->dimensions.y / 2), (obb_ptr)->rot))
+#define obb_p1(obb_ptr)                                                 vec2f_sum((obb_ptr)->center, vec2f_rotate(vec2f_make(-(obb_ptr)->dimensions.x / 2, -(obb_ptr)->dimensions.y / 2), (obb_ptr)->rot))
+#define obb_p2(obb_ptr)                                                 vec2f_sum((obb_ptr)->center, vec2f_rotate(vec2f_make((obb_ptr)->dimensions.x / 2, -(obb_ptr)->dimensions.y / 2), (obb_ptr)->rot))
+#define obb_p3(obb_ptr)                                                 vec2f_sum((obb_ptr)->center, vec2f_rotate(vec2f_make(-(obb_ptr)->dimensions.x / 2, (obb_ptr)->dimensions.y / 2), (obb_ptr)->rot))
+
+#define obb_right(obb_ptr)                                              vec2f_rotate(VEC2F_RIGHT, (obb_ptr)->rot)
+#define obb_up   (obb_ptr)                                              vec2f_rotate(VEC2F_UP, (obb_ptr)->rot)
+#define obb_left (obb_ptr)                                              vec2f_rotate(VEC2F_LEFT, (obb_ptr)->rot)
+#define obb_down (obb_ptr)                                              vec2f_rotate(VEC2F_DOWN, (obb_ptr)->rot)
+
+/**
+ * Returns AABB that covers or/and encloses specified OBB box.
+ */
+AABB obb_enclose_in_aabb(OBB *box);
 
 
 typedef struct circle {
@@ -378,15 +427,7 @@ typedef struct rigid_body_2d {
     float mass;
 } Rigid_Body_2D;
 
-#define aabb_make(p0, p1)                                               ((AABB) { p0, p1 } )   
-#define aabb_make_dimensions(center, width, height)                     ((AABB) { .p0 = vec2f_make((center).x - (width) / 2, (center).y - (height) / 2), .p1 = vec2f_make((center).x + (width) / 2, (center).y + (height) / 2) } )   
-
 #define rb_2d_make(center_mass, mass)                                   ((Rigid_Body_2D) { center_mass, VEC2F_ORIGIN, mass } )   
-
-#define aabb_center(aabb)                                               vec2f_make(aabb.p0.x + (aabb.p1.x - aabb.p0.x) / 2, aabb.p0.y + (aabb.p1.y - aabb.p0.y) / 2)
-
-void aabb_move(AABB *box, Vec2f move);
-
 
 
 /**

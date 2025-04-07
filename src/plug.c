@@ -14,6 +14,11 @@
 void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle);
 void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale);
 void draw_line(Vec2f p0, Vec2f p1, Vec4f color);
+void draw_dot(Vec2f position, Vec4f color);
+
+// Drawing frames.
+void draw_quad_outline(Vec2f p0, Vec2f p1, Vec4f color, float offset_angle);
+void draw_circle_outline(Vec2f position, float radius, u32 detail, Vec4f color);
 
 // Drawing function.
 void draw_function(float x0, float x1, Function y, u32 detail, Vec4f color);
@@ -126,7 +131,9 @@ void phys_apply_acceleration(Rigid_Body_2D *rb, Vec2f acceleration) {
 }
 
 
+
 #define MAX_IMPULSES        16
+#define MAX_GENERATORS      16
 
 void phys_init() {
     // Setting physics variables.
@@ -243,6 +250,8 @@ void update_player(Player *p);
 
 void draw_player(Player *p);
 
+Vec2f test_rot = vec2f_make(2.0f, 0.0f);
+float angle = 90.0f;
 
 /**
  * @Important: In game update loops the order of procedures is: Updating -> Drawing.
@@ -278,6 +287,17 @@ void plug_update(Plug_State *state) {
     
     // Lerp camera.
     state->main_camera.center = vec2f_lerp(state->main_camera.center, state->player.body.center_mass, 0.025f);
+
+
+
+    // Test rotation.
+    angle += PI / 4 * state->t->delta_time;
+    test_rot = vec2f_rotate(test_rot, PI/2 * state->t->delta_time);
+
+    // Test obb.
+    OBB test_obb = obb_make(vec2f_make(3.0f, 2.0f), 0.8f, 1.4f, angle);
+    AABB test_aabb = obb_enclose_in_aabb(&test_obb);
+
 
 
 
@@ -332,6 +352,10 @@ void plug_update(Plug_State *state) {
     draw_begin(&state->drawer);
 
     draw_player(&state->player);
+    
+    draw_quad(obb_p0(&test_obb), obb_p1(&test_obb), VEC4F_GREEN, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, test_obb.rot);
+    draw_dot(test_obb.center, VEC4F_WHITE);
+    draw_dot(test_rot, VEC4F_RED);
 
     draw_end();
 
@@ -341,10 +365,15 @@ void plug_update(Plug_State *state) {
 
     draw_line(state->player.body.center_mass, vec2f_sum(state->player.body.center_mass, state->player.body.velocity), VEC4F_RED);
 
+    draw_line(VEC2F_ORIGIN, test_rot, VEC4F_CYAN);
+
+    draw_quad_outline(test_aabb.p0, test_aabb.p1, VEC4F_RED, 0);
+    draw_circle_outline(test_obb.center, right_triangle_hypotenuse(test_obb.dimensions.x, test_obb.dimensions.y) / 2, 32, VEC4F_GREY);
+
     line_draw_end();
 
 
-    // Testing to screen matrix.
+    // To screen, (ui) matrix.
     projection = screen_calculate_projection(state->window_width, state->window_height);
 
     shader_update_projection(quad_shader, &projection);
@@ -353,7 +382,6 @@ void plug_update(Plug_State *state) {
     state->drawer.program = quad_shader;
     draw_begin(&state->drawer);
 
-    // draw_text("Hello World!", vec2f_make(10.0f, 50.0f), VEC4F_WHITE, font_small, 1);
     draw_pop_up(vec2f_make(10.0f, 80.0f), VEC4F_WHITE, font_medium, 1);
 
     draw_end();
@@ -407,7 +435,7 @@ void update_player(Player *p) {
     // Applying calculated velocities. For both AABB and Rigid Body 2D.
     aabb_move(&p->bound_box, vec2f_multi_constant(p->body.velocity, global_state->t->delta_time));
     p->body.center_mass = vec2f_sum(p->body.center_mass, vec2f_multi_constant(p->body.velocity, global_state->t->delta_time));
-
+    
     // Ground collision resolution.
     if (p->bound_box.p0.y < 0) {
         p->body.center_mass.y -= p->bound_box.p0.y;
@@ -519,6 +547,61 @@ void draw_line(Vec2f p0, Vec2f p1, Vec4f color) {
     };
 
     draw_line_data(line_data, 1);
+}
+
+#define DOT_SCALE 0.0015f
+
+void draw_dot(Vec2f position, Vec4f color) {
+    draw_quad(vec2f_make(position.x - (float)global_state->main_camera.unit_scale * DOT_SCALE, position.y), vec2f_make(position.x + (float)global_state->main_camera.unit_scale * DOT_SCALE, position.y), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, PI/4);
+}
+
+void draw_quad_outline(Vec2f p0, Vec2f p1, Vec4f color, float offset_angle) {
+    
+    Vec2f k = vec2f_make(cosf(offset_angle), sinf(offset_angle));
+    k = vec2f_multi_constant(k, vec2f_dot(k, vec2f_difference(p1, p0)));
+    
+    Vec2f p2 = vec2f_sum(p0, k);
+    Vec2f p3 = vec2f_difference(p1, k);
+    
+    float line_data[56] = {
+        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w,
+        p2.x, p2.y, 0.0f, color.x, color.y, color.z, color.w,
+        p2.x, p2.y, 0.0f, color.x, color.y, color.z, color.w,
+        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w,
+        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w,
+        p3.x, p3.y, 0.0f, color.x, color.y, color.z, color.w,
+        p3.x, p3.y, 0.0f, color.x, color.y, color.z, color.w,
+        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w,
+    };
+
+    draw_line_data(line_data, 4);
+}
+
+void draw_circle_outline(Vec2f position, float radius, u32 detail, Vec4f color) {
+
+    float line_data[detail * 14];
+
+    float step = 2*PI / (float)detail;
+    for (u32 i = 0; i < detail; i++) {
+        line_data[0  + i * 14] = radius * cosf(step * (float)i) + position.x;
+        line_data[1  + i * 14] = radius * sinf(step * (float)i) + position.y;
+        line_data[2  + i * 14] = 0.0f;
+        line_data[3  + i * 14] = color.x;
+        line_data[4  + i * 14] = color.y;
+        line_data[5  + i * 14] = color.z;
+        line_data[6  + i * 14] = color.w;
+                     
+        line_data[7  + i * 14] = radius * cosf(step * (float)(i + 1)) + position.x;
+        line_data[8  + i * 14] = radius * sinf(step * (float)(i + 1)) + position.y;
+        line_data[9  + i * 14] = 0.0f;
+        line_data[10 + i * 14] = color.x;
+        line_data[11 + i * 14] = color.y;
+        line_data[12 + i * 14] = color.z;
+        line_data[13 + i * 14] = color.w;
+    }
+    
+   
+    draw_line_data(line_data, detail);
 }
 
 void draw_function(float x0, float x1, Function y, u32 detail, Vec4f color) {

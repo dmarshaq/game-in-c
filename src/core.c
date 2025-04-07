@@ -9,6 +9,7 @@
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
+
 /**
  * Debug.
  */
@@ -723,6 +724,34 @@ Transform transform_trs_2d(Vec2f position, float angle, Vec2f scale) {
 void aabb_move(AABB *box, Vec2f move) {
     box->p0 = vec2f_sum(box->p0, move);
     box->p1 = vec2f_sum(box->p1, move);
+}
+
+
+AABB obb_enclose_in_aabb(OBB *box) {
+    Vec2f verts[4] = {
+        obb_p0(box),
+        obb_p1(box),
+        obb_p2(box),
+        obb_p3(box)
+    };
+
+    AABB result = aabb_make(verts[0], verts[1]);
+
+    for (u32 i = 0; i < 4; i++) {
+        if (result.p0.x > verts[i].x)
+            result.p0.x = verts[i].x;
+        
+        if (result.p0.y > verts[i].y)
+            result.p0.y = verts[i].y;
+
+        if (result.p1.x < verts[i].x)
+            result.p1.x = verts[i].x;
+        
+        if (result.p1.y < verts[i].y)
+            result.p1.y = verts[i].y;
+    }
+    
+    return result;
 }
 
 
