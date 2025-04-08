@@ -22,10 +22,12 @@ typedef struct player {
  * @Important: All global variables should be saved and organized in the struct.
  */
 typedef struct plug_state {
-    bool quit;
+    SDL_Event event;
     Time_Data *t;
+    bool quit;
     u32 window_width;
     u32 window_height;
+    Vec2f mouse_position;
 
     /**
      * Globals, @Important: Must be loaded or/and unloaded when hot reloading plug.

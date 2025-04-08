@@ -170,8 +170,34 @@ void phys_apply_impulses() {
     }
 }
 
-bool phys_sat_collision_obb(OBB *obb1, OBB *obb2) {
+/**
+ * Internal function.
+ * @Important: "axis1" should always correspond to the axis alligned with "obb1".
+ * Returns true if "obb1" and "obb2" projected points are touching on "axis1".
+ */
+bool phys_sat_check_axis(OBB *obb1, Vec2f axis1, OBB *obb2) {
+    float min = vec2f_dot(axis1, obb_p0(obb1));
+    float max = vec2f_dot(axis1, obb_p1(obb1));
 
+    if (min > max) {
+        min = max;
+        max = vec2f_dot(axis1, obb_p0(obb1));
+    }
+
+    return value_inside_domain(min, max, vec2f_dot(axis1, obb_p0(obb2))) ||
+        value_inside_domain(min, max, vec2f_dot(axis1, obb_p1(obb2))) ||
+        value_inside_domain(min, max, vec2f_dot(axis1, obb_p2(obb2))) ||
+        value_inside_domain(min, max, vec2f_dot(axis1, obb_p3(obb2)));
+}
+
+/**
+ * Returns true of "obb1" and "obb2" touch.
+ */
+bool phys_sat_collision_obb(OBB *obb1, OBB *obb2) {
+    return phys_sat_check_axis(obb1, obb_right(obb1), obb2) &&
+        phys_sat_check_axis(obb1, obb_up(obb1), obb2) &&
+        phys_sat_check_axis(obb2, obb_right(obb2), obb1) &&
+        phys_sat_check_axis(obb2, obb_up(obb2), obb1);
 }
 
 
@@ -401,9 +427,14 @@ void plug_update(Plug_State *state) {
     draw_begin(&state->drawer);
 
     draw_player(&state->player);
+
+    Vec4f obb_color = VEC4F_GREEN;
+    if (phys_sat_collision_obb(obb1, obb2)) {
+        obb_color = VEC4F_RED;
+    }
     
-    draw_quad(obb_p0(obb1), obb_p1(obb1), VEC4F_PINK, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, obb1->rot);
-    draw_quad(obb_p0(obb2), obb_p1(obb2), VEC4F_GREEN, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, obb2->rot);
+    draw_quad(obb_p0(obb1), obb_p1(obb1), obb_color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, obb1->rot);
+    draw_quad(obb_p0(obb2), obb_p1(obb2), obb_color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, obb2->rot);
     
 
     for (u32 n = 0; n < 4; n++) {

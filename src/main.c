@@ -1,3 +1,5 @@
+#include "SDL2/SDL_events.h"
+#include "SDL2/SDL_mouse.h"
 #include "plug.h"
 #include <windows.h>
 
@@ -71,10 +73,18 @@ int main(int argc, char *argv[]) {
                 case SDL_QUIT:
                     state.quit = true;
                     break;
+                case SDL_MOUSEMOTION:
+                    s32 mx, my;
+                    SDL_GetMouseState(&mx, &my);
+
+                    state.mouse_position.x = (float)mx;
+                    state.mouse_position.y = (float)(state.window_height - my);
+                    break;
                 default:
                     break;
             }
         }
+        state.event = event;
         
         plug_update(&state);
 
