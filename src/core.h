@@ -252,7 +252,9 @@ void hash_table_print(void **table);
 #define TAU (PI * 2)
 
 #define right_triangle_hypotenuse(a, b)     (sqrtf((a) * (a) + (b) * (b)))
-#define lerp(a, b, t)                       ( (a) + ((b) - (a)) * (t))
+#define lerp(a, b, t)                       ((a) + ((b) - (a)) * (t))
+#define sig(a)                              (((a) == 0.0f) ? (0.0f) : (fabsf(a) / (a)))
+
 
 typedef struct vec2f {
     float x;

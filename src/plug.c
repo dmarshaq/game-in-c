@@ -173,33 +173,85 @@ void phys_apply_impulses() {
 /**
  * Internal function.
  * @Important: "axis1" should always correspond to the axis alligned with "obb1".
- * Returns true if "obb1" and "obb2" projected points are touching on "axis1".
+ * Returns min separation between "obb1" and "obb2" projected points on "axis1".
  */
-bool phys_sat_check_axis(OBB *obb1, Vec2f axis1, OBB *obb2) {
-    float min = vec2f_dot(axis1, obb_p0(obb1));
-    float max = vec2f_dot(axis1, obb_p1(obb1));
+float phys_sat_min_depth_on_normal(OBB *obb1, Vec2f axis1, OBB *obb2) {
+    // Getting minA and maxA out of 2 points.
+    float minA = vec2f_dot(axis1, obb_p0(obb1));
+    float maxA = vec2f_dot(axis1, obb_p1(obb1));
 
-    if (min > max) {
-        min = max;
-        max = vec2f_dot(axis1, obb_p0(obb1));
+    if (minA > maxA) {
+        minA = maxA;
+        maxA = vec2f_dot(axis1, obb_p0(obb1));
     }
 
-    return value_inside_domain(min, max, vec2f_dot(axis1, obb_p0(obb2))) ||
-        value_inside_domain(min, max, vec2f_dot(axis1, obb_p1(obb2))) ||
-        value_inside_domain(min, max, vec2f_dot(axis1, obb_p2(obb2))) ||
-        value_inside_domain(min, max, vec2f_dot(axis1, obb_p3(obb2)));
+    // Getting minB and maxB out of 4 points. @Optimization: Maybe find a way to calculate dot products only once and reuse them to find min, max.
+    float minB = fminf(fminf(vec2f_dot(axis1, obb_p0(obb2)), vec2f_dot(axis1, obb_p1(obb2))), fminf(vec2f_dot(axis1, obb_p2(obb2)), vec2f_dot(axis1, obb_p3(obb2))));
+    float maxB = fmaxf(fmaxf(vec2f_dot(axis1, obb_p0(obb2)), vec2f_dot(axis1, obb_p1(obb2))), fmaxf(vec2f_dot(axis1, obb_p2(obb2)), vec2f_dot(axis1, obb_p3(obb2))));
+    
+    float dist1 = maxB - minA; 
+    float dist2 = maxA - minB; 
+
+    return fabsf(fminf(dist1, dist2)) * sig(dist1 * dist2);
 }
 
 /**
  * Returns true of "obb1" and "obb2" touch.
+ * Usefull for triggers.
  */
-bool phys_sat_collision_obb(OBB *obb1, OBB *obb2) {
-    return phys_sat_check_axis(obb1, obb_right(obb1), obb2) &&
-        phys_sat_check_axis(obb1, obb_up(obb1), obb2) &&
-        phys_sat_check_axis(obb2, obb_right(obb2), obb1) &&
-        phys_sat_check_axis(obb2, obb_up(obb2), obb1);
+bool phys_sat_check_collision_obb(OBB *obb1, OBB *obb2) {
+    return phys_sat_min_depth_on_normal(obb1,  obb_right(obb1), obb2) > 0.0f &&
+        phys_sat_min_depth_on_normal(obb1,     obb_up(obb1), obb2) > 0.0f &&
+        phys_sat_min_depth_on_normal(obb2,     obb_right(obb2), obb1) > 0.0f &&
+        phys_sat_min_depth_on_normal(obb2,     obb_up(obb2), obb1) > 0.0f;
 }
 
+/**
+ * Sets both obbs apart based on min collision normal depth.
+ * Usefull for two colliding dynamic objects.
+ */
+void phys_sat_resolve_if_collision_obb(OBB *obb1, OBB *obb2) {
+    if (!phys_sat_check_collision_obb(obb1, obb2)) {
+        return;
+    }
+    // @Robustenss: After all neccessary collision is written, check and see if this code can be abstracted into a helper function.
+    Vec2f normals[4] = {
+        obb_right(obb1),
+        obb_up(obb1),
+        obb_right(obb2),
+        obb_up(obb2)
+    };
+    float depths[4] = {
+        phys_sat_min_depth_on_normal(obb1, normals[0], obb2),
+        phys_sat_min_depth_on_normal(obb1, normals[1], obb2),
+        phys_sat_min_depth_on_normal(obb2, normals[2], obb1),
+        phys_sat_min_depth_on_normal(obb2, normals[3], obb1)
+    };
+
+    for (u32 i = 1; i < 4; i++) {
+        if (depths[0] > depths[i]) {
+            depths[0] = depths[i];
+            if (i >= 2)
+                normals[0] = vec2f_negate(normals[i]); // @Important: Make that normal always goes from "obb1" to "obb2".
+            normals[0] = normals[i];
+        }
+    }
+
+    // @Important: No collision check.
+    if (depths[0] <= 0) {
+        return;
+    }
+
+
+    float depth = depths[0];
+    Vec2f normal = normals[0];
+    
+    Vec2f displacement = vec2f_multi_constant(normal, depth / 2);
+
+    obb1->center = vec2f_sum(obb1->center, displacement);
+    obb2->center = vec2f_difference(obb2->center, displacement);
+    
+}
 
 
 
@@ -222,6 +274,9 @@ void plug_init(Plug_State *state) {
     phys_init();
 }
 
+
+OBB box1;
+OBB box2;
 
 void plug_load(Plug_State *state) {
     state->clear_color = vec4f_make(0.1f, 0.1f, 0.4f, 1.0f);
@@ -268,6 +323,9 @@ void plug_load(Plug_State *state) {
     // Player loading.
     state->player.speed = 10.0f;
 
+    box1 = obb_make(vec2f_make(0.0f, 3.5f), 2.0f, 1.5f, 0.0f);
+    box2 = obb_make(vec2f_make(0.0f, 0.0f), 1.2f, 1.6f, 0.0f);
+
     global_state = state;
 }
 
@@ -283,24 +341,6 @@ void draw_player(Player *p);
 Vec2f test_rot = vec2f_make(2.0f, 0.0f);
 float angle = 90.0f;
 
-
-bool dot_collision(float *dotprod) {
-    float min = dotprod[0], max = dotprod[0];
-    
-    for (u32 i = 1; i < 4; i++) {
-        if (dotprod[i] > max)
-            max = dotprod[i];
-
-        if (dotprod[i] < min)
-            min = dotprod[i];
-    }
-
-    for (u32 i = 0; i < 4; i++) {
-        if (value_inside_domain(min, max, dotprod[i + 4]))
-            return true;
-    }
-    return false;
-}
 
 /**
  * @Important: In game update loops the order of procedures is: Updating -> Drawing.
@@ -344,32 +384,16 @@ void plug_update(Plug_State *state) {
     test_rot = vec2f_rotate(test_rot, PI/2 * state->t->delta_time);
 
     // Test obb.
-    OBB box1 = obb_make(vec2f_make(4.0f, 3.0f), 2.0f, 1.5f, angle);
-    OBB box2 = obb_make(vec2f_make(2.2f, 2.2f), 1.2f, 1.6f, PI / 6 + angle);
+    box2.center.y += state->t->delta_time;
 
     OBB *obb1 = &box1;
     OBB *obb2 = &box2;
 
-    Vec2f normals[4] = {
-        obb_right(obb1),
-        obb_up(obb1),
-        obb_right(obb2),
-        obb_up(obb2),
-    };
-
-    float dotprod[32];
-
-    for (u32 i = 0; i < 4; i++) {
-        dotprod[0 + i * 8] = vec2f_dot(normals[i], obb_p0(obb1));
-        dotprod[1 + i * 8] = vec2f_dot(normals[i], obb_p1(obb1));
-        dotprod[2 + i * 8] = vec2f_dot(normals[i], obb_p2(obb1));
-        dotprod[3 + i * 8] = vec2f_dot(normals[i], obb_p3(obb1));
-        dotprod[4 + i * 8] = vec2f_dot(normals[i], obb_p0(obb2));
-        dotprod[5 + i * 8] = vec2f_dot(normals[i], obb_p1(obb2));
-        dotprod[6 + i * 8] = vec2f_dot(normals[i], obb_p2(obb2));
-        dotprod[7 + i * 8] = vec2f_dot(normals[i], obb_p3(obb2));
+    Vec4f obb_color = VEC4F_GREEN;
+    if (phys_sat_check_collision_obb(obb1, obb2)) {
+        obb_color = VEC4F_RED;
     }
-
+    phys_sat_resolve_if_collision_obb(obb1, obb2);
 
     /**
      * -----------------------------------
@@ -428,22 +452,10 @@ void plug_update(Plug_State *state) {
 
     draw_player(&state->player);
 
-    Vec4f obb_color = VEC4F_GREEN;
-    if (phys_sat_collision_obb(obb1, obb2)) {
-        obb_color = VEC4F_RED;
-    }
     
     draw_quad(obb_p0(obb1), obb_p1(obb1), obb_color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, obb1->rot);
     draw_quad(obb_p0(obb2), obb_p1(obb2), obb_color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, obb2->rot);
     
-
-    for (u32 n = 0; n < 4; n++) {
-        for (u32 i = 0; i < 8; i++) {
-            draw_dot(vec2f_multi_constant(normals[n], dotprod[i + n * 8]), VEC4F_BLUE);
-        }
-    }
-
-
 
     draw_end();
 
@@ -454,27 +466,6 @@ void plug_update(Plug_State *state) {
 
     // Line drawing.
     line_draw_begin(&state->line_drawer);
-
-    Vec4f color = VEC4F_GREY;
-    if (dot_collision(dotprod))
-        color = VEC4F_RED;
-    draw_function(-12, 12, func_expr((normals[0].y / normals[0].x) * x), 1, color);
-
-    color = VEC4F_GREY;
-    if (dot_collision(dotprod + 8))
-        color = VEC4F_RED;
-    draw_function(-12, 12, func_expr((normals[1].y / normals[1].x) * x), 1, color);
-
-    color = VEC4F_GREY;
-    if (dot_collision(dotprod + 16))
-        color = VEC4F_RED;
-    draw_function(-12, 12, func_expr((normals[2].y / normals[2].x) * x), 1, color);
-
-    color = VEC4F_GREY;
-    if (dot_collision(dotprod + 24))
-        color = VEC4F_RED;
-    draw_function(-12, 12, func_expr((normals[3].y / normals[3].x) * x), 1, color);
-
 
 
     line_draw_end();
