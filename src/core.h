@@ -255,6 +255,8 @@ void hash_table_print(void **table);
 #define lerp(a, b, t)                       ((a) + ((b) - (a)) * (t))
 #define sig(a)                              (((a) == 0.0f) ? (0.0f) : (fabsf(a) / (a)))
 
+#define randf()                             ((float)rand() / RAND_MAX)
+
 
 typedef struct vec2f {
     float x;

@@ -11,7 +11,7 @@ typedef struct impulse {
 
 // Game entities.
 typedef struct player {
-    AABB bound_box;
+    OBB *bound_box;
     Rigid_Body_2D body;
     float speed;
     bool in_air;
@@ -42,6 +42,8 @@ typedef struct plug_state {
     Line_Drawer line_drawer;
 
     Impulse *impulses;
+    OBB *dynamic_boxes;
+    Vec4f *colors;
 
     /**
      * Unsorted.

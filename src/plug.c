@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /**
  * Helper functions interface.
@@ -133,11 +134,15 @@ void phys_apply_acceleration(Rigid_Body_2D *rb, Vec2f acceleration) {
 
 
 #define MAX_IMPULSES        16
-#define MAX_GENERATORS      16
+
+#define MAX_DYNAMIC_BOXES   16
 
 void phys_init() {
     // Setting physics variables.
-    global_state->impulses = array_list_make(Impulse, MAX_IMPULSES, &std_allocator); // @Leak
+    global_state->impulses = array_list_make(Impulse, MAX_IMPULSES, &std_allocator); // @Leak.
+    global_state->dynamic_boxes = array_list_make(OBB, MAX_DYNAMIC_BOXES, &std_allocator); // @Leak.
+    global_state->colors = array_list_make(Vec4f, MAX_DYNAMIC_BOXES, &std_allocator); // @Leak.
+
 }
 
 void phys_add_impulse(Vec2f force, u32 milliseconds, Rigid_Body_2D *rb) {
@@ -200,10 +205,10 @@ float phys_sat_min_depth_on_normal(OBB *obb1, Vec2f axis1, OBB *obb2) {
  * Usefull for triggers.
  */
 bool phys_sat_check_collision_obb(OBB *obb1, OBB *obb2) {
-    return phys_sat_min_depth_on_normal(obb1,  obb_right(obb1), obb2) > 0.0f &&
-        phys_sat_min_depth_on_normal(obb1,     obb_up(obb1), obb2) > 0.0f &&
-        phys_sat_min_depth_on_normal(obb2,     obb_right(obb2), obb1) > 0.0f &&
-        phys_sat_min_depth_on_normal(obb2,     obb_up(obb2), obb1) > 0.0f;
+    return phys_sat_min_depth_on_normal(obb1, obb_right(obb1), obb2) > 0.0f &&
+        phys_sat_min_depth_on_normal(obb1, obb_up(obb1), obb2) > 0.0f &&
+        phys_sat_min_depth_on_normal(obb2, obb_right(obb2), obb1) > 0.0f &&
+        phys_sat_min_depth_on_normal(obb2, obb_up(obb2), obb1) > 0.0f;
 }
 
 /**
@@ -214,6 +219,7 @@ void phys_sat_resolve_if_collision_obb(OBB *obb1, OBB *obb2) {
     if (!phys_sat_check_collision_obb(obb1, obb2)) {
         return;
     }
+
     // @Robustenss: After all neccessary collision is written, check and see if this code can be abstracted into a helper function.
     Vec2f normals[4] = {
         obb_right(obb1),
@@ -231,8 +237,6 @@ void phys_sat_resolve_if_collision_obb(OBB *obb1, OBB *obb2) {
     for (u32 i = 1; i < 4; i++) {
         if (depths[0] > depths[i]) {
             depths[0] = depths[i];
-            if (i >= 2)
-                normals[0] = vec2f_negate(normals[i]); // @Important: Make that normal always goes from "obb1" to "obb2".
             normals[0] = normals[i];
         }
     }
@@ -241,21 +245,47 @@ void phys_sat_resolve_if_collision_obb(OBB *obb1, OBB *obb2) {
     if (depths[0] <= 0) {
         return;
     }
-
-
+    
+    
     float depth = depths[0];
     Vec2f normal = normals[0];
     
+    // Flip normal if it's not looking in direction of collosion.
+    if (vec2f_dot(normal, vec2f_normalize(vec2f_difference(obb1->center, obb2->center))) < 0.0f) {
+        normal = vec2f_negate(normal);
+    }
+
     Vec2f displacement = vec2f_multi_constant(normal, depth / 2);
 
     obb1->center = vec2f_sum(obb1->center, displacement);
     obb2->center = vec2f_difference(obb2->center, displacement);
-    
 }
 
 
+void spawn_box(Vec2f position, Vec4f color) {
+    array_list_append(&global_state->dynamic_boxes, obb_make(position, 1.0f, 1.0f, 0.0f));
+    array_list_append(&global_state->colors, color);
+}
+
+void update_boxes() {
+    u32 length = array_list_length(&global_state->dynamic_boxes);
+    for (u32 i = 0; i < length; i++) {
+        for (u32 j = i + 1; j < length; j++) {
+            phys_sat_resolve_if_collision_obb(&global_state->dynamic_boxes[i], &global_state->dynamic_boxes[j]);
+        }
+    }
+}
+
+void draw_boxes() {
+    u32 length = array_list_length(&global_state->dynamic_boxes);
+    for (u32 i = 0; i < length; i++) {
+        draw_quad(obb_p0(&global_state->dynamic_boxes[i]), obb_p1(&global_state->dynamic_boxes[i]), global_state->colors[i], NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, global_state->dynamic_boxes[i].rot);
+    }
+}
+
 
 void plug_init(Plug_State *state) {
+    srand((u32)time(NULL));
     global_state = state;
 
     /**
@@ -265,18 +295,22 @@ void plug_init(Plug_State *state) {
     state->shader_table = hash_table_make(Shader, 8, &std_allocator);
     state->font_table = hash_table_make(Font_Baked, 8, &std_allocator);
     
+    phys_init();
+    
+    array_list_append(&state->dynamic_boxes, obb_make(vec2f_make(0.0f, 0.0f), 1.0f, 1.0f, 0.0f));
+    array_list_append(&state->colors, VEC4F_GREEN);
     state->player = (Player) {
-        .bound_box = aabb_make_dimensions(vec2f_make(0.0f, 0.0f), 1.0f, 1.8f),
+        .bound_box = &state->dynamic_boxes[0],
         .body = rb_2d_make(vec2f_make(0.0f, 0.0f), 70.0f),
         .speed = 0.0f,
     };
 
-    phys_init();
+    for (u32 i = 0; i < 10; i++) {
+        spawn_box(vec2f_make(randf() * 10.0f - 5.0f, randf() * 10.0f - 5.0f), vec4f_make(randf(), randf(), randf(), 1.0f));
+    }
+
 }
 
-
-OBB box1;
-OBB box2;
 
 void plug_load(Plug_State *state) {
     state->clear_color = vec4f_make(0.1f, 0.1f, 0.4f, 1.0f);
@@ -323,8 +357,8 @@ void plug_load(Plug_State *state) {
     // Player loading.
     state->player.speed = 10.0f;
 
-    box1 = obb_make(vec2f_make(0.0f, 3.5f), 2.0f, 1.5f, 0.0f);
-    box2 = obb_make(vec2f_make(0.0f, 0.0f), 1.2f, 1.6f, 0.0f);
+    // box1 = obb_make(vec2f_make(0.0f, 3.5f), 2.0f, 1.5f, 0.0f);
+    // box2 = obb_make(vec2f_make(0.0f, 0.0f), 1.2f, 1.6f, 0.0f);
 
     global_state = state;
 }
@@ -375,7 +409,7 @@ void plug_update(Plug_State *state) {
     update_player(&state->player);
     
     // Lerp camera.
-    state->main_camera.center = vec2f_lerp(state->main_camera.center, state->player.body.center_mass, 0.025f);
+    state->main_camera.center = vec2f_lerp(state->main_camera.center, state->player.bound_box->center, 0.025f);
 
 
 
@@ -384,16 +418,17 @@ void plug_update(Plug_State *state) {
     test_rot = vec2f_rotate(test_rot, PI/2 * state->t->delta_time);
 
     // Test obb.
-    box2.center.y += state->t->delta_time;
+    update_boxes();
+    // box2.center.y += state->t->delta_time;
 
-    OBB *obb1 = &box1;
-    OBB *obb2 = &box2;
+    // OBB *obb1 = &box1;
+    // OBB *obb2 = &box2;
 
-    Vec4f obb_color = VEC4F_GREEN;
-    if (phys_sat_check_collision_obb(obb1, obb2)) {
-        obb_color = VEC4F_RED;
-    }
-    phys_sat_resolve_if_collision_obb(obb1, obb2);
+    // Vec4f obb_color = VEC4F_GREEN;
+    // if (phys_sat_check_collision_obb(obb1, obb2)) {
+    //     obb_color = VEC4F_RED;
+    // }
+    // phys_sat_resolve_if_collision_obb(obb1, obb2);
 
     /**
      * -----------------------------------
@@ -452,9 +487,10 @@ void plug_update(Plug_State *state) {
 
     draw_player(&state->player);
 
-    
-    draw_quad(obb_p0(obb1), obb_p1(obb1), obb_color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, obb1->rot);
-    draw_quad(obb_p0(obb2), obb_p1(obb2), obb_color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, obb2->rot);
+    draw_boxes();
+
+    // draw_quad(obb_p0(obb1), obb_p1(obb1), obb_color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, obb1->rot);
+    // draw_quad(obb_p0(obb2), obb_p1(obb2), obb_color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, obb2->rot);
     
 
     draw_end();
@@ -500,66 +536,37 @@ void plug_update(Plug_State *state) {
  * Remove unnecessary if branching.
  */
 void update_player(Player *p) {
-    if (p->bound_box.p0.y > 0)
-        p->in_air = true;
-    else
-        p->in_air = false;
     
-    float vel_x = 0.0f;
-
+    Vec2f vel = VEC2F_ORIGIN;
     if (is_hold_keycode(SDLK_d)) {
-        vel_x = 1.0f;
+        vel.x = 1.0f;
     }
-
     if (is_hold_keycode(SDLK_a)) {
-        vel_x = -1.0f;
+        vel.x = -1.0f;
+    }
+    if (is_hold_keycode(SDLK_w)) {
+        vel.y = 1.0f;
+    }
+    if (is_hold_keycode(SDLK_s)) {
+        vel.y = -1.0f;
     }
     
-    vel_x *= p->speed;
-    p->body.velocity.x = lerp(p->body.velocity.x, vel_x, p->in_air ? 10.0f * air_control_percent * global_state->t->delta_time : 10.0f * global_state->t->delta_time );
+    vel = vec2f_normalize(vel);
+    vel.x *= p->speed;
+    vel.y *= p->speed;
+    // p->body.velocity.x = lerp(p->body.velocity.x, vel_x, p->in_air ? 10.0f * air_control_percent * global_state->t->delta_time : 10.0f * global_state->t->delta_time );
+    p->body.velocity = vec2f_lerp(p->body.velocity, vel, 10.0f * global_state->t->delta_time);
  
-    if (p->bound_box.p0.y <= jump_input_leeway && is_pressed_keycode(SDLK_SPACE)) {
-        p->body.center_mass.y -= p->bound_box.p0.y;
-        p->bound_box.p1.y -= p->bound_box.p0.y;
-        p->bound_box.p0.y -= p->bound_box.p0.y;
-        p->body.velocity.y = 0;
-        
-        // p->body.velocity = vec2f_sum(p->body.velocity, vec2f_divide_constant(vec2f_make(0.0f, sqrtf(0.75f) * 566.4f), p->body.mass));
-        phys_apply_force(&p->body, vec2f_make(0.0f, 500.0f));
-
-        // Update physics.
-        phys_apply_impulses();
-    }
-
-    // Apply gravity.
-    if (p->in_air) {
-        // Vi + a * dt = Vf . 
-        p->body.velocity = vec2f_sum(p->body.velocity, vec2f_multi_constant(gravity_acceleration, global_state->t->delta_time));
-    }
-
 
     // Applying calculated velocities. For both AABB and Rigid Body 2D.
-    aabb_move(&p->bound_box, vec2f_multi_constant(p->body.velocity, global_state->t->delta_time));
-    p->body.center_mass = vec2f_sum(p->body.center_mass, vec2f_multi_constant(p->body.velocity, global_state->t->delta_time));
+    p->bound_box->center = vec2f_sum(p->bound_box->center, vec2f_multi_constant(p->body.velocity, global_state->t->delta_time));
+    // p->body.center_mass = vec2f_sum(p->body.center_mass, vec2f_multi_constant(p->body.velocity, global_state->t->delta_time));
     
-    // Ground collision resolution.
-    if (p->bound_box.p0.y < 0) {
-        p->body.center_mass.y -= p->bound_box.p0.y;
-        p->bound_box.p1.y -= p->bound_box.p0.y;
-        p->bound_box.p0.y -= p->bound_box.p0.y;
-        p->body.velocity.y = 0;
-        p->in_air = false;
-    }
-    else {
-        p->in_air = true;
-    }
-
-
 }
 
 void draw_player(Player *p) {
     // Drawing player as a quad.
-   draw_quad(p->bound_box.p0, p->bound_box.p1, VEC4F_YELLOW, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f);
+   // draw_quad(p->bound_box.p0, p->bound_box.p1, VEC4F_YELLOW, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f;
 }
 
 
