@@ -405,7 +405,7 @@ typedef struct oriented_bounding_box {
 #define obb_p3(obb_ptr)                                                 vec2f_sum((obb_ptr)->center, vec2f_rotate(vec2f_make(-(obb_ptr)->dimensions.x / 2, (obb_ptr)->dimensions.y / 2), (obb_ptr)->rot))
 
 #define obb_right(obb_ptr)                                              vec2f_rotate(VEC2F_RIGHT, (obb_ptr)->rot)
-#define obb_up   (obb_ptr)                                              vec2f_rotate(VEC2F_UP, (obb_ptr)->rot)
+#define obb_up(obb_ptr)                                                 vec2f_rotate(VEC2F_UP, (obb_ptr)->rot) 
 #define obb_left (obb_ptr)                                              vec2f_rotate(VEC2F_LEFT, (obb_ptr)->rot)
 #define obb_down (obb_ptr)                                              vec2f_rotate(VEC2F_DOWN, (obb_ptr)->rot)
 

@@ -170,6 +170,10 @@ void phys_apply_impulses() {
     }
 }
 
+bool phys_sat_collision_obb(OBB *obb1, OBB *obb2) {
+
+}
+
 
 
 
@@ -253,6 +257,25 @@ void draw_player(Player *p);
 Vec2f test_rot = vec2f_make(2.0f, 0.0f);
 float angle = 90.0f;
 
+
+bool dot_collision(float *dotprod) {
+    float min = dotprod[0], max = dotprod[0];
+    
+    for (u32 i = 1; i < 4; i++) {
+        if (dotprod[i] > max)
+            max = dotprod[i];
+
+        if (dotprod[i] < min)
+            min = dotprod[i];
+    }
+
+    for (u32 i = 0; i < 4; i++) {
+        if (value_inside_domain(min, max, dotprod[i + 4]))
+            return true;
+    }
+    return false;
+}
+
 /**
  * @Important: In game update loops the order of procedures is: Updating -> Drawing.
  * Where in updating all logic of the game loop is contained including inputs, sound and so on.
@@ -295,10 +318,31 @@ void plug_update(Plug_State *state) {
     test_rot = vec2f_rotate(test_rot, PI/2 * state->t->delta_time);
 
     // Test obb.
-    OBB test_obb = obb_make(vec2f_make(3.0f, 2.0f), 0.8f, 1.4f, angle);
-    AABB test_aabb = obb_enclose_in_aabb(&test_obb);
+    OBB box1 = obb_make(vec2f_make(4.0f, 3.0f), 2.0f, 1.5f, angle);
+    OBB box2 = obb_make(vec2f_make(2.2f, 2.2f), 1.2f, 1.6f, PI / 6 + angle);
 
+    OBB *obb1 = &box1;
+    OBB *obb2 = &box2;
 
+    Vec2f normals[4] = {
+        obb_right(obb1),
+        obb_up(obb1),
+        obb_right(obb2),
+        obb_up(obb2),
+    };
+
+    float dotprod[32];
+
+    for (u32 i = 0; i < 4; i++) {
+        dotprod[0 + i * 8] = vec2f_dot(normals[i], obb_p0(obb1));
+        dotprod[1 + i * 8] = vec2f_dot(normals[i], obb_p1(obb1));
+        dotprod[2 + i * 8] = vec2f_dot(normals[i], obb_p2(obb1));
+        dotprod[3 + i * 8] = vec2f_dot(normals[i], obb_p3(obb1));
+        dotprod[4 + i * 8] = vec2f_dot(normals[i], obb_p0(obb2));
+        dotprod[5 + i * 8] = vec2f_dot(normals[i], obb_p1(obb2));
+        dotprod[6 + i * 8] = vec2f_dot(normals[i], obb_p2(obb2));
+        dotprod[7 + i * 8] = vec2f_dot(normals[i], obb_p3(obb2));
+    }
 
 
     /**
@@ -347,30 +391,70 @@ void plug_update(Plug_State *state) {
     draw_end();
 
 
+
+
+
+
+
     // Regular quad drawing.
     state->drawer.program = quad_shader;
     draw_begin(&state->drawer);
 
     draw_player(&state->player);
     
-    draw_quad(obb_p0(&test_obb), obb_p1(&test_obb), VEC4F_GREEN, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, test_obb.rot);
-    draw_dot(test_obb.center, VEC4F_WHITE);
-    draw_dot(test_rot, VEC4F_RED);
+    draw_quad(obb_p0(obb1), obb_p1(obb1), VEC4F_PINK, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, obb1->rot);
+    draw_quad(obb_p0(obb2), obb_p1(obb2), VEC4F_GREEN, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, obb2->rot);
+    
+
+    for (u32 n = 0; n < 4; n++) {
+        for (u32 i = 0; i < 8; i++) {
+            draw_dot(vec2f_multi_constant(normals[n], dotprod[i + n * 8]), VEC4F_BLUE);
+        }
+    }
+
+
 
     draw_end();
+
+
+
+
 
 
     // Line drawing.
     line_draw_begin(&state->line_drawer);
 
-    draw_line(state->player.body.center_mass, vec2f_sum(state->player.body.center_mass, state->player.body.velocity), VEC4F_RED);
+    Vec4f color = VEC4F_GREY;
+    if (dot_collision(dotprod))
+        color = VEC4F_RED;
+    draw_function(-12, 12, func_expr((normals[0].y / normals[0].x) * x), 1, color);
 
-    draw_line(VEC2F_ORIGIN, test_rot, VEC4F_CYAN);
+    color = VEC4F_GREY;
+    if (dot_collision(dotprod + 8))
+        color = VEC4F_RED;
+    draw_function(-12, 12, func_expr((normals[1].y / normals[1].x) * x), 1, color);
 
-    draw_quad_outline(test_aabb.p0, test_aabb.p1, VEC4F_RED, 0);
-    draw_circle_outline(test_obb.center, right_triangle_hypotenuse(test_obb.dimensions.x, test_obb.dimensions.y) / 2, 32, VEC4F_GREY);
+    color = VEC4F_GREY;
+    if (dot_collision(dotprod + 16))
+        color = VEC4F_RED;
+    draw_function(-12, 12, func_expr((normals[2].y / normals[2].x) * x), 1, color);
+
+    color = VEC4F_GREY;
+    if (dot_collision(dotprod + 24))
+        color = VEC4F_RED;
+    draw_function(-12, 12, func_expr((normals[3].y / normals[3].x) * x), 1, color);
+
+
 
     line_draw_end();
+
+
+
+
+
+
+
+
 
 
     // To screen, (ui) matrix.
