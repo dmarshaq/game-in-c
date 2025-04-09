@@ -241,54 +241,98 @@ void phys_sat_find_min_depth_normal(OBB *obb1, OBB *obb2, float *depth, Vec2f *n
 }
 
 /**
- * Sets both obbs apart based on min collision normal depth.
+ * Sets both obbs apart based on depth and normal.
  * Usefull for two colliding dynamic objects.
  */
-void phys_sat_resolve_dynamic_obb_collision(OBB *obb, OBB *obb_dynamic) {
-    float depth;
-    Vec2f normal;
-
-    phys_sat_find_min_depth_normal(obb, obb_dynamic, &depth, &normal);
+void phys_resolve_dynamic_obb_collision(OBB *obb1, OBB *obb2, float depth, Vec2f normal) {
 
     Vec2f displacement = vec2f_multi_constant(normal, depth / 2);
 
-    obb->center = vec2f_sum(obb->center, displacement);
-    obb_dynamic->center = vec2f_difference(obb_dynamic->center, displacement);
+    obb1->center = vec2f_sum(obb1->center, displacement);
+    obb2->center = vec2f_difference(obb2->center, displacement);
+}
+
+void phys_resolve_dynamic_rb_collision(Rigid_Body_2D *rb1, Rigid_Body_2D *rb2, Vec2f normal) {
+    
+    Vec2f relative_velocity = vec2f_difference(rb2->velocity, rb1->velocity);
+
+    float e = fminf(rb1->restitution, rb2->restitution);
+
+    float j = -(1.0f + e) * vec2f_dot(relative_velocity, normal);
+    j /= (1.0f / rb1->mass + 1.0f / rb2->mass);
+
+    phys_apply_force(rb1, vec2f_multi_constant(normal, -j));
+    phys_apply_force(rb2, vec2f_multi_constant(normal, j));
 }
 
 /**
- * Sets obb apart from static obb based on min collision normal depth.
+ * Sets dynamic obb apart based on depth and normal.
  * Usefull for colliding dynamic object with immovable or static object.
  */
-void phys_sat_resolve_static_obb_collision(OBB *obb, OBB *obb_static) {
-    float depth;
-    Vec2f normal;
-
-    phys_sat_find_min_depth_normal(obb, obb_static, &depth, &normal);
+void phys_resolve_static_obb_collision(OBB *obb, float depth, Vec2f normal) {
 
     obb->center = vec2f_sum(obb->center, vec2f_multi_constant(normal, depth));
 }
 
+void phys_resolve_static_rb_collision(Rigid_Body_2D *rb1, Vec2f normal) {
+    
+    Vec2f relative_velocity = rb1->velocity;
+
+    float e = rb1->restitution;
+
+    float j = -(1.0f + e) * vec2f_dot(relative_velocity, normal);
+    j /= (1.0f / rb1->mass);
+
+    phys_apply_force(rb1, vec2f_multi_constant(normal, j));
+}
 
 void spawn_box(Vec2f position, Vec4f color) {
     array_list_append(&global_state->phys_boxes, ((Phys_Box) {
                 .bound_box = obb_make(position, 1.0f, 1.0f, 0.0f),
-                .body = rb_2d_make(20.0f),
+                .body = rb_2d_make(20.0f, 1.0f),
                 .color = color,
                 .is_static = false
             }));
 }
 
+void spawn_rect(Vec2f p0, Vec2f p1, Vec4f color) {
+    array_list_append(&global_state->phys_boxes, ((Phys_Box) {
+                .bound_box = obb_make(vec2f_sum(p0, vec2f_divide_constant(vec2f_difference(p1, p0), 2)), p1.x - p0.x, p1.y - p0.y, 0.0f),
+                .body = rb_2d_make(1.0f, 0.0f),
+                .color = color,
+                .is_static = true,
+            }));
+}
+
 void update_boxes() {
     u32 length = array_list_length(&global_state->phys_boxes);
+
+    float depth;
+    Vec2f normal;
+    Phys_Box *box1;
+    Phys_Box *box2;
+
+
     for (u32 i = 0; i < length; i++) {
+        box1 = &global_state->phys_boxes[i];
+        
+        // Applying velocities.
+        box1->bound_box.center = vec2f_sum(box1->bound_box.center, vec2f_multi_constant(box1->body.velocity, global_state->t->delta_time));
+    }
+
+    for (u32 i = 0; i < length; i++) {
+        box1 = &global_state->phys_boxes[i];
         for (u32 j = i + 1; j < length; j++) {
-            if (phys_sat_check_collision_obb(&global_state->phys_boxes[i].bound_box, &global_state->phys_boxes[j].bound_box)) {
+            box2 = &global_state->phys_boxes[j];
+            if (phys_sat_check_collision_obb(&box1->bound_box, &box2->bound_box)) {
+                phys_sat_find_min_depth_normal(&box1->bound_box, &box2->bound_box, &depth, &normal);
                 if (global_state->phys_boxes[i].is_static || global_state->phys_boxes[j].is_static) {
-                    phys_sat_resolve_static_obb_collision(&global_state->phys_boxes[i].bound_box, &global_state->phys_boxes[j].bound_box);
+                    phys_resolve_static_obb_collision(&box1->bound_box, depth, normal);
+                    phys_resolve_static_rb_collision(&box1->body, normal);
                 }
                 else {
-                    phys_sat_resolve_dynamic_obb_collision(&global_state->phys_boxes[i].bound_box, &global_state->phys_boxes[j].bound_box);
+                    phys_resolve_dynamic_obb_collision(&box1->bound_box, &box2->bound_box, depth, normal);
+                    phys_resolve_dynamic_rb_collision(&box1->body, &box2->body, normal);
                 }
             }
         }
@@ -318,14 +362,18 @@ void plug_init(Plug_State *state) {
     
     state->player = (Player) {
         .bound_box = obb_make(VEC2F_ORIGIN, 1.0f, 1.0f, 0.0f),
-        .body = rb_2d_make(70.0f),
+        .body = rb_2d_make(10.0f, 1.0f),
         .speed = 0.0f,
     };
 
     for (u32 i = 0; i < 10; i++) {
         spawn_box(vec2f_make(randf() * 10.0f - 5.0f, randf() * 10.0f - 5.0f), vec4f_make(randf(), randf(), randf(), 1.0f));
     }
-
+    
+    spawn_rect(vec2f_make(-8.0f, 5.0f), vec2f_make(8.0f, 6.0f), vec4f_make(randf(), randf(), randf(), 1.0f));
+    spawn_rect(vec2f_make(-8.0f, -5.0f), vec2f_make(8.0f, -6.0f), vec4f_make(randf(), randf(), randf(), 1.0f));
+    spawn_rect(vec2f_make(-9.0f, -6.0f), vec2f_make(-8.0f, 6.0f), vec4f_make(randf(), randf(), randf(), 1.0f));
+    spawn_rect(vec2f_make(8.0f, -6.0f), vec2f_make(9.0f, 6.0f), vec4f_make(randf(), randf(), randf(), 1.0f));
 }
 
 
@@ -572,20 +620,28 @@ void update_player(Player *p) {
     vel.x *= p->speed;
     vel.y *= p->speed;
     // p->body.velocity.x = lerp(p->body.velocity.x, vel_x, p->in_air ? 10.0f * air_control_percent * global_state->t->delta_time : 10.0f * global_state->t->delta_time );
-    p->body.velocity = vec2f_lerp(p->body.velocity, vel, 10.0f * global_state->t->delta_time);
+    if (vel.x != 0.0f && vel.y != 0.0f)
+        p->body.velocity = vec2f_lerp(p->body.velocity, vel, 50.0f * global_state->t->delta_time);
  
 
     // Applying calculated velocities. For both AABB and Rigid Body 2D.
     p->bound_box.center = vec2f_sum(p->bound_box.center, vec2f_multi_constant(p->body.velocity, global_state->t->delta_time));
 
     u32 length = array_list_length(&global_state->phys_boxes);
+
+    float depth;
+    Vec2f normal;
+
     for (u32 i = 0; i < length; i++) {
         if (phys_sat_check_collision_obb(&p->bound_box, &global_state->phys_boxes[i].bound_box)) {
+            phys_sat_find_min_depth_normal(&p->bound_box, &global_state->phys_boxes[i].bound_box, &depth, &normal);
             if (global_state->phys_boxes[i].is_static) {
-                phys_sat_resolve_static_obb_collision(&p->bound_box, &global_state->phys_boxes[i].bound_box);
+                phys_resolve_static_obb_collision(&p->bound_box, depth, normal);
+                phys_resolve_static_rb_collision(&p->body, normal);
             }
             else {
-                phys_sat_resolve_dynamic_obb_collision(&p->bound_box, &global_state->phys_boxes[i].bound_box);
+                phys_resolve_dynamic_obb_collision(&p->bound_box, &global_state->phys_boxes[i].bound_box, depth, normal);
+                phys_resolve_dynamic_rb_collision(&p->body, &global_state->phys_boxes[i].body, normal);
             }
         }
     }
