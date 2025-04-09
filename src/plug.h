@@ -11,11 +11,17 @@ typedef struct impulse {
 
 // Game entities.
 typedef struct player {
-    OBB *bound_box;
+    OBB bound_box;
     Rigid_Body_2D body;
     float speed;
-    bool in_air;
 } Player;
+
+typedef struct phys_box {
+    OBB bound_box;
+    Rigid_Body_2D body;
+    Vec4f color;
+    bool is_static;
+} Phys_Box;
 
 /**
  * Definition of plug_state.
@@ -42,8 +48,7 @@ typedef struct plug_state {
     Line_Drawer line_drawer;
 
     Impulse *impulses;
-    OBB *dynamic_boxes;
-    Vec4f *colors;
+    Phys_Box *phys_boxes;
 
     /**
      * Unsorted.

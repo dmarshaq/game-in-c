@@ -426,12 +426,11 @@ typedef struct circle {
 
 
 typedef struct rigid_body_2d {
-    Vec2f center_mass;
     Vec2f velocity;
     float mass;
 } Rigid_Body_2D;
 
-#define rb_2d_make(center_mass, mass)                                   ((Rigid_Body_2D) { center_mass, VEC2F_ORIGIN, mass } )   
+#define rb_2d_make(mass)                                   ((Rigid_Body_2D) { VEC2F_ORIGIN, mass } )   
 
 
 /**
