@@ -254,6 +254,7 @@ void hash_table_print(void **table);
 #define right_triangle_hypotenuse(a, b)     (sqrtf((a) * (a) + (b) * (b)))
 #define lerp(a, b, t)                       ((a) + ((b) - (a)) * (t))
 #define sig(a)                              (((a) == 0.0f) ? (0.0f) : (fabsf(a) / (a)))
+#define fequal(a, b)                        (fabs((a) - (b)) < FLT_EPSILON)
 
 #define randf()                             ((float)rand() / RAND_MAX)
 
@@ -427,19 +428,22 @@ typedef struct circle {
     float radius;
 } Circle;
 
+#define calculate_obb_inertia(mass, width, height)                                          (1.0f / 12.0f) * mass * (height * height + width * width)
 
-typedef struct rigid_body_2d {
+typedef struct body_2d {
     Vec2f velocity;
+    float angular_velocity;
+
     float mass;
+    float inv_mass;
+    float inertia;
+    float inv_inertia;
     Vec2f mass_center;
     float restitution;
-    float angular_velocity;
-    float inertia;
-} Rigid_Body_2D;
+} Body_2D;
 
-#define rb_2d_make(mass, mass_center, restitution, inertia)                                   ((Rigid_Body_2D) { VEC2F_ORIGIN, mass, mass_center, restitution, 0.0f, inertia } )   
+#define body_obb_make(mass, center, width, height, restitution)                             ((Body_2D) { VEC2F_ORIGIN, 0.0f, mass, (mass == 0.0f ? 0.0f : 1.0f / mass), calculate_obb_inertia(mass, width, height), (mass == 0.0f ? 0.0f : 1.0f / calculate_obb_inertia(mass, width, height)), center, restitution })
 
-#define calculate_obb_inertia(mass, width, height)                                          (1.0f / 12.0f) * mass * (height * height + width * width)
 
 
 /**

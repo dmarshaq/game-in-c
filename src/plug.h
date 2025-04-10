@@ -6,19 +6,19 @@
 typedef struct impulse {
     Vec2f delta_force;
     u32 milliseconds;
-    Rigid_Body_2D *target;
+    Body_2D *target;
 } Impulse;
 
 // Game entities.
 typedef struct player {
     OBB bound_box;
-    Rigid_Body_2D body;
+    Body_2D body;
     float speed;
 } Player;
 
 typedef struct phys_box {
     OBB bound_box;
-    Rigid_Body_2D body;
+    Body_2D body;
     Vec4f color;
     bool is_static;
 } Phys_Box;
