@@ -42,6 +42,7 @@ int main(int argc, char *argv[]) {
     graphics_init();
     
     t.delta_time_multi = 1.0f;
+    t.time_slow_factor = 1;
 
     state.t = &t;
     state.quit = false;

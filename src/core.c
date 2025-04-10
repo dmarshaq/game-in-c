@@ -1,5 +1,6 @@
 #include "core.h"
 #include "SDL2/SDL_video.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -684,6 +685,20 @@ void hash_table_print(void **table) {
 /**
  * Math float.
  */
+
+float point_segment_min_distance(Vec2f p, Vec2f a, Vec2f b) {
+    Vec2f ba = vec2f_difference(b, a);
+    Vec2f pa = vec2f_difference(p, a);
+    float dot = vec2f_dot(pa, vec2f_normalize(ba));
+
+    if (dot <= 0) {
+        return vec2f_magnitude(pa);
+    }
+    else if (dot >= vec2f_magnitude(ba)) {
+        return vec2f_magnitude(vec2f_difference(p, b));
+    }
+    return sqrtf(vec2f_magnitude(pa) * vec2f_magnitude(pa) - dot * dot);
+}
 
 Matrix4f matrix4f_multiplication(Matrix4f *multiplier, Matrix4f *target) {
     Matrix4f result = {

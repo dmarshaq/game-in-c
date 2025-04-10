@@ -279,6 +279,7 @@ typedef struct vec2f {
 #define vec2f_sum_constant(v1, c)           vec2f_make(v1.x + c, v1.y + c)
 #define vec2f_difference_constant(v1, c)    vec2f_make(v1.x - c, v1.y - c) 
 #define vec2f_dot(v1, v2)                   (v1.x * v2.x + v1.y * v2.y)
+#define vec2f_cross(v1, v2)                 (v1.x * v2.y - v1.y * v2.x)
 #define vec2f_multi_constant(v1, c)         vec2f_make(v1.x * c, v1.y * c)
 #define vec2f_divide_constant(v1, c)        vec2f_make(v1.x / c, v1.y / c)
 #define vec2f_magnitude(v1)                 right_triangle_hypotenuse(v1.x, v1.y)
@@ -287,6 +288,8 @@ typedef struct vec2f {
 #define vec2f_normalize(v1)                 (((v1).x == 0.0f && (v1).y == 0.0f) ? VEC2F_ORIGIN : vec2f_divide_constant(v1, vec2f_magnitude(v1)))
 #define vec2f_lerp(v1, v2, t)               vec2f_make(lerp(v1.x, v2.x, t), lerp(v1.y, v2.y, t))
 #define vec2f_rotate(v1, angle)             vec2f_make(cosf(angle) * v1.x - sinf(angle) * v1.y, sinf(angle) * v1.x + cosf(angle) * v1.y)
+
+float point_segment_min_distance(Vec2f p, Vec2f a, Vec2f b);
 
 typedef struct vec3f {
     float x;
@@ -428,10 +431,15 @@ typedef struct circle {
 typedef struct rigid_body_2d {
     Vec2f velocity;
     float mass;
+    Vec2f mass_center;
     float restitution;
+    float angular_velocity;
+    float inertia;
 } Rigid_Body_2D;
 
-#define rb_2d_make(mass, restitution)                                   ((Rigid_Body_2D) { VEC2F_ORIGIN, mass, restitution } )   
+#define rb_2d_make(mass, mass_center, restitution, inertia)                                   ((Rigid_Body_2D) { VEC2F_ORIGIN, mass, mass_center, restitution, 0.0f, inertia } )   
+
+#define calculate_obb_inertia(mass, width, height)                                          (1.0f / 12.0f) * mass * (height * height + width * width)
 
 
 /**
@@ -703,6 +711,7 @@ typedef struct time_data {
     float delta_time;
 
     float delta_time_multi;
+    u32 time_slow_factor;
 
     u32 last_update_time;
     u32 accumilated_time;
