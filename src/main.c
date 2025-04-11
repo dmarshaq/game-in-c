@@ -1,5 +1,6 @@
 #include "SDL2/SDL_events.h"
 #include "SDL2/SDL_mouse.h"
+#include "core.h"
 #include "plug.h"
 #include <windows.h>
 
@@ -49,6 +50,16 @@ int main(int argc, char *argv[]) {
     state.window_width = WINDOW_WIDTH;
     state.window_height = WINDOW_HEIGHT;
 
+    state.mouse_input = (Mouse_Input) {
+        .position = VEC2F_ORIGIN,
+        .left_hold = false,
+        .left_pressed = false,
+        .left_unpressed = false,
+        .right_hold = false,
+        .right_pressed = false,
+        .right_unpressed = false,
+    };
+
     reload_libplug();
 
     SDL_Event event;
@@ -77,9 +88,37 @@ int main(int argc, char *argv[]) {
                 case SDL_MOUSEMOTION:
                     s32 mx, my;
                     SDL_GetMouseState(&mx, &my);
+                    
+                    state.mouse_input.position.x = (float)mx;
+                    state.mouse_input.position.y = (float)(state.window_height - my);
+                    break;
+                case SDL_MOUSEBUTTONDOWN:
+                    if (event.button.button == SDL_BUTTON_LEFT) {
+                        if (!state.mouse_input.left_pressed && !state.mouse_input.left_hold) {
+                            state.mouse_input.left_pressed = true;
+                        }
+                        else {
+                            state.mouse_input.left_pressed = false;
+                        }
+                        state.mouse_input.left_hold = true;
+                    }
+                    else if (event.button.button == SDL_BUTTON_RIGHT) {
 
-                    state.mouse_position.x = (float)mx;
-                    state.mouse_position.y = (float)(state.window_height - my);
+                    }
+                    break;
+                case SDL_MOUSEBUTTONUP:
+                    if (event.button.button == SDL_BUTTON_LEFT) {
+                        if (!state.mouse_input.left_unpressed && state.mouse_input.left_hold) {
+                            state.mouse_input.left_unpressed = true;
+                        }
+                        else {
+                            state.mouse_input.left_unpressed = false;
+                        }
+                        state.mouse_input.left_hold = false;
+                    }
+                    else if (event.button.button == SDL_BUTTON_RIGHT) {
+
+                    }
                     break;
                 default:
                     break;

@@ -440,9 +440,11 @@ typedef struct body_2d {
     float inv_inertia;
     Vec2f mass_center;
     float restitution;
+    float static_friction;
+    float dynamic_friction;
 } Body_2D;
 
-#define body_obb_make(mass, center, width, height, restitution)                             ((Body_2D) { VEC2F_ORIGIN, 0.0f, mass, (mass == 0.0f ? 0.0f : 1.0f / mass), calculate_obb_inertia(mass, width, height), (mass == 0.0f ? 0.0f : 1.0f / calculate_obb_inertia(mass, width, height)), center, restitution })
+#define body_obb_make(mass, center, width, height, restitution, static_friction, dynamic_friction)                             ((Body_2D) { VEC2F_ORIGIN, 0.0f, mass, (mass == 0.0f ? 0.0f : 1.0f / mass), calculate_obb_inertia(mass, width, height), (mass == 0.0f ? 0.0f : 1.0f / calculate_obb_inertia(mass, width, height)), center, restitution, static_friction, dynamic_friction })
 
 
 
@@ -486,6 +488,17 @@ String_8 read_file_into_str8(char *file_name, Allocator *allocator);
 /**
  * Input
  */
+
+typedef struct mouse_input {
+    Vec2f position;
+    bool left_hold;
+    bool left_pressed;
+    bool left_unpressed;
+    bool right_hold;
+    bool right_pressed;
+    bool right_unpressed;
+} Mouse_Input;
+
 void keyboard_state_init();
 
 void keyboard_state_old_update();

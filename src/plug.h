@@ -33,7 +33,7 @@ typedef struct plug_state {
     bool quit;
     u32 window_width;
     u32 window_height;
-    Vec2f mouse_position;
+    Mouse_Input mouse_input;
 
     /**
      * Globals, @Important: Must be loaded or/and unloaded when hot reloading plug.
