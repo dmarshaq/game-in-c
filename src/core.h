@@ -428,7 +428,7 @@ typedef struct circle {
     float radius;
 } Circle;
 
-#define calculate_obb_inertia(mass, width, height)                                          (1.0f / 12.0f) * mass * (height * height + width * width)
+#define calculate_obb_inertia(mass, width, height)                                          ((1.0f / 12.0f) * mass * (height * height + width * width))
 
 typedef struct body_2d {
     Vec2f velocity;
