@@ -38,6 +38,7 @@ void draw_viewport(u32 x, u32 y, u32 width, u32 height, Vec4f color, Camera *cam
 void viewport_reset(Plug_State *state);
 
 
+Vec2f camera_screen_to_world(Vec2f point, Camera *camera);
 
 
 Plug_State *global_state;
@@ -46,6 +47,7 @@ const Vec2f gravity_acceleration = vec2f_make(0.0f, -9.81f);
 const float jump_input_leeway = 0.4f;
 const float air_control_percent = 0.3f;
 
+float mouse_g_constant = 0.0f;
 
 /**
  * Pop up message.
@@ -227,19 +229,29 @@ void phys_sat_find_min_depth_normal(OBB *obb1, OBB *obb2, float *depth, Vec2f *n
     };
 
     for (u32 i = 1; i < 4; i++) {
-        if (depths[0] > depths[i]) {
+        if (depths[i] < depths[0]) {
             depths[0] = depths[i];
             normals[0] = normals[i];
         }
     }
 
+    Vec2f dir = vec2f_normalize(vec2f_difference(obb2->center, obb1->center));
+
     // Flip normal if it's not looking in direction of collosion.
-    if (vec2f_dot(normals[0], vec2f_normalize(vec2f_difference(obb1->center, obb2->center))) < 0.0f) {
+    if (vec2f_dot(normals[0], vec2f_normalize(vec2f_difference(obb2->center, obb1->center))) < 0.0f) {
         normals[0] = vec2f_negate(normals[0]);
     }
 
     *depth = depths[0];
     *normal = normals[0];
+
+
+    // line_draw_begin(&global_state->line_drawer);
+
+    // draw_line(obb1->center, vec2f_sum(obb1->center, (*normal)), VEC4F_CYAN);
+    // draw_line(obb1->center, vec2f_sum(obb1->center, dir), VEC4F_BLUE);
+
+    // line_draw_end();
 }
 
 /**
@@ -250,8 +262,8 @@ void phys_resolve_dynamic_obb_collision(OBB *obb1, OBB *obb2, float depth, Vec2f
 
     Vec2f displacement = vec2f_multi_constant(normal, depth / 2);
 
-    obb1->center = vec2f_sum(obb1->center, displacement);
-    obb2->center = vec2f_difference(obb2->center, displacement);
+    obb1->center = vec2f_sum(obb1->center, vec2f_negate(displacement));
+    obb2->center = vec2f_sum(obb2->center, displacement);
 }
 
 void phys_resolve_dynamic_body_collision_basic(Body_2D *body1, Body_2D *body2, Vec2f normal) {
@@ -276,7 +288,7 @@ void phys_resolve_dynamic_body_collision(Body_2D *body1, Body_2D *body2, Vec2f n
     float e = fminf(body1->restitution, body2->restitution);
 
     Vec2f angular_lin_velocity1, angular_lin_velocity2, relative_velocity;
-    float r1_perp_dot_n, r2_perp_dot_n, j;
+    float r1_perp_dot_n, r2_perp_dot_n, contact_velocity_mag, j;
 
     // Calculating impulses and vectors to contact points, for each contact point.
     for (u32 i = 0; i < contacts_count; i++) {
@@ -287,11 +299,17 @@ void phys_resolve_dynamic_body_collision(Body_2D *body1, Body_2D *body2, Vec2f n
         angular_lin_velocity2 = vec2f_multi_constant(vec2f_make(-r2_array[i].y, r2_array[i].x), body2->angular_velocity);
 
         relative_velocity = vec2f_difference(vec2f_sum(body2->velocity, angular_lin_velocity2), vec2f_sum(body1->velocity, angular_lin_velocity1));
+        
+        contact_velocity_mag = vec2f_dot(relative_velocity, normal);
+
+        if (contact_velocity_mag > 0.0f) {
+            continue;
+        }
 
         r1_perp_dot_n = vec2f_cross(r1_array[i], normal);
         r2_perp_dot_n = vec2f_cross(r2_array[i], normal);
 
-        j = -(1.0f + e) * vec2f_dot(relative_velocity, normal);
+        j = -(1.0f + e) * contact_velocity_mag;
         j /= body1->inv_mass + body2->inv_mass + (r1_perp_dot_n * r1_perp_dot_n) * body1->inv_inertia + (r2_perp_dot_n * r2_perp_dot_n) * body2->inv_inertia;
         j /= (float)contacts_count;
 
@@ -323,7 +341,7 @@ void phys_resolve_dynamic_body_collision_with_friction(Body_2D *body1, Body_2D *
     float df = (body1->dynamic_friction + body2->dynamic_friction) / 2;
 
     Vec2f angular_lin_velocity1, angular_lin_velocity2, relative_velocity;
-    float r1_perp_dot_n, r2_perp_dot_n, j, jt;
+    float r1_perp_dot_n, r2_perp_dot_n, contact_velocity_mag, j, jt;
 
     // Calculating impulses and vectors to contact points, for each contact point.
     for (u32 i = 0; i < contacts_count; i++) {
@@ -335,15 +353,23 @@ void phys_resolve_dynamic_body_collision_with_friction(Body_2D *body1, Body_2D *
 
         relative_velocity = vec2f_difference(vec2f_sum(body2->velocity, angular_lin_velocity2), vec2f_sum(body1->velocity, angular_lin_velocity1));
 
+        contact_velocity_mag = vec2f_dot(relative_velocity, normal);
+
+        if (contact_velocity_mag > 0.0f) {
+            continue;
+        }
+
         r1_perp_dot_n = vec2f_cross(r1_array[i], normal);
         r2_perp_dot_n = vec2f_cross(r2_array[i], normal);
 
-        j = -(1.0f + e) * vec2f_dot(relative_velocity, normal);
+        j = -(1.0f + e) * contact_velocity_mag;
         j /= body1->inv_mass + body2->inv_mass + (r1_perp_dot_n * r1_perp_dot_n) * body1->inv_inertia + (r2_perp_dot_n * r2_perp_dot_n) * body2->inv_inertia;
         j /= (float)contacts_count;
 
-        impulses[i] = vec2f_multi_constant(normal, j);
+
         j_array[i] = j;
+
+        impulses[i] = vec2f_multi_constant(normal, j);
     }
 
     // For each contact point applying impulse and angular acceleration.
@@ -355,15 +381,28 @@ void phys_resolve_dynamic_body_collision_with_friction(Body_2D *body1, Body_2D *
         phys_apply_angular_acceleration(body2, vec2f_cross(r2_array[i], impulses[i]) * body2->inv_inertia);
     }
 
+    // line_draw_begin(&global_state->line_drawer);
+
     // Friction.
     for (u32 i = 0; i < contacts_count; i++) {
+        r1_array[i] = vec2f_difference(contacts[i], body1->mass_center);
+        r2_array[i] = vec2f_difference(contacts[i], body2->mass_center);
+
+        angular_lin_velocity1 = vec2f_multi_constant(vec2f_make(-r1_array[i].y, r1_array[i].x), body1->angular_velocity);
+        angular_lin_velocity2 = vec2f_multi_constant(vec2f_make(-r2_array[i].y, r2_array[i].x), body2->angular_velocity);
+
+        relative_velocity = vec2f_difference(vec2f_sum(body2->velocity, angular_lin_velocity2), vec2f_sum(body1->velocity, angular_lin_velocity1));
+
+
         Vec2f tanget = vec2f_difference(relative_velocity, vec2f_multi_constant(normal, vec2f_dot(relative_velocity, normal)));
-        if (fequal(tanget.x, 0.0f), fequal(tanget.y, 0.0f)) {
+
+        
+        // draw_line(body2->mass_center, vec2f_sum(body2->mass_center, tanget), VEC4F_RED);
+        if (fequal(tanget.x, 0.0f) && fequal(tanget.y, 0.0f)) {
             continue;
         }
-        else {
-            tanget = vec2f_normalize(tanget);
-        }
+
+        tanget = vec2f_normalize(tanget);
 
         r1_perp_dot_n = vec2f_cross(r1_array[i], tanget);
         r2_perp_dot_n = vec2f_cross(r2_array[i], tanget);
@@ -373,7 +412,6 @@ void phys_resolve_dynamic_body_collision_with_friction(Body_2D *body1, Body_2D *
         jt /= (float)contacts_count;
     
 
-
         // Collumbs law.
         if (fabsf(jt) <= j * sf) {
             friction_impulses[i] = vec2f_multi_constant(tanget, jt);
@@ -382,8 +420,12 @@ void phys_resolve_dynamic_body_collision_with_friction(Body_2D *body1, Body_2D *
             friction_impulses[i] = vec2f_multi_constant(tanget, -j_array[i] * df);
         }
 
-        friction_impulses[i] = vec2f_multi_constant(tanget, jt);
+
+        // draw_line(contacts[i], vec2f_sum(contacts[i], friction_impulses[i]), VEC4F_RED);
+
     }
+
+    // line_draw_end();
 
     // For each contact point applying friction impulse and angular acceleration.
     for (u32 i = 0; i < contacts_count; i++) {
@@ -460,7 +502,7 @@ void spawn_box(Vec2f position, Vec4f color) {
     float height = 0.6f * randf() + 0.8f;
     array_list_append(&global_state->phys_boxes, ((Phys_Box) {
                 .bound_box = obb_make(position, width, height, 0.0f),
-                .body = body_obb_make(20.0f, position, width, height, 0.0f, 0.4f, 0.6f),
+                .body = body_obb_make(30.0f, position, width, height, 0.4f, 0.6f, 0.4f),
                 .color = color,
                 .is_static = false
             }));
@@ -469,7 +511,7 @@ void spawn_box(Vec2f position, Vec4f color) {
 void spawn_rect(Vec2f p0, Vec2f p1, Vec4f color) {
     array_list_append(&global_state->phys_boxes, ((Phys_Box) {
                 .bound_box = obb_make(vec2f_sum(p0, vec2f_divide_constant(vec2f_difference(p1, p0), 2)), p1.x - p0.x, p1.y - p0.y, 0.0f),
-                .body = body_obb_make(0.0f, vec2f_sum(p0, vec2f_divide_constant(vec2f_difference(p1, p0), 2)), p1.x - p0.x, p1.y - p0.y, 0.0f, 0.4f, 0.6f),
+                .body = body_obb_make(0.0f, vec2f_sum(p0, vec2f_divide_constant(vec2f_difference(p1, p0), 2)), p1.x - p0.x, p1.y - p0.y, 0.4f, 0.6f, 0.4f),
                 .color = color,
                 .is_static = true,
             }));
@@ -479,13 +521,16 @@ void spawn_rect(Vec2f p0, Vec2f p1, Vec4f color) {
 void spawn_obstacle(Vec2f c, float w, float h, Vec4f color, float angle) {
     array_list_append(&global_state->phys_boxes, ((Phys_Box) {
                 .bound_box = obb_make(c, w, h, angle),
-                .body = body_obb_make(0.0f, c, w, h, 0.0f, 0.4f, 0.6f),
+                .body = body_obb_make(0.0f, c, w, h, 0.4f, 0.6f, 0.4f),
                 .color = color,
                 .is_static = true,
             }));
 }
 
+#define PHYS_ITERATIONS 8
+#define PHYS_ITERATION_STEP_TIME (1.0f / PHYS_ITERATIONS)
 
+u32 grabbed_index = UINT_MAX;
 void update_boxes() {
     u32 length = array_list_length(&global_state->phys_boxes);
 
@@ -494,59 +539,89 @@ void update_boxes() {
     Phys_Box *box1;
     Phys_Box *box2;
 
-    // Applying aftermath.
-    for (u32 i = 0; i < length; i++) {
-        box1 = &global_state->phys_boxes[i];
-
-
-        if (box1->body.mass_center.y < -15.0f) {
-            array_list_unordered_remove(&global_state->phys_boxes, i);
-            length = array_list_length(&global_state->phys_boxes);
-            i--;
-            continue;
-        }
-
-        
-        // Applying gravity.
-        if (!box1->is_static) {
-            box1->body.velocity = vec2f_sum(box1->body.velocity, vec2f_multi_constant(gravity_acceleration, global_state->t->delta_time));
-        }
-
-        // Applying velocities.
-        box1->bound_box.center = vec2f_sum(box1->bound_box.center, vec2f_multi_constant(box1->body.velocity, global_state->t->delta_time));
-        box1->bound_box.rot += box1->body.angular_velocity * global_state->t->delta_time;
-        box1->body.mass_center = box1->bound_box.center;
+    Vec2f mouse_w_pos = camera_screen_to_world(global_state->mouse_input.position, &global_state->main_camera);
+    Vec2f mouse_force = VEC2F_ORIGIN;
+    if (global_state->mouse_input.right_hold) {
+        mouse_g_constant = 100.0f;
     }
+    else {
+        mouse_g_constant = 0.0f;
+    }
+    
+    line_draw_begin(&global_state->line_drawer);
+    for (u32 it = 0; it < PHYS_ITERATIONS; it++) {
+        for (u32 i = 0; i < length; i++) {
+            box1 = &global_state->phys_boxes[i];
+
+            if (box1->is_static) {
+                continue;
+            }
 
 
-    Vec2f contacts[2];
-    u32 contacts_count;
-    // Collision.
-    for (u32 i = 0; i < length; i++) {
-        box1 = &global_state->phys_boxes[i];
-        for (u32 j = i + 1; j < length; j++) {
-            box2 = &global_state->phys_boxes[j];
-            if (phys_sat_check_collision_obb(&box1->bound_box, &box2->bound_box)) {
-                phys_sat_find_min_depth_normal(&box1->bound_box, &box2->bound_box, &depth, &normal);
-                if (box1->is_static && !box2->is_static) {
-                    phys_resolve_static_obb_collision(&box2->bound_box, depth, vec2f_negate(normal));
-                }
-                else if (box2->is_static && !box1->is_static) {
-                    phys_resolve_static_obb_collision(&box1->bound_box, depth, normal);
-                }
-                else {
-                    phys_resolve_dynamic_obb_collision(&box1->bound_box, &box2->bound_box, depth, normal);
-                }
-                box1->body.mass_center = box1->bound_box.center;
-                box2->body.mass_center = box2->bound_box.center;
-                contacts_count = phys_find_contanct_points_obb(&box1->bound_box, &box2->bound_box, contacts);
+            if (box1->body.mass_center.y < -15.0f) {
+                array_list_unordered_remove(&global_state->phys_boxes, i);
+                length = array_list_length(&global_state->phys_boxes);
+                i--;
+                continue;
+            }
 
-                phys_resolve_dynamic_body_collision_with_friction(&box1->body, &box2->body, normal, contacts, contacts_count);
-                // phys_resolve_dynamic_body_collision(&box1->body, &box2->body, normal, contacts, contacts_count);
-                // phys_resolve_dynamic_body_collision_basic(&box1->body, &box2->body, normal);
+
+            // Applying gravity.
+            box1->body.velocity = vec2f_sum(box1->body.velocity, vec2f_multi_constant(gravity_acceleration, global_state->t->delta_time * PHYS_ITERATION_STEP_TIME ));
+
+
+
+            // Applying "mouse force".
+            if (!fequal(mouse_g_constant, 0.0f) && (grabbed_index == i || (vec2f_magnitude(vec2f_difference(mouse_w_pos, box1->bound_box.center)) < 1.0f && grabbed_index == UINT_MAX))) {
+                mouse_force = vec2f_multi_constant(vec2f_normalize(vec2f_difference(mouse_w_pos, box1->bound_box.center)), box1->body.mass * mouse_g_constant * (vec2f_magnitude(vec2f_difference(mouse_w_pos, box1->bound_box.center)) + 0.05f));
+                box1->body.velocity = vec2f_sum(box1->body.velocity, vec2f_multi_constant(mouse_force, global_state->t->delta_time * PHYS_ITERATION_STEP_TIME * box1->body.inv_mass ));
+                
+                draw_line(mouse_w_pos, box1->bound_box.center, VEC4F_CYAN);
+                
+                grabbed_index = i;
+            } 
+            else if (fequal(mouse_g_constant, 0.0f)) {
+                grabbed_index = UINT_MAX;
+            }
+
+            // Applying velocities.
+            box1->bound_box.center = vec2f_sum(box1->bound_box.center, vec2f_multi_constant(box1->body.velocity, global_state->t->delta_time * PHYS_ITERATION_STEP_TIME));
+            box1->bound_box.rot += box1->body.angular_velocity * global_state->t->delta_time * PHYS_ITERATION_STEP_TIME;
+            box1->body.mass_center = box1->bound_box.center;
+        }
+
+
+
+        Vec2f contacts[2];
+        u32 contacts_count;
+        // Collision.
+        for (u32 i = 0; i < length; i++) {
+            box1 = &global_state->phys_boxes[i];
+            for (u32 j = i + 1; j < length; j++) {
+                box2 = &global_state->phys_boxes[j];
+                if (phys_sat_check_collision_obb(&box1->bound_box, &box2->bound_box)) {
+                    phys_sat_find_min_depth_normal(&box1->bound_box, &box2->bound_box, &depth, &normal);
+                    if (box1->is_static && !box2->is_static) {
+                        phys_resolve_static_obb_collision(&box2->bound_box, depth, normal);
+                    }
+                    else if (box2->is_static && !box1->is_static) {
+                        phys_resolve_static_obb_collision(&box1->bound_box, depth, vec2f_negate(normal));
+                    }
+                    else {
+                        phys_resolve_dynamic_obb_collision(&box1->bound_box, &box2->bound_box, depth, normal);
+                    }
+                    box1->body.mass_center = box1->bound_box.center;
+                    box2->body.mass_center = box2->bound_box.center;
+                    contacts_count = phys_find_contanct_points_obb(&box1->bound_box, &box2->bound_box, contacts);
+
+                    phys_resolve_dynamic_body_collision_with_friction(&box1->body, &box2->body, normal, contacts, contacts_count);
+                    // phys_resolve_dynamic_body_collision(&box1->body, &box2->body, normal, contacts, contacts_count);
+                    // phys_resolve_dynamic_body_collision_basic(&box1->body, &box2->body, normal);
+                }
             }
         }
     }
+    line_draw_end();
 }
 
 void draw_boxes() {
@@ -559,7 +634,7 @@ void draw_boxes() {
 void draw_boxes_outline() {
     u32 length = array_list_length(&global_state->phys_boxes);
     for (u32 i = 0; i < length; i++) {
-        draw_quad_outline(obb_p0(&global_state->phys_boxes[i].bound_box), obb_p1(&global_state->phys_boxes[i].bound_box), VEC4F_WHITE, global_state->phys_boxes[i].bound_box.rot);
+        draw_quad_outline(obb_p0(&global_state->phys_boxes[i].bound_box), obb_p1(&global_state->phys_boxes[i].bound_box), vec4f_make(1.0f, 1.0f, 1.0f, 0.6f), global_state->phys_boxes[i].bound_box.rot);
     }
 }
 
@@ -579,14 +654,14 @@ void plug_init(Plug_State *state) {
     
     state->player = (Player) {
         .bound_box = obb_make(VEC2F_ORIGIN, 1.0f, 1.0f, 0.0f),
-        .body = body_obb_make(10.0f, VEC2F_ORIGIN, 1.0f, 1.0f, 0.2f, 0.4f, 0.6f),
+        .body = body_obb_make(10.0f, VEC2F_ORIGIN, 1.0f, 1.0f, 0.4f, 0.6f, 0.4f),
         .speed = 0.0f,
     };
 
 
-    spawn_rect(vec2f_make(-8.0f, -5.0f), vec2f_make(8.0f, -6.0f), vec4f_make(randf(), randf(), randf(), 1.0f));
-    spawn_obstacle(vec2f_make(4.0f, -1.0f), 6.0f, 1.0f, vec4f_make(randf(), randf(), randf(), 1.0f), PI / 6);
-    spawn_obstacle(vec2f_make(-4.0f, 1.5f), 6.0f, 1.0f, vec4f_make(randf(), randf(), randf(), 1.0f), -PI / 6);
+    spawn_rect(vec2f_make(-8.0f, -5.0f), vec2f_make(8.0f, -6.0f), vec4f_make(randf(), randf(), randf(), 0.4f));
+    spawn_obstacle(vec2f_make(4.0f, -1.0f), 6.0f, 1.0f, vec4f_make(randf(), randf(), randf(), 0.4f), PI / 6);
+    spawn_obstacle(vec2f_make(-4.0f, 1.5f), 6.0f, 1.0f, vec4f_make(randf(), randf(), randf(), 0.4f), -PI / 6);
 
     // for (u32 i = 0; i < 10; i++) {
     //     spawn_box(vec2f_make(randf() * 10.0f - 5.0f, randf() * 10.0f - 5.0f), vec4f_make(randf(), randf(), randf(), 1.0f));
@@ -611,7 +686,7 @@ void plug_load(Plug_State *state) {
     state->clear_color = vec4f_make(0.1f, 0.1f, 0.4f, 1.0f);
 
     // Main camera init.
-    state->main_camera = camera_make(VEC2F_ORIGIN, 48);
+    state->main_camera = camera_make(VEC2F_ORIGIN, 32);
 
     // Shader loading.
     Shader quad_shader = shader_load("res/shader/quad.glsl");
@@ -652,12 +727,15 @@ void plug_load(Plug_State *state) {
     // Player loading.
     state->player.speed = 10.0f;
 
-    // box1 = obb_make(vec2f_make(0.0f, 3.5f), 2.0f, 1.5f, 0.0f);
-    // box2 = obb_make(vec2f_make(0.0f, 0.0f), 1.2f, 1.6f, 0.0f);
-
     global_state = state;
 
 
+}
+
+
+
+Vec2f camera_screen_to_world(Vec2f point, Camera *camera) {
+    return vec2f_make(camera->center.x + (point.x - (float)global_state->window_width / 2) / (float)camera->unit_scale, camera->center.y + (point.y - (float)global_state->window_height / 2) / (float)global_state->main_camera.unit_scale);
 }
 
 
@@ -683,6 +761,32 @@ bool temp = false;
  */
 void plug_update(Plug_State *state) {
     
+    // Get neccessary to draw resource: (Shaders, Fonts, Textures, etc.).
+    Shader *quad_shader = hash_table_get(&state->shader_table, "quad", 4);
+    Shader *grid_shader = hash_table_get(&state->shader_table, "grid", 4);
+    Shader *line_shader = hash_table_get(&state->shader_table, "line", 4);
+
+    Font_Baked *font_medium = hash_table_get(&state->font_table, "medium", 6);
+    Font_Baked *font_small  = hash_table_get(&state->font_table, "small", 5);
+
+    
+    // Reset viewport.
+    viewport_reset(state);
+
+
+    // Clear the screen with clear_color.
+    glClearColor(state->clear_color.x, state->clear_color.y, state->clear_color.z, state->clear_color.w);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+
+    // Load camera's projection into all shaders to correctly draw elements according to camera view.
+    Matrix4f projection;
+
+    projection = camera_calculate_projection(&state->main_camera, (float)state->window_width, (float)state->window_height);
+
+    shader_update_projection(quad_shader, &projection);
+    shader_update_projection(grid_shader, &projection);
+    shader_update_projection(line_shader, &projection);
 
 
 
@@ -714,14 +818,16 @@ void plug_update(Plug_State *state) {
     }
 
     if (state->mouse_input.left_hold && !temp) {
-        Vec2f pos = vec2f_make(state->main_camera.center.x + (state->mouse_input.position.x - (float)global_state->window_width / 2) / (float)global_state->main_camera.unit_scale, state->main_camera.center.y + (state->mouse_input.position.y - (float)global_state->window_height / 2) / (float)global_state->main_camera.unit_scale);
-        spawn_box(pos, vec4f_make(randf(), randf(), randf(), 1.0f));
+        Vec2f pos = camera_screen_to_world(state->mouse_input.position, &state->main_camera);
+        spawn_box(pos, vec4f_make(randf(), randf(), randf(), 0.4f));
 
         temp = true;
     } 
     else if (!state->mouse_input.left_hold && temp) {
         temp = false;
     }
+
+
 
     
     // Time slow down input.
@@ -733,7 +839,7 @@ void plug_update(Plug_State *state) {
     }
 
     // Player logic.
-    update_player(&state->player);
+    // update_player(&state->player);
     
     // Lerp camera.
     state->main_camera.center = vec2f_lerp(state->main_camera.center, state->player.bound_box.center, 0.025f);
@@ -756,32 +862,6 @@ void plug_update(Plug_State *state) {
     Phys_Box *box = NULL;
     u32 boxes = array_list_length(&global_state->phys_boxes);
 
-    // Get neccessary to draw resource: (Shaders, Fonts, Textures, etc.).
-    Shader *quad_shader = hash_table_get(&state->shader_table, "quad", 4);
-    Shader *grid_shader = hash_table_get(&state->shader_table, "grid", 4);
-    Shader *line_shader = hash_table_get(&state->shader_table, "line", 4);
-
-    Font_Baked *font_medium = hash_table_get(&state->font_table, "medium", 6);
-    Font_Baked *font_small  = hash_table_get(&state->font_table, "small", 5);
-
-    
-    // Reset viewport.
-    viewport_reset(state);
-
-
-    // Clear the screen with clear_color.
-    glClearColor(state->clear_color.x, state->clear_color.y, state->clear_color.z, state->clear_color.w);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-
-    // Load camera's projection into all shaders to correctly draw elements according to camera view.
-    Matrix4f projection;
-
-    projection = camera_calculate_projection(&state->main_camera, (float)state->window_width, (float)state->window_height);
-
-    shader_update_projection(quad_shader, &projection);
-    shader_update_projection(grid_shader, &projection);
-    shader_update_projection(line_shader, &projection);
 
 
 
@@ -806,16 +886,16 @@ void plug_update(Plug_State *state) {
     state->drawer.program = quad_shader;
     draw_begin(&state->drawer);
 
-    draw_player(&state->player);
+    // draw_player(&state->player);
 
     draw_boxes();
 
 
     // for (u32 i = 0; i < boxes; i++) {
-    //     box = &global_state->phys_boxes[i];
+    //      box = &global_state->phys_boxes[i];
 
-    //     draw_dot(box->bound_box.center, VEC4F_GREEN);
-    //     draw_dot(box->body.mass_center, VEC4F_YELLOW);
+    //      draw_dot(box->bound_box.center, VEC4F_GREEN);
+    //      draw_dot(box->body.mass_center, VEC4F_YELLOW);
 
     // }
 

@@ -254,7 +254,7 @@ void hash_table_print(void **table);
 #define right_triangle_hypotenuse(a, b)     (sqrtf((a) * (a) + (b) * (b)))
 #define lerp(a, b, t)                       ((a) + ((b) - (a)) * (t))
 #define sig(a)                              (((a) == 0.0f) ? (0.0f) : (fabsf(a) / (a)))
-#define fequal(a, b)                        (fabs((a) - (b)) < FLT_EPSILON)
+#define fequal(a, b)                        (fabsf((a) - (b)) < FLT_EPSILON)
 
 #define randf()                             ((float)rand() / RAND_MAX)
 
@@ -277,12 +277,12 @@ typedef struct vec2f {
 
 #define vec2f_sum(v1, v2)                   vec2f_make(v1.x + v2.x, v1.y + v2.y)
 #define vec2f_difference(v1, v2)            vec2f_make(v1.x - v2.x, v1.y - v2.y) 
-#define vec2f_sum_constant(v1, c)           vec2f_make(v1.x + c, v1.y + c)
-#define vec2f_difference_constant(v1, c)    vec2f_make(v1.x - c, v1.y - c) 
+#define vec2f_sum_constant(v1, c)           vec2f_make(v1.x + (c), v1.y + (c))
+#define vec2f_difference_constant(v1, c)    vec2f_make(v1.x - (c), v1.y - (c)) 
 #define vec2f_dot(v1, v2)                   (v1.x * v2.x + v1.y * v2.y)
 #define vec2f_cross(v1, v2)                 (v1.x * v2.y - v1.y * v2.x)
-#define vec2f_multi_constant(v1, c)         vec2f_make(v1.x * c, v1.y * c)
-#define vec2f_divide_constant(v1, c)        vec2f_make(v1.x / c, v1.y / c)
+#define vec2f_multi_constant(v1, c)         vec2f_make(v1.x * (c), v1.y * (c))
+#define vec2f_divide_constant(v1, c)        vec2f_make(v1.x / (c), v1.y / (c))
 #define vec2f_magnitude(v1)                 right_triangle_hypotenuse(v1.x, v1.y)
 #define vec2f_distance(v1, v2)              right_triangle_hypotenuse(v1.x - v2.x, v1.y - v2.y)
 #define vec2f_negate(v1)                    vec2f_make(-v1.x, -v1.y)

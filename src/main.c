@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
                         state.mouse_input.left_hold = true;
                     }
                     else if (event.button.button == SDL_BUTTON_RIGHT) {
-
+                        state.mouse_input.right_hold = true;
                     }
                     break;
                 case SDL_MOUSEBUTTONUP:
@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
                         state.mouse_input.left_hold = false;
                     }
                     else if (event.button.button == SDL_BUTTON_RIGHT) {
-
+                        state.mouse_input.right_hold = false;
                     }
                     break;
                 default:
