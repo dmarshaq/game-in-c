@@ -1,7 +1,5 @@
 #include "plug.h"
 #include "SDL2/SDL_keycode.h"
-#include "SDL2/SDL_mouse.h"
-#include "SDL2/SDL_thread.h"
 #include "core.h"
 #include <math.h>
 #include <stdio.h>
@@ -752,15 +750,12 @@ float angle = 90.0f;
 
 s32 load_counter = 5;
 
-bool temp = false;
-
 /**
  * @Important: In game update loops the order of procedures is: Updating -> Drawing.
  * Where in updating all logic of the game loop is contained including inputs, sound and so on.
  * Drawing part is only responsible for putting pixels accrodingly with calculated data in "Updating" part.
  */
 void plug_update(Plug_State *state) {
-    
     // Get neccessary to draw resource: (Shaders, Fonts, Textures, etc.).
     Shader *quad_shader = hash_table_get(&state->shader_table, "quad", 4);
     Shader *grid_shader = hash_table_get(&state->shader_table, "grid", 4);
@@ -787,6 +782,12 @@ void plug_update(Plug_State *state) {
     shader_update_projection(quad_shader, &projection);
     shader_update_projection(grid_shader, &projection);
     shader_update_projection(line_shader, &projection);
+
+
+
+    // Testing "draw_buffer()".
+    
+
 
 
 
@@ -817,15 +818,10 @@ void plug_update(Plug_State *state) {
         }
     }
 
-    if (state->mouse_input.left_hold && !temp) {
+    if (state->mouse_input.left_unpressed) {
         Vec2f pos = camera_screen_to_world(state->mouse_input.position, &state->main_camera);
         spawn_box(pos, vec4f_make(randf(), randf(), randf(), 0.4f));
-
-        temp = true;
     } 
-    else if (!state->mouse_input.left_hold && temp) {
-        temp = false;
-    }
 
 
 
@@ -866,15 +862,15 @@ void plug_update(Plug_State *state) {
 
 
     // Grid quad drawing.
-    state->drawer.program = grid_shader;
-    draw_begin(&state->drawer);
+    // state->drawer.program = grid_shader;
+    // draw_begin(&state->drawer);
 
-    Vec2f p0, p1;
-    p0 = vec2f_make(-8.0f, -5.0f);
-    p1 = vec2f_make(8.0f, 5.0f);
-    draw_quad(p0, p1, vec4f_make(0.8f, 0.8f, 0.8f, 0.6f), NULL, p0, p1, NULL, 0.0f);
+    // Vec2f p0, p1;
+    // p0 = vec2f_make(-8.0f, -5.0f);
+    // p1 = vec2f_make(8.0f, 5.0f);
+    // draw_quad(p0, p1, vec4f_make(0.8f, 0.8f, 0.8f, 0.6f), NULL, p0, p1, NULL, 0.0f);
 
-    draw_end();
+    // draw_end();
 
 
 

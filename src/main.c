@@ -80,6 +80,13 @@ int main(int argc, char *argv[]) {
         t.delta_time = (float)(t.delta_time_milliseconds) / 1000.0f;
         t.accumilated_time = t.accumilated_time % t.update_step_time;
 
+
+        state.mouse_input.left_pressed = false;
+        state.mouse_input.left_unpressed = false;
+
+        state.mouse_input.right_pressed = false;
+        state.mouse_input.right_unpressed = false;
+
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
                 case SDL_QUIT:
@@ -94,29 +101,21 @@ int main(int argc, char *argv[]) {
                     break;
                 case SDL_MOUSEBUTTONDOWN:
                     if (event.button.button == SDL_BUTTON_LEFT) {
-                        if (!state.mouse_input.left_pressed && !state.mouse_input.left_hold) {
-                            state.mouse_input.left_pressed = true;
-                        }
-                        else {
-                            state.mouse_input.left_pressed = false;
-                        }
+                        state.mouse_input.left_pressed = true;
                         state.mouse_input.left_hold = true;
                     }
                     else if (event.button.button == SDL_BUTTON_RIGHT) {
+                        state.mouse_input.right_pressed = true;
                         state.mouse_input.right_hold = true;
                     }
                     break;
                 case SDL_MOUSEBUTTONUP:
                     if (event.button.button == SDL_BUTTON_LEFT) {
-                        if (!state.mouse_input.left_unpressed && state.mouse_input.left_hold) {
-                            state.mouse_input.left_unpressed = true;
-                        }
-                        else {
-                            state.mouse_input.left_unpressed = false;
-                        }
+                        state.mouse_input.left_unpressed = true;
                         state.mouse_input.left_hold = false;
                     }
                     else if (event.button.button == SDL_BUTTON_RIGHT) {
+                        state.mouse_input.right_unpressed = true;
                         state.mouse_input.right_hold = false;
                     }
                     break;

@@ -1313,37 +1313,31 @@ float add_texture_to_slots(Texture *texture) {
 }
 
 
-Quad_Drawer *active_drawer = NULL;
-
-void draw_begin(Quad_Drawer* drawer) {
-    active_drawer = drawer;
-}
-
-void draw_end() {
+void draw_buffer(Quad_Drawer *drawer, void *buffer, u32 size) {
     // Bind buffers, program, textures.
-    glUseProgram(active_drawer->program->id);
+    glUseProgram(drawer->program->id);
 
     for (u8 i = 0; i < 32; i++) {
         glActiveTexture(GL_TEXTURE0 + i);
         glBindTexture(GL_TEXTURE_2D, texture_ids[i]);
     }
 
-    glBindVertexArray(active_drawer->vao);
-    glBindBuffer(GL_ARRAY_BUFFER, active_drawer->vbo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, active_drawer->ebo);
+    glBindVertexArray(drawer->vao);
+    glBindBuffer(GL_ARRAY_BUFFER, drawer->vbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, drawer->ebo);
 
-    u32 batch_stride = MAX_QUADS_PER_BATCH * VERTICIES_PER_QUAD * active_drawer->program->vertex_stride;
+    u32 batch_stride = MAX_QUADS_PER_BATCH * VERTICIES_PER_QUAD * drawer->program->vertex_stride;
     // Spliting all data on equal batches, and processing each batch in each draw call.
-    u32 batches = array_list_length(&verticies) / batch_stride;
+    u32 batches = size / sizeof(float) / batch_stride;
     for (u32 i = 0; i < batches; i++) {
-        glBufferSubData(GL_ARRAY_BUFFER, 0, batch_stride * sizeof(float), verticies + (i * batch_stride));
+        glBufferSubData(GL_ARRAY_BUFFER, 0, batch_stride * sizeof(float), buffer + (i * batch_stride));
         glDrawElements(GL_TRIANGLES, array_list_length(&quad_indicies), GL_UNSIGNED_INT, 0);
     }
     
     // Data that didn't group into full batch, rendered in last draw call.
-    u32 float_attributes_left = (array_list_length(&verticies) - batch_stride * batches);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, float_attributes_left * sizeof(float), verticies + (batches * batch_stride));
-    glDrawElements(GL_TRIANGLES, float_attributes_left / active_drawer->program->vertex_stride / VERTICIES_PER_QUAD * INDICIES_PER_QUAD, GL_UNSIGNED_INT, 0);
+    u32 float_attributes_left = (size / sizeof(float) - batch_stride * batches);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, float_attributes_left * sizeof(float), buffer + (batches * batch_stride));
+    glDrawElements(GL_TRIANGLES, float_attributes_left / drawer->program->vertex_stride / VERTICIES_PER_QUAD * INDICIES_PER_QUAD, GL_UNSIGNED_INT, 0);
 
     // Unbinding of buffers after use.
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -1358,6 +1352,56 @@ void draw_end() {
     texture_ids_filled_length = 0;
 
     glUseProgram(0);
+}
+
+
+Quad_Drawer *active_drawer = NULL;
+
+void draw_begin(Quad_Drawer* drawer) {
+    active_drawer = drawer;
+}
+
+void draw_end() {
+    // // Bind buffers, program, textures.
+    // glUseProgram(active_drawer->program->id);
+
+    // for (u8 i = 0; i < 32; i++) {
+    //     glActiveTexture(GL_TEXTURE0 + i);
+    //     glBindTexture(GL_TEXTURE_2D, texture_ids[i]);
+    // }
+
+    // glBindVertexArray(active_drawer->vao);
+    // glBindBuffer(GL_ARRAY_BUFFER, active_drawer->vbo);
+    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, active_drawer->ebo);
+
+    // u32 batch_stride = MAX_QUADS_PER_BATCH * VERTICIES_PER_QUAD * active_drawer->program->vertex_stride;
+    // // Spliting all data on equal batches, and processing each batch in each draw call.
+    // u32 batches = array_list_length(&verticies) / batch_stride;
+    // for (u32 i = 0; i < batches; i++) {
+    //     glBufferSubData(GL_ARRAY_BUFFER, 0, batch_stride * sizeof(float), verticies + (i * batch_stride));
+    //     glDrawElements(GL_TRIANGLES, array_list_length(&quad_indicies), GL_UNSIGNED_INT, 0);
+    // }
+    // 
+    // // Data that didn't group into full batch, rendered in last draw call.
+    // u32 float_attributes_left = (array_list_length(&verticies) - batch_stride * batches);
+    // glBufferSubData(GL_ARRAY_BUFFER, 0, float_attributes_left * sizeof(float), verticies + (batches * batch_stride));
+    // glDrawElements(GL_TRIANGLES, float_attributes_left / active_drawer->program->vertex_stride / VERTICIES_PER_QUAD * INDICIES_PER_QUAD, GL_UNSIGNED_INT, 0);
+
+    // // Unbinding of buffers after use.
+    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    // glBindBuffer(GL_ARRAY_BUFFER, 0);
+    // glBindVertexArray(0);
+    // 
+    // // Unbind texture ids.
+    // for (u8 i = 0; i < 32; i++) {
+    //     glActiveTexture(GL_TEXTURE0 + i);
+    //     glBindTexture(GL_TEXTURE_2D, 0);
+    // }
+    // texture_ids_filled_length = 0;
+
+    // glUseProgram(0);
+
+    draw_buffer(active_drawer, verticies, array_list_length(&verticies) * sizeof(float));
 
     // Clean up.
     active_drawer = NULL;

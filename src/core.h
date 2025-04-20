@@ -629,6 +629,13 @@ void drawer_free(Quad_Drawer *drawer);
  */
 float add_texture_to_slots(Texture *texture);
 
+
+/**
+ * Draws quad data to the screen that is stored in the buffer.
+ * For example: "draw_end()" uses this function to draw verticies that are stored inside verticies array.
+ */
+
+void draw_buffer(Quad_Drawer *drawer, void *buffer, u32 size);
 /**
  * @Incomplete: Write description.
  */
@@ -638,6 +645,7 @@ void draw_begin(Quad_Drawer *drawer);
  * @Incomplete: Write description.
  */
 void draw_end();
+
 
 /**
  * Simply places specified data directly into the verticies array.
