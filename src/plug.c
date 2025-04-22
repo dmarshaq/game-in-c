@@ -142,7 +142,7 @@ void phys_apply_angular_acceleration(Body_2D *body, float acceleration) {
 void phys_init() {
     // Setting physics variables.
     global_state->impulses = array_list_make(Impulse, MAX_IMPULSES, &std_allocator); // @Leak.
-    global_state->phys_boxes = array_list_make(Phys_Box, MAX_PHYS_BOXES, &std_allocator); // @Leak.
+    global_state->phys_boxes = array_list_make(Phys_Box *, MAX_PHYS_BOXES, &std_allocator); // @Leak.
 
 }
 
@@ -233,7 +233,6 @@ void phys_sat_find_min_depth_normal(OBB *obb1, OBB *obb2, float *depth, Vec2f *n
         }
     }
 
-    Vec2f dir = vec2f_normalize(vec2f_difference(obb2->center, obb1->center));
 
     // Flip normal if it's not looking in direction of collosion.
     if (vec2f_dot(normals[0], vec2f_normalize(vec2f_difference(obb2->center, obb1->center))) < 0.0f) {
@@ -495,41 +494,150 @@ u32 phys_find_contanct_points_obb(OBB* obb1, OBB* obb2, Vec2f *points) {
 
 
 
+
+
+
+
+#define MAX_BOXES 32
+
+
+void spawn_player(Vec2f position, Vec4f color) {
+    global_state->player = (Player) {
+        .p_box = (Phys_Box) {
+                .bound_box = obb_make(position, 1.0f, 1.0f, 0.0f),
+                .body = body_obb_make(10.0f, position, 1.0f, 1.8f, 0.4f, 0.6f, 0.4f),
+
+                .dynamic = true,
+                .rotatable = false,
+                .destructible = false,
+                },
+        .color = color,
+        .speed = 0.0f,
+    };
+
+    array_list_append(&global_state->phys_boxes, &global_state->player.p_box);
+}
+
 void spawn_box(Vec2f position, Vec4f color) {
+
+    u32 free_index = 0;
+
+    for (; free_index < MAX_BOXES; free_index++) {
+        if (global_state->boxes[free_index].destroyed) {
+            break;
+        }   
+    }
+
+    if (free_index == MAX_BOXES) {
+        printf_err("Max boxes limit have been reached, cannot spawn more boxes.\n");
+        return;
+    }
+
     float width = 0.6f * randf() + 0.8f;
     float height = 0.6f * randf() + 0.8f;
-    array_list_append(&global_state->phys_boxes, ((Phys_Box) {
+    
+
+    global_state->boxes[free_index] = (Box) {
+        .p_box = (Phys_Box) {
                 .bound_box = obb_make(position, width, height, 0.0f),
                 .body = body_obb_make(30.0f, position, width, height, 0.4f, 0.6f, 0.4f),
-                .color = color,
-                .is_static = false
-            }));
+
+                .dynamic = true,
+                .rotatable = true,
+                .destructible = false,
+            },
+        .color = color,
+        .destroyed = false,
+    };
+
+    array_list_append(&global_state->phys_boxes, &global_state->boxes[free_index].p_box);
 }
 
 void spawn_rect(Vec2f p0, Vec2f p1, Vec4f color) {
-    array_list_append(&global_state->phys_boxes, ((Phys_Box) {
+
+    u32 free_index = 0;
+
+    for (; free_index < MAX_BOXES; free_index++) {
+        if (global_state->boxes[free_index].destroyed) {
+            break;
+        }   
+    }
+
+    if (free_index == MAX_BOXES) {
+        printf_err("Max boxes limit have been reached, cannot spawn more boxes.\n");
+        return;
+    }
+
+    global_state->boxes[free_index] = (Box) {
+        .p_box = (Phys_Box) {
                 .bound_box = obb_make(vec2f_sum(p0, vec2f_divide_constant(vec2f_difference(p1, p0), 2)), p1.x - p0.x, p1.y - p0.y, 0.0f),
                 .body = body_obb_make(0.0f, vec2f_sum(p0, vec2f_divide_constant(vec2f_difference(p1, p0), 2)), p1.x - p0.x, p1.y - p0.y, 0.4f, 0.6f, 0.4f),
-                .color = color,
-                .is_static = true,
-            }));
+
+                .dynamic = false,
+                .destructible = false,
+                .rotatable = true,
+            },
+        .color = color,
+        .destroyed = false,
+    };
+
+    array_list_append(&global_state->phys_boxes, &global_state->boxes[free_index].p_box);
 }
 
 
 void spawn_obstacle(Vec2f c, float w, float h, Vec4f color, float angle) {
-    array_list_append(&global_state->phys_boxes, ((Phys_Box) {
+
+    u32 free_index = 0;
+
+    for (; free_index < MAX_BOXES; free_index++) {
+        if (global_state->boxes[free_index].destroyed) {
+            break;
+        }   
+    }
+
+    if (free_index == MAX_BOXES) {
+        printf_err("Max boxes limit have been reached, cannot spawn more boxes.\n");
+        return;
+    }
+
+    global_state->boxes[free_index] = (Box) {
+        .p_box = (Phys_Box) {
                 .bound_box = obb_make(c, w, h, angle),
                 .body = body_obb_make(0.0f, c, w, h, 0.4f, 0.6f, 0.4f),
-                .color = color,
-                .is_static = true,
-            }));
+
+                .dynamic = false,
+                .destructible = false,
+                .rotatable = true,
+            },
+        .color = color,
+        .destroyed = false,
+    };
+
+    array_list_append(&global_state->phys_boxes, &global_state->boxes[free_index].p_box);
 }
+
+
+
+
+void update_boxes() {
+    for (u32 i = 0; i < MAX_BOXES; i++) {
+        if (global_state->boxes[i].destroyed) {
+            continue;
+        }
+        if (global_state->boxes[i].p_box.bound_box.center.y < -15.0f) {
+            printf_ok("Box nullified / destroyed.\n");
+            global_state->boxes[i].p_box.bound_box.dimensions.x = 0.0f;
+            global_state->boxes[i].destroyed = true;
+        }
+    }
+}
+
 
 #define PHYS_ITERATIONS 8
 #define PHYS_ITERATION_STEP_TIME (1.0f / PHYS_ITERATIONS)
 
 u32 grabbed_index = UINT_MAX;
-void update_boxes() {
+void phys_update() {
     u32 length = array_list_length(&global_state->phys_boxes);
 
     float depth;
@@ -549,17 +657,17 @@ void update_boxes() {
     line_draw_begin(&global_state->line_drawer);
     for (u32 it = 0; it < PHYS_ITERATIONS; it++) {
         for (u32 i = 0; i < length; i++) {
-            box1 = &global_state->phys_boxes[i];
+            box1 = global_state->phys_boxes[i];
 
-            if (box1->is_static) {
-                continue;
-            }
-
-
-            if (box1->body.mass_center.y < -15.0f) {
+            if (fequal(box1->bound_box.dimensions.x, 0.0f)) {
+                printf_ok("Phys Box removed.\n");
                 array_list_unordered_remove(&global_state->phys_boxes, i);
                 length = array_list_length(&global_state->phys_boxes);
                 i--;
+                continue;
+            }
+
+            if (!box1->dynamic) {
                 continue;
             }
 
@@ -567,8 +675,7 @@ void update_boxes() {
             // Applying gravity.
             box1->body.velocity = vec2f_sum(box1->body.velocity, vec2f_multi_constant(gravity_acceleration, global_state->t->delta_time * PHYS_ITERATION_STEP_TIME ));
 
-
-
+            
             // Applying "mouse force".
             if (!fequal(mouse_g_constant, 0.0f) && (grabbed_index == i || (vec2f_magnitude(vec2f_difference(mouse_w_pos, box1->bound_box.center)) < 1.0f && grabbed_index == UINT_MAX))) {
                 mouse_force = vec2f_multi_constant(vec2f_normalize(vec2f_difference(mouse_w_pos, box1->bound_box.center)), box1->body.mass * mouse_g_constant * (vec2f_magnitude(vec2f_difference(mouse_w_pos, box1->bound_box.center)) + 0.05f));
@@ -594,27 +701,35 @@ void update_boxes() {
         u32 contacts_count;
         // Collision.
         for (u32 i = 0; i < length; i++) {
-            box1 = &global_state->phys_boxes[i];
+            box1 = global_state->phys_boxes[i];
             for (u32 j = i + 1; j < length; j++) {
-                box2 = &global_state->phys_boxes[j];
+                box2 = global_state->phys_boxes[j];
                 if (phys_sat_check_collision_obb(&box1->bound_box, &box2->bound_box)) {
                     phys_sat_find_min_depth_normal(&box1->bound_box, &box2->bound_box, &depth, &normal);
-                    if (box1->is_static && !box2->is_static) {
-                        phys_resolve_static_obb_collision(&box2->bound_box, depth, normal);
-                    }
-                    else if (box2->is_static && !box1->is_static) {
+                    if (box1->dynamic && !box2->dynamic) {
                         phys_resolve_static_obb_collision(&box1->bound_box, depth, vec2f_negate(normal));
+                    }
+                    else if (box2->dynamic && !box1->dynamic) {
+                        phys_resolve_static_obb_collision(&box2->bound_box, depth, normal);
                     }
                     else {
                         phys_resolve_dynamic_obb_collision(&box1->bound_box, &box2->bound_box, depth, normal);
                     }
                     box1->body.mass_center = box1->bound_box.center;
                     box2->body.mass_center = box2->bound_box.center;
-                    contacts_count = phys_find_contanct_points_obb(&box1->bound_box, &box2->bound_box, contacts);
-
-                    phys_resolve_dynamic_body_collision_with_friction(&box1->body, &box2->body, normal, contacts, contacts_count);
-                    // phys_resolve_dynamic_body_collision(&box1->body, &box2->body, normal, contacts, contacts_count);
-                    // phys_resolve_dynamic_body_collision_basic(&box1->body, &box2->body, normal);
+                    
+                    /**
+                     * @Incomplete: This is a clear bug, since if one obj is rotatable and other obj is not, they are both resolved without rotation physics.
+                     * Where in reality only the box that doesn't rotate should be solved this way.
+                     */
+                    if (box1->rotatable && box2->rotatable) {
+                        contacts_count = phys_find_contanct_points_obb(&box1->bound_box, &box2->bound_box, contacts);
+                        phys_resolve_dynamic_body_collision_with_friction(&box1->body, &box2->body, normal, contacts, contacts_count);
+                        // phys_resolve_dynamic_body_collision(&box1->body, &box2->body, normal, contacts, contacts_count);
+                    }
+                    else {
+                        phys_resolve_dynamic_body_collision_basic(&box1->body, &box2->body, normal);
+                    }
                 }
             }
         }
@@ -623,18 +738,21 @@ void update_boxes() {
 }
 
 void draw_boxes() {
-    u32 length = array_list_length(&global_state->phys_boxes);
-    for (u32 i = 0; i < length; i++) {
-        draw_quad(obb_p0(&global_state->phys_boxes[i].bound_box), obb_p1(&global_state->phys_boxes[i].bound_box), global_state->phys_boxes[i].color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, global_state->phys_boxes[i].bound_box.rot);
+    for (u32 i = 0; i < MAX_BOXES; i++) {
+        if (!global_state->boxes[i].destroyed)
+            draw_quad(obb_p0(&global_state->boxes[i].p_box.bound_box), obb_p1(&global_state->boxes[i].p_box.bound_box), global_state->boxes[i].color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, global_state->boxes[i].p_box.bound_box.rot);
     }
 }
 
 void draw_boxes_outline() {
-    u32 length = array_list_length(&global_state->phys_boxes);
-    for (u32 i = 0; i < length; i++) {
-        draw_quad_outline(obb_p0(&global_state->phys_boxes[i].bound_box), obb_p1(&global_state->phys_boxes[i].bound_box), vec4f_make(1.0f, 1.0f, 1.0f, 0.6f), global_state->phys_boxes[i].bound_box.rot);
+    for (u32 i = 0; i < MAX_BOXES; i++) {
+        if (!global_state->boxes[i].destroyed)
+            draw_quad_outline(obb_p0(&global_state->boxes[i].p_box.bound_box), obb_p1(&global_state->boxes[i].p_box.bound_box), vec4f_make(1.0f, 1.0f, 1.0f, 0.6f), global_state->boxes[i].p_box.bound_box.rot);
     }
 }
+
+
+
 
 
 void plug_init(Plug_State *state) {
@@ -649,12 +767,17 @@ void plug_init(Plug_State *state) {
     state->font_table = hash_table_make(Font_Baked, 8, &std_allocator);
     
     phys_init();
+
+    global_state->boxes = malloc(MAX_BOXES * sizeof(Box));
+    if (global_state->boxes == NULL)
+        printf_err("Couldn't allocate boxes array.\n");
     
-    state->player = (Player) {
-        .bound_box = obb_make(VEC2F_ORIGIN, 1.0f, 1.0f, 0.0f),
-        .body = body_obb_make(10.0f, VEC2F_ORIGIN, 1.0f, 1.0f, 0.4f, 0.6f, 0.4f),
-        .speed = 0.0f,
-    };
+    // Small init for other algorithms to work properly.
+    for (u32 i = 0; i < MAX_BOXES; i++) {
+        global_state->boxes[i].destroyed = true;
+    }
+    
+    
 
 
     spawn_rect(vec2f_make(-8.0f, -5.0f), vec2f_make(8.0f, -6.0f), vec4f_make(randf(), randf(), randf(), 0.4f));
@@ -838,7 +961,7 @@ void plug_update(Plug_State *state) {
     // update_player(&state->player);
     
     // Lerp camera.
-    state->main_camera.center = vec2f_lerp(state->main_camera.center, state->player.bound_box.center, 0.025f);
+    state->main_camera.center = vec2f_lerp(state->main_camera.center, state->player.p_box.bound_box.center, 0.025f);
 
 
 
@@ -846,8 +969,11 @@ void plug_update(Plug_State *state) {
     angle += PI / 4 * state->t->delta_time;
     test_rot = vec2f_rotate(test_rot, PI/2 * state->t->delta_time);
 
-    // Test obb.
+
+
     update_boxes();
+
+    phys_update();
 
     /**
      * -----------------------------------
@@ -971,46 +1097,46 @@ void update_player(Player *p) {
     vel.y *= p->speed;
 
 
-    p->body.velocity = vec2f_lerp(p->body.velocity, vel, 50.0f * global_state->t->delta_time);
+    p->p_box.body.velocity = vec2f_lerp(p->p_box.body.velocity, vel, 50.0f * global_state->t->delta_time);
  
 
     // Applying calculated velocities. For both AABB and Rigid Body 2D.
-    p->bound_box.center = vec2f_sum(p->bound_box.center, vec2f_multi_constant(p->body.velocity, global_state->t->delta_time));
-    p->body.mass_center = p->bound_box.center;
+    p->p_box.bound_box.center = vec2f_sum(p->p_box.bound_box.center, vec2f_multi_constant(p->p_box.body.velocity, global_state->t->delta_time));
+    p->p_box.body.mass_center = p->p_box.bound_box.center;
 
 
     
     // Collision.
-    u32 length = array_list_length(&global_state->phys_boxes);
+    // u32 length = array_list_length(&global_state->phys_boxes);
 
-    float depth;
-    Vec2f normal;
+    // float depth;
+    // Vec2f normal;
 
-    Vec2f contacts[2];
-    u32 contacts_count;
-    for (u32 i = 0; i < length; i++) {
-        if (phys_sat_check_collision_obb(&p->bound_box, &global_state->phys_boxes[i].bound_box)) {
-            phys_sat_find_min_depth_normal(&p->bound_box, &global_state->phys_boxes[i].bound_box, &depth, &normal);
-            if (global_state->phys_boxes[i].is_static) {
-                phys_resolve_static_obb_collision(&p->bound_box, depth, normal);
-            }
-            else {
-                phys_resolve_dynamic_obb_collision(&p->bound_box, &global_state->phys_boxes[i].bound_box, depth, normal);
-            }
-            contacts_count = phys_find_contanct_points_obb(&p->bound_box, &global_state->phys_boxes[i].bound_box, contacts);
+    // Vec2f contacts[2];
+    // u32 contacts_count;
+    // for (u32 i = 0; i < length; i++) {
+    //     if (phys_sat_check_collision_obb(&p->bound_box, &global_state->phys_boxes[i].bound_box)) {
+    //         phys_sat_find_min_depth_normal(&p->bound_box, &global_state->phys_boxes[i].bound_box, &depth, &normal);
+    //         if (global_state->phys_boxes[i].is_static) {
+    //             phys_resolve_static_obb_collision(&p->bound_box, depth, normal);
+    //         }
+    //         else {
+    //             phys_resolve_dynamic_obb_collision(&p->bound_box, &global_state->phys_boxes[i].bound_box, depth, normal);
+    //         }
+    //         contacts_count = phys_find_contanct_points_obb(&p->bound_box, &global_state->phys_boxes[i].bound_box, contacts);
 
-            phys_resolve_dynamic_body_collision_with_friction(&p->body, &global_state->phys_boxes[i].body, normal, contacts, contacts_count);
-            // phys_resolve_dynamic_body_collision(&p->body, &global_state->phys_boxes[i].body, normal, contacts, contacts_count);
-            // phys_resolve_dynamic_body_collision_basic(&p->body, &global_state->phys_boxes[i].body, normal);
-        }
-    }
+    //         phys_resolve_dynamic_body_collision_with_friction(&p->body, &global_state->phys_boxes[i].body, normal, contacts, contacts_count);
+    //         // phys_resolve_dynamic_body_collision(&p->body, &global_state->phys_boxes[i].body, normal, contacts, contacts_count);
+    //         // phys_resolve_dynamic_body_collision_basic(&p->body, &global_state->phys_boxes[i].body, normal);
+    //     }
+    // }
 
     
 }
 
 void draw_player(Player *p) {
     // Drawing player as a quad.
-   draw_quad(obb_p0(&p->bound_box), obb_p1(&p->bound_box), VEC4F_GREEN, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f);
+   draw_quad(obb_p0(&p->p_box.bound_box), obb_p1(&p->p_box.bound_box), p->color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, p->p_box.bound_box.rot);
 }
 
 
