@@ -10,6 +10,9 @@ typedef struct impulse {
 } Impulse;
 
 
+/**
+ * Some of these flags in theory can be moved to rigid body 2d to abstact shape from body when resolving collisions.
+ */
 typedef struct phys_box {
     OBB bound_box;
     Body_2D body;
@@ -17,6 +20,8 @@ typedef struct phys_box {
     bool dynamic;
     bool rotatable;
     bool destructible;
+    bool gravitable;
+    bool grounded;
 
 } Phys_Box;
 

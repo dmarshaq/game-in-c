@@ -275,6 +275,8 @@ void phys_resolve_dynamic_body_collision_basic(Body_2D *body1, Body_2D *body2, V
     phys_apply_force(body2, vec2f_multi_constant(normal, j));
 }
 
+
+
 void phys_resolve_dynamic_body_collision(Body_2D *body1, Body_2D *body2, Vec2f normal, Vec2f *contacts, u32 contacts_count) {
     // Calculated variables, used in both loops.
     Vec2f impulses[2] = { VEC2F_ORIGIN, VEC2F_ORIGIN };
@@ -323,6 +325,233 @@ void phys_resolve_dynamic_body_collision(Body_2D *body1, Body_2D *body2, Vec2f n
     }
 }
 
+typedef struct phys_collision_calc_vars {
+    // Calculated variables, used in both loops.
+    Vec2f impulse;
+    Vec2f r1;
+    Vec2f r2;
+    
+    // Calculation variables.
+    float e;
+    float sf;
+    float df;
+
+    Vec2f angular_lin_velocity1;
+    Vec2f angular_lin_velocity2;
+    Vec2f relative_velocity;
+    float r1_perp_dot_n; 
+    float r2_perp_dot_n;
+    float contact_velocity_mag;
+    float j[2];
+    float jt;
+
+    // Result variables.
+    Vec2f res_velocity1;
+    Vec2f res_velocity2;
+    float res_angular_acceleration1;
+    float res_angular_acceleration2;
+
+} Phys_Collision_Calc_Vars;
+
+Phys_Collision_Calc_Vars p_calc_vars;
+
+void phys_resolve_phys_box_collision_with_rotation_friction(Phys_Box *box1, Phys_Box *box2, Vec2f normal, Vec2f *contacts, u32 contacts_count) {
+    // Setting up variables that can be calculated without contact points.
+    p_calc_vars.e  = fminf(box1->body.restitution, box2->body.restitution);
+    p_calc_vars.sf = (box1->body.static_friction + box2->body.static_friction) / 2;
+    p_calc_vars.df = (box1->body.dynamic_friction + box2->body.dynamic_friction) / 2;
+
+    // Init resulat vars to default values.
+    p_calc_vars.res_velocity1 = VEC2F_ORIGIN;
+    p_calc_vars.res_velocity2 = VEC2F_ORIGIN;
+    p_calc_vars.res_angular_acceleration1 = 0.0f;
+    p_calc_vars.res_angular_acceleration2 = 0.0f;
+
+
+    p_calc_vars.r1 = VEC2F_ORIGIN;
+    p_calc_vars.r2 = VEC2F_ORIGIN;
+    p_calc_vars.impulse = VEC2F_ORIGIN;
+
+    p_calc_vars.j[0] = 0.0f;
+    p_calc_vars.j[1] = 0.0f;
+
+
+
+    // Calculating impulses and vectors to contact points, for each contact point.
+    for (u32 i = 0; i < contacts_count; i++) {
+        // r1_array[i] = vec2f_difference(contacts[i], body1->mass_center);
+        // r2_array[i] = vec2f_difference(contacts[i], body2->mass_center);
+        p_calc_vars.r1 = vec2f_difference(contacts[i], box1->body.mass_center);
+        p_calc_vars.r2 = vec2f_difference(contacts[i], box2->body.mass_center);
+
+        // angular_lin_velocity1 = vec2f_multi_constant(vec2f_make(-r1_array[i].y, r1_array[i].x), body1->angular_velocity);
+        // angular_lin_velocity2 = vec2f_multi_constant(vec2f_make(-r2_array[i].y, r2_array[i].x), body2->angular_velocity);
+        p_calc_vars.angular_lin_velocity1 = vec2f_multi_constant(vec2f_make(-p_calc_vars.r1.y, p_calc_vars.r1.x), box1->body.angular_velocity);
+        p_calc_vars.angular_lin_velocity2 = vec2f_multi_constant(vec2f_make(-p_calc_vars.r2.y, p_calc_vars.r2.x), box2->body.angular_velocity);
+
+        // relative_velocity = vec2f_difference(vec2f_sum(body2->velocity, angular_lin_velocity2), vec2f_sum(body1->velocity, angular_lin_velocity1));
+        p_calc_vars.relative_velocity = vec2f_difference(vec2f_sum(box2->body.velocity, p_calc_vars.angular_lin_velocity2), vec2f_sum(box1->body.velocity, p_calc_vars.angular_lin_velocity1));
+
+        // contact_velocity_mag = vec2f_dot(relative_velocity, normal);
+        p_calc_vars.contact_velocity_mag = vec2f_dot(p_calc_vars.relative_velocity, normal);
+
+
+        // if (contact_velocity_mag > 0.0f) {
+        //     continue;
+        // }
+        if (p_calc_vars.contact_velocity_mag > 0.0f) {
+            // Very dangerous here cause we technically have zero j / force applied when if statement triggered.
+            continue;
+        }
+
+        // r1_perp_dot_n = vec2f_cross(r1_array[i], normal);
+        // r2_perp_dot_n = vec2f_cross(r2_array[i], normal);
+        p_calc_vars.r1_perp_dot_n = vec2f_cross(p_calc_vars.r1, normal);
+        p_calc_vars.r2_perp_dot_n = vec2f_cross(p_calc_vars.r2, normal);
+
+        // j = -(1.0f + e) * contact_velocity_mag;
+        // j /= body1->inv_mass + body2->inv_mass + (r1_perp_dot_n * r1_perp_dot_n) * body1->inv_inertia + (r2_perp_dot_n * r2_perp_dot_n) * body2->inv_inertia;
+        // j /= (float)contacts_count;
+        p_calc_vars.j[i] = -(1.0f + p_calc_vars.e) * p_calc_vars.contact_velocity_mag;
+        p_calc_vars.j[i] /= box1->body.inv_mass + box2->body.inv_mass + (p_calc_vars.r1_perp_dot_n * p_calc_vars.r1_perp_dot_n) * box1->body.inv_inertia + (p_calc_vars.r2_perp_dot_n * p_calc_vars.r2_perp_dot_n) * box2->body.inv_inertia;
+        p_calc_vars.j[i] /= (float)contacts_count;
+
+
+
+        // j_array[i] = j;
+
+        // impulses[i] = vec2f_multi_constant(normal, j);
+        p_calc_vars.impulse = vec2f_multi_constant(normal, p_calc_vars.j[i]);
+
+        p_calc_vars.res_velocity1 = vec2f_sum(p_calc_vars.res_velocity1, vec2f_multi_constant(vec2f_negate(p_calc_vars.impulse), box1->body.inv_mass));
+        p_calc_vars.res_angular_acceleration1 += -vec2f_cross(p_calc_vars.r1, p_calc_vars.impulse) * box1->body.inv_inertia;
+
+        p_calc_vars.res_velocity2 = vec2f_sum(p_calc_vars.res_velocity2, vec2f_multi_constant(p_calc_vars.impulse, box2->body.inv_mass));
+        p_calc_vars.res_angular_acceleration2 += vec2f_cross(p_calc_vars.r2, p_calc_vars.impulse) * box2->body.inv_inertia;
+    }
+
+    box1->body.velocity = vec2f_sum(box1->body.velocity, p_calc_vars.res_velocity1);
+    if (box1->rotatable)
+        box1->body.angular_velocity += p_calc_vars.res_angular_acceleration1;
+
+    box2->body.velocity = vec2f_sum(box2->body.velocity, p_calc_vars.res_velocity2);
+    if (box2->rotatable)
+        box2->body.angular_velocity += p_calc_vars.res_angular_acceleration2;
+
+
+
+    p_calc_vars.res_velocity1 = VEC2F_ORIGIN;
+    p_calc_vars.res_velocity2 = VEC2F_ORIGIN;
+    p_calc_vars.res_angular_acceleration1 = 0.0f;
+    p_calc_vars.res_angular_acceleration2 = 0.0f;
+
+
+    p_calc_vars.r1 = VEC2F_ORIGIN;
+    p_calc_vars.r2 = VEC2F_ORIGIN;
+    p_calc_vars.impulse = VEC2F_ORIGIN;
+
+
+    // Friction.
+    for (u32 i = 0; i < contacts_count; i++) {
+        // r1_array[i] = vec2f_difference(contacts[i], body1->mass_center);
+        // r2_array[i] = vec2f_difference(contacts[i], body2->mass_center);
+        p_calc_vars.r1 = vec2f_difference(contacts[i], box1->body.mass_center);
+        p_calc_vars.r2 = vec2f_difference(contacts[i], box2->body.mass_center);
+
+        // angular_lin_velocity1 = vec2f_multi_constant(vec2f_make(-r1_array[i].y, r1_array[i].x), body1->angular_velocity);
+        // angular_lin_velocity2 = vec2f_multi_constant(vec2f_make(-r2_array[i].y, r2_array[i].x), body2->angular_velocity);
+        p_calc_vars.angular_lin_velocity1 = vec2f_multi_constant(vec2f_make(-p_calc_vars.r1.y, p_calc_vars.r1.x), box1->body.angular_velocity);
+        p_calc_vars.angular_lin_velocity2 = vec2f_multi_constant(vec2f_make(-p_calc_vars.r2.y, p_calc_vars.r2.x), box2->body.angular_velocity);
+
+        // relative_velocity = vec2f_difference(vec2f_sum(body2->velocity, angular_lin_velocity2), vec2f_sum(body1->velocity, angular_lin_velocity1));
+        p_calc_vars.relative_velocity = vec2f_difference(vec2f_sum(box2->body.velocity, p_calc_vars.angular_lin_velocity2), vec2f_sum(box1->body.velocity, p_calc_vars.angular_lin_velocity1));
+
+        // Vec2f tanget = vec2f_difference(relative_velocity, vec2f_multi_constant(normal, vec2f_dot(relative_velocity, normal)));
+        Vec2f tanget = vec2f_difference(p_calc_vars.relative_velocity, vec2f_multi_constant(normal, vec2f_dot(p_calc_vars.relative_velocity, normal)));
+
+        
+        if (fequal(tanget.x, 0.0f) && fequal(tanget.y, 0.0f)) {
+            continue;
+        }
+
+        tanget = vec2f_normalize(tanget);
+
+        // r1_perp_dot_n = vec2f_cross(r1_array[i], tanget);
+        // r2_perp_dot_n = vec2f_cross(r2_array[i], tanget);
+        p_calc_vars.r1_perp_dot_n = vec2f_cross(p_calc_vars.r1, tanget);
+        p_calc_vars.r2_perp_dot_n = vec2f_cross(p_calc_vars.r2, tanget);
+
+        // jt = -vec2f_dot(relative_velocity, tanget);
+        // jt /= body1->inv_mass + body2->inv_mass + (r1_perp_dot_n * r1_perp_dot_n) * body1->inv_inertia + (r2_perp_dot_n * r2_perp_dot_n) * body2->inv_inertia;
+        // jt /= (float)contacts_count;
+
+        p_calc_vars.jt = -vec2f_dot(p_calc_vars.relative_velocity, tanget);
+        p_calc_vars.jt /= box1->body.inv_mass + box2->body.inv_mass + (p_calc_vars.r1_perp_dot_n * p_calc_vars.r1_perp_dot_n) * box1->body.inv_inertia + (p_calc_vars.r2_perp_dot_n * p_calc_vars.r2_perp_dot_n) * box2->body.inv_inertia;
+        p_calc_vars.jt /= (float)contacts_count;
+
+
+        // @Temporary: Calculating new j, maybe its wrong. @Todo: Fix it.
+        // p_calc_vars.contact_velocity_mag = vec2f_dot(p_calc_vars.relative_velocity, normal);
+
+        // if (p_calc_vars.contact_velocity_mag > 0.0f) {
+        //     p_calc_vars.j = 0.0f;
+        // } else {
+        //     p_calc_vars.j = -(1.0f + p_calc_vars.e) * p_calc_vars.contact_velocity_mag;
+        //     p_calc_vars.j /= box1->body.inv_mass + box2->body.inv_mass + (p_calc_vars.r1_perp_dot_n * p_calc_vars.r1_perp_dot_n) * box1->body.inv_inertia + (p_calc_vars.r2_perp_dot_n * p_calc_vars.r2_perp_dot_n) * box2->body.inv_inertia;
+        //     p_calc_vars.j /= (float)contacts_count;
+        // }
+
+    
+
+        // Collumbs law.
+        if (fabsf(p_calc_vars.jt) <= p_calc_vars.j[i] * p_calc_vars.sf) {
+            // friction_impulses[i] = vec2f_multi_constant(tanget, p_calc_vars.jt);
+            p_calc_vars.impulse = vec2f_multi_constant(tanget, p_calc_vars.jt);
+        }
+        else {
+            // friction_impulses[i] = vec2f_multi_constant(tanget, -j_array[i] * p_calc_vars.df);
+            p_calc_vars.impulse = vec2f_multi_constant(tanget, -p_calc_vars.j[i] * p_calc_vars.df);
+        }
+
+        p_calc_vars.res_velocity1 = vec2f_sum(p_calc_vars.res_velocity1, vec2f_multi_constant(vec2f_negate(p_calc_vars.impulse), box1->body.inv_mass));
+        p_calc_vars.res_angular_acceleration1 += -vec2f_cross(p_calc_vars.r1, p_calc_vars.impulse) * box1->body.inv_inertia;
+
+        p_calc_vars.res_velocity2 = vec2f_sum(p_calc_vars.res_velocity2, vec2f_multi_constant(p_calc_vars.impulse, box2->body.inv_mass));
+        p_calc_vars.res_angular_acceleration2 += vec2f_cross(p_calc_vars.r2, p_calc_vars.impulse) * box2->body.inv_inertia;
+    }
+
+
+    box1->body.velocity = vec2f_sum(box1->body.velocity, p_calc_vars.res_velocity1);
+    if (box1->rotatable)
+        box1->body.angular_velocity += p_calc_vars.res_angular_acceleration1;
+
+    box2->body.velocity = vec2f_sum(box2->body.velocity, p_calc_vars.res_velocity2);
+    if (box2->rotatable)
+        box2->body.angular_velocity += p_calc_vars.res_angular_acceleration2;
+
+    // // For each contact point applying friction impulse and angular acceleration.
+    // for (u32 i = 0; i < contacts_count; i++) {
+    //     phys_apply_force(body1, vec2f_negate(friction_impulses[i]));
+    //     phys_apply_angular_acceleration(body1, -vec2f_cross(r1_array[i], friction_impulses[i]) * body1->inv_inertia);
+
+    //     phys_apply_force(body2, friction_impulses[i]);
+    //     phys_apply_angular_acceleration(body2, vec2f_cross(r2_array[i], friction_impulses[i]) * body2->inv_inertia);
+    // }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void phys_resolve_dynamic_body_collision_with_friction(Body_2D *body1, Body_2D *body2, Vec2f normal, Vec2f *contacts, u32 contacts_count) {
     // Calculated variables, used in both loops.
@@ -352,6 +581,7 @@ void phys_resolve_dynamic_body_collision_with_friction(Body_2D *body1, Body_2D *
 
         contact_velocity_mag = vec2f_dot(relative_velocity, normal);
 
+
         if (contact_velocity_mag > 0.0f) {
             continue;
         }
@@ -378,7 +608,9 @@ void phys_resolve_dynamic_body_collision_with_friction(Body_2D *body1, Body_2D *
         phys_apply_angular_acceleration(body2, vec2f_cross(r2_array[i], impulses[i]) * body2->inv_inertia);
     }
 
-    // line_draw_begin(&global_state->line_drawer);
+
+
+
 
     // Friction.
     for (u32 i = 0; i < contacts_count; i++) {
@@ -394,7 +626,6 @@ void phys_resolve_dynamic_body_collision_with_friction(Body_2D *body1, Body_2D *
         Vec2f tanget = vec2f_difference(relative_velocity, vec2f_multi_constant(normal, vec2f_dot(relative_velocity, normal)));
 
         
-        // draw_line(body2->mass_center, vec2f_sum(body2->mass_center, tanget), VEC4F_RED);
         if (fequal(tanget.x, 0.0f) && fequal(tanget.y, 0.0f)) {
             continue;
         }
@@ -416,13 +647,9 @@ void phys_resolve_dynamic_body_collision_with_friction(Body_2D *body1, Body_2D *
         else {
             friction_impulses[i] = vec2f_multi_constant(tanget, -j_array[i] * df);
         }
-
-
-        // draw_line(contacts[i], vec2f_sum(contacts[i], friction_impulses[i]), VEC4F_RED);
-
     }
 
-    // line_draw_end();
+
 
     // For each contact point applying friction impulse and angular acceleration.
     for (u32 i = 0; i < contacts_count; i++) {
@@ -504,12 +731,13 @@ u32 phys_find_contanct_points_obb(OBB* obb1, OBB* obb2, Vec2f *points) {
 void spawn_player(Vec2f position, Vec4f color) {
     global_state->player = (Player) {
         .p_box = (Phys_Box) {
-                .bound_box = obb_make(position, 1.0f, 1.0f, 0.0f),
-                .body = body_obb_make(10.0f, position, 1.0f, 1.8f, 0.4f, 0.6f, 0.4f),
-
+                .bound_box = obb_make(position, 1.0f, 1.8f, 0.0f),
+                .body = body_obb_make(30.0f, position, 1.0f, 1.8f, 0.0f, 0.45f, 0.3f),
                 .dynamic = true,
                 .rotatable = false,
                 .destructible = false,
+                .gravitable = true,
+                .grounded = false,
                 },
         .color = color,
         .speed = 0.0f,
@@ -540,11 +768,13 @@ void spawn_box(Vec2f position, Vec4f color) {
     global_state->boxes[free_index] = (Box) {
         .p_box = (Phys_Box) {
                 .bound_box = obb_make(position, width, height, 0.0f),
-                .body = body_obb_make(30.0f, position, width, height, 0.4f, 0.6f, 0.4f),
+                .body = body_obb_make(30.0f, position, width, height, 0.4f, 0.45f, 0.3f),
 
                 .dynamic = true,
                 .rotatable = true,
                 .destructible = false,
+                .gravitable = true,
+                .grounded = false,
             },
         .color = color,
         .destroyed = false,
@@ -571,11 +801,13 @@ void spawn_rect(Vec2f p0, Vec2f p1, Vec4f color) {
     global_state->boxes[free_index] = (Box) {
         .p_box = (Phys_Box) {
                 .bound_box = obb_make(vec2f_sum(p0, vec2f_divide_constant(vec2f_difference(p1, p0), 2)), p1.x - p0.x, p1.y - p0.y, 0.0f),
-                .body = body_obb_make(0.0f, vec2f_sum(p0, vec2f_divide_constant(vec2f_difference(p1, p0), 2)), p1.x - p0.x, p1.y - p0.y, 0.4f, 0.6f, 0.4f),
+                .body = body_obb_make(0.0f, vec2f_sum(p0, vec2f_divide_constant(vec2f_difference(p1, p0), 2)), p1.x - p0.x, p1.y - p0.y, 0.4f, 0.45f, 0.3f),
 
                 .dynamic = false,
                 .destructible = false,
                 .rotatable = true,
+                .gravitable = false,
+                .grounded = false,
             },
         .color = color,
         .destroyed = false,
@@ -603,11 +835,13 @@ void spawn_obstacle(Vec2f c, float w, float h, Vec4f color, float angle) {
     global_state->boxes[free_index] = (Box) {
         .p_box = (Phys_Box) {
                 .bound_box = obb_make(c, w, h, angle),
-                .body = body_obb_make(0.0f, c, w, h, 0.4f, 0.6f, 0.4f),
+                .body = body_obb_make(0.0f, c, w, h, 0.4f, 0.45f, 0.3f),
 
                 .dynamic = false,
                 .destructible = false,
                 .rotatable = true,
+                .gravitable = false,
+                .grounded = false,
             },
         .color = color,
         .destroyed = false,
@@ -625,7 +859,6 @@ void update_boxes() {
             continue;
         }
         if (global_state->boxes[i].p_box.bound_box.center.y < -15.0f) {
-            printf_ok("Box nullified / destroyed.\n");
             global_state->boxes[i].p_box.bound_box.dimensions.x = 0.0f;
             global_state->boxes[i].destroyed = true;
         }
@@ -645,22 +878,14 @@ void phys_update() {
     Phys_Box *box1;
     Phys_Box *box2;
 
-    Vec2f mouse_w_pos = camera_screen_to_world(global_state->mouse_input.position, &global_state->main_camera);
-    Vec2f mouse_force = VEC2F_ORIGIN;
-    if (global_state->mouse_input.right_hold) {
-        mouse_g_constant = 100.0f;
-    }
-    else {
-        mouse_g_constant = 0.0f;
-    }
-    
     line_draw_begin(&global_state->line_drawer);
     for (u32 it = 0; it < PHYS_ITERATIONS; it++) {
+
         for (u32 i = 0; i < length; i++) {
             box1 = global_state->phys_boxes[i];
 
-            if (fequal(box1->bound_box.dimensions.x, 0.0f)) {
-                printf_ok("Phys Box removed.\n");
+            // @Important: This is a check if a pointer box1 is invalid pointer, it is done by specifically looking at x dimension, since that is part of data that is set to 0.0f when box1 is no longer used / nullified.
+            if (fequal(box1->bound_box.dimensions.x, 0.0f)) { 
                 array_list_unordered_remove(&global_state->phys_boxes, i);
                 length = array_list_length(&global_state->phys_boxes);
                 i--;
@@ -672,22 +897,14 @@ void phys_update() {
             }
 
 
-            // Applying gravity.
-            box1->body.velocity = vec2f_sum(box1->body.velocity, vec2f_multi_constant(gravity_acceleration, global_state->t->delta_time * PHYS_ITERATION_STEP_TIME ));
+            box1->grounded = false;
 
-            
-            // Applying "mouse force".
-            if (!fequal(mouse_g_constant, 0.0f) && (grabbed_index == i || (vec2f_magnitude(vec2f_difference(mouse_w_pos, box1->bound_box.center)) < 1.0f && grabbed_index == UINT_MAX))) {
-                mouse_force = vec2f_multi_constant(vec2f_normalize(vec2f_difference(mouse_w_pos, box1->bound_box.center)), box1->body.mass * mouse_g_constant * (vec2f_magnitude(vec2f_difference(mouse_w_pos, box1->bound_box.center)) + 0.05f));
-                box1->body.velocity = vec2f_sum(box1->body.velocity, vec2f_multi_constant(mouse_force, global_state->t->delta_time * PHYS_ITERATION_STEP_TIME * box1->body.inv_mass ));
-                
-                draw_line(mouse_w_pos, box1->bound_box.center, VEC4F_CYAN);
-                
-                grabbed_index = i;
-            } 
-            else if (fequal(mouse_g_constant, 0.0f)) {
-                grabbed_index = UINT_MAX;
+            // Applying gravity.
+            if (box1->gravitable) {
+                box1->body.velocity = vec2f_sum(box1->body.velocity, vec2f_multi_constant(gravity_acceleration, global_state->t->delta_time * PHYS_ITERATION_STEP_TIME ));
             }
+
+
 
             // Applying velocities.
             box1->bound_box.center = vec2f_sum(box1->bound_box.center, vec2f_multi_constant(box1->body.velocity, global_state->t->delta_time * PHYS_ITERATION_STEP_TIME));
@@ -704,32 +921,59 @@ void phys_update() {
             box1 = global_state->phys_boxes[i];
             for (u32 j = i + 1; j < length; j++) {
                 box2 = global_state->phys_boxes[j];
-                if (phys_sat_check_collision_obb(&box1->bound_box, &box2->bound_box)) {
+                if (phys_sat_check_collision_obb(&box1->bound_box, &box2->bound_box)) { // @Speed: Need separate broad phase.
+                    
+                    // Fidning depth and normal of collision.
                     phys_sat_find_min_depth_normal(&box1->bound_box, &box2->bound_box, &depth, &normal);
+
+                    // Calculating dot product to check if any objects are grounded.
+                    float grounded_dot = vec2f_dot(vec2f_normalize(gravity_acceleration), normal);
+
                     if (box1->dynamic && !box2->dynamic) {
                         phys_resolve_static_obb_collision(&box1->bound_box, depth, vec2f_negate(normal));
+
+                        if (grounded_dot > 0.7f)
+                            box1->grounded = true;
                     }
                     else if (box2->dynamic && !box1->dynamic) {
                         phys_resolve_static_obb_collision(&box2->bound_box, depth, normal);
+
+                        if (grounded_dot < -0.7f)
+                            box2->grounded = true;
                     }
                     else {
                         phys_resolve_dynamic_obb_collision(&box1->bound_box, &box2->bound_box, depth, normal);
+
+                        if (grounded_dot > 0.7f)
+                            box1->grounded = true;
+                        else if (grounded_dot < -0.7f)
+                            box2->grounded = true;
                     }
                     box1->body.mass_center = box1->bound_box.center;
                     box2->body.mass_center = box2->bound_box.center;
-                    
+
+
+                    // Set box1 state to grounded if normal of collision is in the same general direction as the force of gravity.
+
+
+                    // printf_ok("dot: %2.2f\n", vec2f_dot(vec2f_normalize(gravity_acceleration), normal));
+
+
                     /**
-                     * @Incomplete: This is a clear bug, since if one obj is rotatable and other obj is not, they are both resolved without rotation physics.
-                     * Where in reality only the box that doesn't rotate should be solved this way.
+                     * @Todo: Remove physics resolution abstraction, and generalize for different types of phys boxes collisions.
                      */
-                    if (box1->rotatable && box2->rotatable) {
-                        contacts_count = phys_find_contanct_points_obb(&box1->bound_box, &box2->bound_box, contacts);
-                        phys_resolve_dynamic_body_collision_with_friction(&box1->body, &box2->body, normal, contacts, contacts_count);
-                        // phys_resolve_dynamic_body_collision(&box1->body, &box2->body, normal, contacts, contacts_count);
-                    }
-                    else {
-                        phys_resolve_dynamic_body_collision_basic(&box1->body, &box2->body, normal);
-                    }
+                    contacts_count = phys_find_contanct_points_obb(&box1->bound_box, &box2->bound_box, contacts);
+                    // phys_resolve_dynamic_body_collision_with_friction(&box1->body, &box2->body, normal, contacts, contacts_count);
+                    phys_resolve_phys_box_collision_with_rotation_friction(box1, box2, normal, contacts, contacts_count);
+
+                    // if (box1->rotatable && box2->rotatable) {
+                    //     contacts_count = phys_find_contanct_points_obb(&box1->bound_box, &box2->bound_box, contacts);
+                    //     phys_resolve_dynamic_body_collision_with_friction(&box1->body, &box2->body, normal, contacts, contacts_count);
+                    //     // phys_resolve_dynamic_body_collision(&box1->body, &box2->body, normal, contacts, contacts_count);
+                    // }
+                    // else {
+                    //     phys_resolve_dynamic_body_collision_basic(&box1->body, &box2->body, normal);
+                    // }
                 }
             }
         }
@@ -772,7 +1016,7 @@ void plug_init(Plug_State *state) {
     if (global_state->boxes == NULL)
         printf_err("Couldn't allocate boxes array.\n");
     
-    // Small init for other algorithms to work properly.
+    // Small init of boxes for other algorithms to work properly.
     for (u32 i = 0; i < MAX_BOXES; i++) {
         global_state->boxes[i].destroyed = true;
     }
@@ -783,6 +1027,8 @@ void plug_init(Plug_State *state) {
     spawn_rect(vec2f_make(-8.0f, -5.0f), vec2f_make(8.0f, -6.0f), vec4f_make(randf(), randf(), randf(), 0.4f));
     spawn_obstacle(vec2f_make(4.0f, -1.0f), 6.0f, 1.0f, vec4f_make(randf(), randf(), randf(), 0.4f), PI / 6);
     spawn_obstacle(vec2f_make(-4.0f, 1.5f), 6.0f, 1.0f, vec4f_make(randf(), randf(), randf(), 0.4f), -PI / 6);
+
+    spawn_player(VEC2F_ORIGIN, vec4f_make(0.0f, 1.0f, 0.0f, 0.2f));
 
     // for (u32 i = 0; i < 10; i++) {
     //     spawn_box(vec2f_make(randf() * 10.0f - 5.0f, randf() * 10.0f - 5.0f), vec4f_make(randf(), randf(), randf(), 1.0f));
@@ -846,7 +1092,7 @@ void plug_load(Plug_State *state) {
     free(font_data);
 
     // Player loading.
-    state->player.speed = 10.0f;
+    state->player.speed = 5.0f;
 
     global_state = state;
 
@@ -868,8 +1114,7 @@ void update_player(Player *p);
 
 void draw_player(Player *p);
 
-Vec2f test_rot = vec2f_make(2.0f, 0.0f);
-float angle = 90.0f;
+
 
 s32 load_counter = 5;
 
@@ -958,21 +1203,15 @@ void plug_update(Plug_State *state) {
     }
 
     // Player logic.
-    // update_player(&state->player);
+    update_player(&state->player);
     
     // Lerp camera.
-    state->main_camera.center = vec2f_lerp(state->main_camera.center, state->player.p_box.bound_box.center, 0.025f);
+    // state->main_camera.center = vec2f_lerp(state->main_camera.center, state->player.p_box.bound_box.center, 0.025f);
 
-
-
-    // Test rotation.
-    angle += PI / 4 * state->t->delta_time;
-    test_rot = vec2f_rotate(test_rot, PI/2 * state->t->delta_time);
-
-
-
+    // Boxes logic.
     update_boxes();
 
+    // Physics update loop.
     phys_update();
 
     /**
@@ -981,22 +1220,17 @@ void plug_update(Plug_State *state) {
      * -----------------------------------
      */
 
-    Phys_Box *box = NULL;
-    u32 boxes = array_list_length(&global_state->phys_boxes);
-
-
-
 
     // Grid quad drawing.
-    // state->drawer.program = grid_shader;
-    // draw_begin(&state->drawer);
+    state->drawer.program = grid_shader;
+    draw_begin(&state->drawer);
 
-    // Vec2f p0, p1;
-    // p0 = vec2f_make(-8.0f, -5.0f);
-    // p1 = vec2f_make(8.0f, 5.0f);
-    // draw_quad(p0, p1, vec4f_make(0.8f, 0.8f, 0.8f, 0.6f), NULL, p0, p1, NULL, 0.0f);
+    Vec2f p0, p1;
+    p0 = vec2f_make(-8.0f, -5.0f);
+    p1 = vec2f_make(8.0f, 5.0f);
+    draw_quad(p0, p1, vec4f_make(0.8f, 0.8f, 0.8f, 0.6f), NULL, p0, p1, NULL, 0.0f);
 
-    // draw_end();
+    draw_end();
 
 
 
@@ -1008,22 +1242,9 @@ void plug_update(Plug_State *state) {
     state->drawer.program = quad_shader;
     draw_begin(&state->drawer);
 
-    // draw_player(&state->player);
-
+    draw_player(&state->player);
     draw_boxes();
 
-
-    // for (u32 i = 0; i < boxes; i++) {
-    //      box = &global_state->phys_boxes[i];
-
-    //      draw_dot(box->bound_box.center, VEC4F_GREEN);
-    //      draw_dot(box->body.mass_center, VEC4F_YELLOW);
-
-    // }
-
-    // draw_quad(obb_p0(obb1), obb_p1(obb1), obb_color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, obb1->rot);
-    // draw_quad(obb_p0(obb2), obb_p1(obb2), obb_color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, obb2->rot);
-    
     draw_end();
 
 
@@ -1031,25 +1252,16 @@ void plug_update(Plug_State *state) {
 
     
 
-    glLineWidth(2.0f);
     // Line drawing.
+    glLineWidth(2.0f);
+
     line_draw_begin(&state->line_drawer);
-
-    // for (u32 i = 0; i < boxes; i++) {
-    //     box = &global_state->phys_boxes[i];
-    //     c = box->body.mass_center;
-
-    //     draw_line(c, vec2f_sum(c, vec2f_multi_constant(box->body.velocity, state->t->delta_time)), VEC4F_CYAN);
-    // }
 
     draw_boxes_outline();
 
     line_draw_end();
+
     glLineWidth(1.0f);
-
-
-
-
 
 
 
@@ -1072,71 +1284,35 @@ void plug_update(Plug_State *state) {
 }
 
 
-/**
- * @Todo: Refactor this approach.
- * Remove unnecessary if branching.
- */
+#define MAX_PLAYER_SPEED 6.0f
+
 void update_player(Player *p) {
-    
-    Vec2f vel = VEC2F_ORIGIN;
+    float x_vel = 0.0f;
     if (is_hold_keycode(SDLK_d)) {
-        vel.x = 1.0f;
+        x_vel = 1.0f;
     }
     if (is_hold_keycode(SDLK_a)) {
-        vel.x = -1.0f;
+        x_vel = -1.0f;
     }
-    if (is_hold_keycode(SDLK_w)) {
-        vel.y = 1.0f;
-    }
-    if (is_hold_keycode(SDLK_s)) {
-        vel.y = -1.0f;
-    }
-    
-    vel = vec2f_normalize(vel);
-    vel.x *= p->speed;
-    vel.y *= p->speed;
 
+    x_vel *= p->speed;
 
-    p->p_box.body.velocity = vec2f_lerp(p->p_box.body.velocity, vel, 50.0f * global_state->t->delta_time);
- 
+    p->p_box.body.velocity.x = lerp(p->p_box.body.velocity.x, x_vel, 0.5f);
+
+    if (is_pressed_keycode(SDLK_SPACE) && p->p_box.grounded) {
+        phys_apply_force(&p->p_box.body, vec2f_make(0.0f, 140.0f));
+    }
+
 
     // Applying calculated velocities. For both AABB and Rigid Body 2D.
     p->p_box.bound_box.center = vec2f_sum(p->p_box.bound_box.center, vec2f_multi_constant(p->p_box.body.velocity, global_state->t->delta_time));
     p->p_box.body.mass_center = p->p_box.bound_box.center;
 
-
-    
-    // Collision.
-    // u32 length = array_list_length(&global_state->phys_boxes);
-
-    // float depth;
-    // Vec2f normal;
-
-    // Vec2f contacts[2];
-    // u32 contacts_count;
-    // for (u32 i = 0; i < length; i++) {
-    //     if (phys_sat_check_collision_obb(&p->bound_box, &global_state->phys_boxes[i].bound_box)) {
-    //         phys_sat_find_min_depth_normal(&p->bound_box, &global_state->phys_boxes[i].bound_box, &depth, &normal);
-    //         if (global_state->phys_boxes[i].is_static) {
-    //             phys_resolve_static_obb_collision(&p->bound_box, depth, normal);
-    //         }
-    //         else {
-    //             phys_resolve_dynamic_obb_collision(&p->bound_box, &global_state->phys_boxes[i].bound_box, depth, normal);
-    //         }
-    //         contacts_count = phys_find_contanct_points_obb(&p->bound_box, &global_state->phys_boxes[i].bound_box, contacts);
-
-    //         phys_resolve_dynamic_body_collision_with_friction(&p->body, &global_state->phys_boxes[i].body, normal, contacts, contacts_count);
-    //         // phys_resolve_dynamic_body_collision(&p->body, &global_state->phys_boxes[i].body, normal, contacts, contacts_count);
-    //         // phys_resolve_dynamic_body_collision_basic(&p->body, &global_state->phys_boxes[i].body, normal);
-    //     }
-    // }
-
-    
 }
 
 void draw_player(Player *p) {
     // Drawing player as a quad.
-   draw_quad(obb_p0(&p->p_box.bound_box), obb_p1(&p->p_box.bound_box), p->color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, p->p_box.bound_box.rot);
+    draw_quad(obb_p0(&p->p_box.bound_box), obb_p1(&p->p_box.bound_box), p->color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, p->p_box.bound_box.rot);
 }
 
 
