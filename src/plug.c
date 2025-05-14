@@ -741,6 +741,20 @@ void spawn_player(Vec2f position, Vec4f color) {
                 },
         .color = color,
         .speed = 0.0f,
+
+
+        .sword = (Sword) {
+            .origin = position,
+            
+            .sword_held_angle = PI / 6,
+            .sword_held_offset = 0.4f,
+
+            .handle_length = 0.3f,
+            .blade_length = 1.2f,
+            .angle = PI / 4,
+
+            .flip_x = false,
+        }
     };
 
     array_list_append(&global_state->phys_boxes, &global_state->player.p_box);
@@ -1114,7 +1128,12 @@ void update_player(Player *p);
 
 void draw_player(Player *p);
 
+void draw_sword_line(Sword *s);
 
+
+float test_angle_a = 60.0f;
+float test_angle_b = -30.0f;
+T_Interpolator test_ti = ti_make(2.0f);
 
 s32 load_counter = 5;
 
@@ -1186,7 +1205,7 @@ void plug_update(Plug_State *state) {
         }
     }
 
-    if (state->mouse_input.left_unpressed) {
+    if (state->mouse_input.right_pressed) {
         Vec2f pos = camera_screen_to_world(state->mouse_input.position, &state->main_camera);
         spawn_box(pos, vec4f_make(randf(), randf(), randf(), 0.4f));
     } 
@@ -1259,6 +1278,29 @@ void plug_update(Plug_State *state) {
 
     draw_boxes_outline();
 
+    draw_sword_line(&state->player.sword);
+
+
+    // Test interpolation of angle matrix.
+    Transform mat = transform_make_trs_2d(VEC2F_ORIGIN, 0.0f, vec2f_make(2.3f, 0.6f));
+
+    // transform_set_translation_2d(&mat, vec2f_make(-2.0f, -1.0f));
+
+    transform_set_rotation_2d(&mat, deg2rad(lerp(test_angle_a, test_angle_b, ease_in_back(ti_elapsed_percent(&test_ti)) )));
+    ti_update(&test_ti, state->t->delta_time);
+
+
+
+    Vec2f right = matrix4f_vec2f_multiplication(mat, VEC2F_RIGHT);
+    Vec2f up = matrix4f_vec2f_multiplication(mat, VEC2F_UP);
+    Vec2f origin = matrix4f_vec2f_multiplication(mat, VEC2F_ORIGIN);
+
+    draw_line(origin, right, VEC4F_RED);
+    draw_line(origin, up, VEC4F_GREEN);
+
+
+
+
     line_draw_end();
 
     glLineWidth(1.0f);
@@ -1286,13 +1328,22 @@ void plug_update(Plug_State *state) {
 
 #define MAX_PLAYER_SPEED 6.0f
 
+// Use matricies for sword rotations!
 void update_player(Player *p) {
     float x_vel = 0.0f;
     if (is_hold_keycode(SDLK_d)) {
         x_vel = 1.0f;
+
+        p->sword.sword_held_angle = -fabsf(p->sword.sword_held_angle);
+        p->sword.angle = -fabsf(p->sword.angle);
+        p->sword.flip_x = false;
     }
-    if (is_hold_keycode(SDLK_a)) {
+    else if (is_hold_keycode(SDLK_a)) {
         x_vel = -1.0f;
+
+        p->sword.sword_held_angle = fabsf(p->sword.sword_held_angle);
+        p->sword.angle = fabsf(p->sword.angle);
+        p->sword.flip_x = true;
     }
 
     x_vel *= p->speed;
@@ -1308,14 +1359,37 @@ void update_player(Player *p) {
     p->p_box.bound_box.center = vec2f_sum(p->p_box.bound_box.center, vec2f_multi_constant(p->p_box.body.velocity, global_state->t->delta_time));
     p->p_box.body.mass_center = p->p_box.bound_box.center;
 
+    // Updating sword.
+    p->sword.origin = p->p_box.bound_box.center;
+
+    if (global_state->mouse_input.left_pressed) {
+        p->sword.sword_held_angle += sig(p->sword.sword_held_angle) * PI / 2;
+        p->sword.angle += sig(p->sword.angle) * PI / 2;
+    }
+
+
 }
 
 void draw_player(Player *p) {
     // Drawing player as a quad.
     draw_quad(obb_p0(&p->p_box.bound_box), obb_p1(&p->p_box.bound_box), p->color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, p->p_box.bound_box.rot);
+
+    
 }
 
+void draw_sword_trail(Sword *s) {
 
+}
+
+void draw_sword_line(Sword *s) {
+    // Drawing sword as a stick.
+    Vec2f pivot = vec2f_sum(s->origin, vec2f_make_angle(s->sword_held_offset, s->sword_held_angle + PI / 2));
+    Vec2f p0 = vec2f_difference(pivot, vec2f_make_angle(s->handle_length, s->angle + PI / 2));
+    Vec2f p1 = vec2f_sum(pivot, vec2f_make_angle(s->blade_length, s->angle + PI / 2));
+
+
+    draw_line(p0, p1, VEC4F_PINK);
+}
 
 
 

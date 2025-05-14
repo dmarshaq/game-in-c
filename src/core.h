@@ -251,12 +251,19 @@ void hash_table_print(void **table);
 #define PI 3.14159265358979323846f
 #define TAU (PI * 2)
 
+#define deg2rad(deg)                        ((deg) * PI / 180.0f)
+#define rad2deg(rad)                        ((rad) * 180.0f / PI)
+
 #define right_triangle_hypotenuse(a, b)     (sqrtf((a) * (a) + (b) * (b)))
-#define lerp(a, b, t)                       ((a) + ((b) - (a)) * (t))
 #define sig(a)                              (((a) == 0.0f) ? (0.0f) : (fabsf(a) / (a)))
 #define fequal(a, b)                        (fabsf((a) - (b)) < FLT_EPSILON)
 
 #define randf()                             ((float)rand() / RAND_MAX)
+
+
+#define lerp(a, b, t)                       ((a) + ((b) - (a)) * (t))
+#define ease_in_back(x)                     (((1.70158f + 1.0f) * (x) * (x) * (x)) - (1.70158f * (x) * (x)))
+
 
 
 typedef struct vec2f {
@@ -265,6 +272,7 @@ typedef struct vec2f {
 } Vec2f;
 
 #define vec2f_make(x, y)                    ((Vec2f) { x, y } )
+#define vec2f_make_angle(mag, angle)        ((Vec2f) { (mag) * cosf(angle), (mag) * sinf(angle) } )
 
 #define VEC2F_ORIGIN                        ((Vec2f) { 0.0f,  0.0f } )
 #define VEC2F_RIGHT                         ((Vec2f) { 1.0f,  0.0f } )
@@ -334,20 +342,25 @@ typedef struct matrix4f {
 
 #define matrix4f_orthographic(left, right, bottom, top, near, far)     ((Matrix4f) {{ 2.0f / ((right) - (left)), 0.0f, 0.0f, ((left) + (right)) / ((left) - (right)),    0.0f, 2.0f / ((top) - (bottom)), 0.0f, ((bottom) + (top)) / ((bottom) - (top)),    0.0f, 0.0f, 2.0f / ((near) - (far)), ((near) + (far)) / ((near) - (far)),    0.0f, 0.0f, 0.0f, 1.0f }} )
 
-#define matrix4f_vec2f_multiplication(matrix, vec2)                     ((Vec2f) { .x = multiplier->array[0] * target->x + multiplier->array[1] * target->y,    .y = multiplier->array[4] * target->x + multiplier->array[5] * target->y, } )
-#define matrix4f_vec3f_multiplication(matrix, vec3)                     ((Vec3f) { .x = multiplier->array[0] * target->x + multiplier->array[1] * target->y + multiplier->array[2] * target->z,    .y = multiplier->array[4] * target->x + multiplier->array[5] * target->y + multiplier->array[6] * target->z,    .z = multiplier->array[8] * target->x + multiplier->array[9] * target->y + multiplier->array[10] * target->z, } )
-#define matrix4f_vec4f_multiplication(matrix, vec4)                     ((Vec4f) { .x = multiplier->array[0] * target->x + multiplier->array[1] * target->y + multiplier->array[2] * target->z + multiplier->array[3] * target->w,    .y = multiplier->array[4] * target->x + multiplier->array[5] * target->y + multiplier->array[6] * target->z + multiplier->array[7] * target->w,    .z = multiplier->array[8] * target->x + multiplier->array[9] * target->y + multiplier->array[10] * target->z + multiplier->array[11] * target->w,    .w = multiplier->array[12] * target->x + multiplier->array[13] * target->y + multiplier->array[14] * target->z + multiplier->array[15] * target->w, } )
+#define matrix4f_vec2f_multiplication(matrix, vec2)                     ((Vec2f) { .x = matrix.array[0] * vec2.x + matrix.array[1] * vec2.y + matrix.array[3],    .y = matrix.array[4] * vec2.x + matrix.array[5] * vec2.y + matrix.array[7], } )
+#define matrix4f_vec3f_multiplication(matrix, vec3)                     ((Vec3f) { .x = matrix.array[0] * vec3.x + matrix.array[1] * vec3.y + matrix.array[2] * vec3.z,    .y = matrix.array[4] * vec3.x + matrix.array[5] * vec3.y + matrix.array[6] * vec3.z,    .z = matrix.array[8] * vec3.x + matrix.array[9] * vec3.y + matrix.array[10] * vec3.z, } )
+#define matrix4f_vec4f_multiplication(matrix, vec4)                     ((Vec4f) { .x = matrix.array[0] * vec4.x + matrix.array[1] * vec4.y + matrix.array[2] * vec4.z + matrix.array[3] * vec4.w,    .y = matrix.array[4] * vec4.x + matrix.array[5] * vec4.y + matrix.array[6] * vec4.z + matrix.array[7] * vec4.w,    .z = matrix.array[8] * vec4.x + matrix.array[9] * vec4.y + matrix.array[10] * vec4.z + matrix.array[11] * vec4.w,    .w = matrix.array[12] * vec4.x + matrix.array[13] * vec4.y + matrix.array[14] * vec4.z + matrix.array[15] * vec4.w, } )
 
 Matrix4f matrix4f_multiplication(Matrix4f *multiplier, Matrix4f *target);
 
 typedef Matrix4f Transform;
 
-#define transform_translation_2d(position)                              ((Transform) {{ 1.0f, 0.0f, 0.0f, position.x,   0.0f, 1.0f, 0.0f, position.y,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} )
-#define transform_rotation_2d(angle)                                    ((Transform) {{ cosf(angle), -sinf(angle), 0.0f, 0.0f,    sinf(angle),  cosf(angle), 0.0f, 0.0f,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} )
-#define transform_scale_2d(scale)                                       ((Transform) {{ scale.x, 0.0f, 0.0f, 0.0f,   0.0f, scale.y, 0.0f, 0.0f,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} )
+#define transform_make_translation_2d(position)                              ((Transform) {{ 1.0f, 0.0f, 0.0f, position.x,   0.0f, 1.0f, 0.0f, position.y,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} )
+#define transform_make_rotation_2d(angle)                                    ((Transform) {{ cosf(angle), -sinf(angle), 0.0f, 0.0f,    sinf(angle),  cosf(angle), 0.0f, 0.0f,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} )
+#define transform_make_scale_2d(scale)                                       ((Transform) {{ scale.x, 0.0f, 0.0f, 0.0f,   0.0f, scale.y, 0.0f, 0.0f,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} )
 
-Transform transform_srt_2d(Vec2f position, float angle, Vec2f scale);
-Transform transform_trs_2d(Vec2f position, float angle, Vec2f scale);
+// Transform transform_make_srt_2d(Vec2f position, float angle, Vec2f scale);
+Transform transform_make_trs_2d(Vec2f position, float angle, Vec2f scale);
+
+void transform_set_rotation_2d(Transform *transform, float angle);
+void transform_set_translation_2d(Transform *transform, Vec2f position);
+void transform_flip_y(Transform *transform);
+void transform_flip_x(Transform *transform);
 
 
 
@@ -427,25 +440,6 @@ typedef struct circle {
     Vec2f center;
     float radius;
 } Circle;
-
-#define calculate_obb_inertia(mass, width, height)                                          ((1.0f / 12.0f) * mass * (height * height + width * width))
-
-typedef struct body_2d {
-    Vec2f velocity;
-    float angular_velocity;
-
-    float mass;
-    float inv_mass;
-    float inertia;
-    float inv_inertia;
-    Vec2f mass_center;
-    float restitution;
-    float static_friction;
-    float dynamic_friction;
-} Body_2D;
-
-#define body_obb_make(mass, center, width, height, restitution, static_friction, dynamic_friction)                             ((Body_2D) { VEC2F_ORIGIN, 0.0f, mass, (mass == 0.0f ? 0.0f : 1.0f / mass), calculate_obb_inertia(mass, width, height), (mass == 0.0f ? 0.0f : 1.0f / calculate_obb_inertia(mass, width, height)), center, restitution, static_friction, dynamic_friction })
-
 
 
 /**
@@ -742,6 +736,17 @@ typedef struct time_data {
     u32 accumilated_time;
     u32 update_step_time;
 } Time_Data;
+
+
+typedef struct time_interpolator {
+    float duration;
+    float elapsed_t;
+} T_Interpolator;
+
+#define ti_make(duration)                   ((T_Interpolator) { duration, 0.0f })\
+
+void ti_update(T_Interpolator *interpolator, float delta_time);
+float ti_elapsed_percent(T_Interpolator *interpolator);
 
 
 

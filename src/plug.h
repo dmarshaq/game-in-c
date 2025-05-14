@@ -3,11 +3,32 @@
 
 #include "core.h"
 
+#define calculate_obb_inertia(mass, width, height)                                          ((1.0f / 12.0f) * mass * (height * height + width * width))
+
+typedef struct body_2d {
+    Vec2f velocity;
+    float angular_velocity;
+
+    float mass;
+    float inv_mass;
+    float inertia;
+    float inv_inertia;
+    Vec2f mass_center;
+    float restitution;
+    float static_friction;
+    float dynamic_friction;
+} Body_2D;
+
+#define body_obb_make(mass, center, width, height, restitution, static_friction, dynamic_friction)                             ((Body_2D) { VEC2F_ORIGIN, 0.0f, mass, (mass == 0.0f ? 0.0f : 1.0f / mass), calculate_obb_inertia(mass, width, height), (mass == 0.0f ? 0.0f : 1.0f / calculate_obb_inertia(mass, width, height)), center, restitution, static_friction, dynamic_friction })
+
+
 typedef struct impulse {
     Vec2f delta_force;
     u32 milliseconds;
     Body_2D *target;
 } Impulse;
+
+
 
 
 /**
@@ -38,11 +59,28 @@ typedef struct phys_box {
  *      4) Comment such checks so it is easier to understand what is done.
  */
 
+typedef struct sword {
+    Vec2f origin;
+
+    float sword_held_angle;
+    float sword_held_offset;
+
+    float handle_length;
+    float blade_length;
+    float angle;
+
+    bool flip_x;
+} Sword;
+
+
 typedef struct player {
     Phys_Box p_box;
     Vec4f color;
     float speed;
+    
+    Sword sword;
 } Player;
+
 
 typedef struct box {
     Phys_Box p_box;

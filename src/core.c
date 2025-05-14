@@ -717,22 +717,47 @@ Matrix4f matrix4f_multiplication(Matrix4f *multiplier, Matrix4f *target) {
     return result;
 }
 
-Transform transform_srt_2d(Vec2f position, float angle, Vec2f scale) {
+Transform transform_make_trs_2d(Vec2f position, float angle, Vec2f scale) {
     return (Transform) {
         .array = { scale.x * cosf(angle),   scale.y * -sinf(angle), 0.0f, position.x, 
-                   scale.x * sinf(angle),   scale.y *  cosf(angle), 0.0f, position.y,
+                   scale.x * sinf(angle),   scale.y * cosf(angle),  0.0f, position.y,
                    0.0f,                    0.0f,                   1.0f, 0.0f,
                    0.0f,                    0.0f,                   0.0f, 1.0f}
     };
 }
 
-Transform transform_trs_2d(Vec2f position, float angle, Vec2f scale) {
-    Transform s = transform_scale_2d(scale);
-    Transform r = transform_rotation_2d(angle);
-    Transform t = transform_translation_2d(position);
+// Transform transform_make_srt_2d(Vec2f position, float angle, Vec2f scale) {
+//     Transform s = transform_make_scale_2d(scale);
+//     Transform r = transform_make_rotation_2d(angle);
+//     Transform t = transform_make_translation_2d(position);
+// 
+//     r = matrix4f_multiplication(&s, &r);
+//     return matrix4f_multiplication(&r, &t);
+// }
 
-    r = matrix4f_multiplication(&s, &r);
-    return matrix4f_multiplication(&r, &t);
+void transform_set_rotation_2d(Transform *transform, float angle) {
+    float scale_x = sig(transform->array[0]) * sqrtf(transform->array[0] * transform->array[0] + transform->array[4] * transform->array[4]);
+    float scale_y = sig(transform->array[5]) * sqrtf(transform->array[1] * transform->array[1] + transform->array[5] * transform->array[5]);
+    
+    transform->array[0] = scale_x * cosf(angle);
+    transform->array[4] = scale_x * sinf(angle);
+    transform->array[1] = scale_y * -sinf(angle);
+    transform->array[5] = scale_y * cosf(angle);
+}
+
+void transform_set_translation_2d(Transform *transform, Vec2f position) {
+    transform->array[3] = position.x;
+    transform->array[7] = position.y;
+}
+
+void transform_flip_y(Transform *transform) {
+    transform->array[1] *= -1.0f;
+    transform->array[5] *= -1.0f;
+}
+
+void transform_flip_x(Transform *transform) {
+    transform->array[0] *= -1.0f;
+    transform->array[4] *= -1.0f;
 }
 
 
@@ -1552,9 +1577,6 @@ void draw_line_data(float *line_data, u32 count) {
 
 
 
-
-
-
 void print_verticies() {
     u32 stride = 1;
     if (active_drawer != NULL) {
@@ -1603,17 +1625,22 @@ void print_indicies() {
 
 
 
+/**
+ * Time
+ */
 
+void ti_update(T_Interpolator *interpolator, float delta_time) {
+    interpolator->elapsed_t += delta_time;
 
+    if (interpolator->elapsed_t > interpolator->duration) {
+        // Later there should different cases of how end of interpolation should be handled.
+        interpolator->elapsed_t = interpolator->duration;
+    }
+}
 
-
-
-
-
-
-
-
-
+float ti_elapsed_percent(T_Interpolator *interpolator) {
+    return interpolator->elapsed_t / interpolator->duration;
+}
 
 
 
