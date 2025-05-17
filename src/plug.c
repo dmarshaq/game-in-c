@@ -744,17 +744,13 @@ void spawn_player(Vec2f position, Vec4f color) {
 
 
         .sword = (Sword) {
-            .origin = position,
-            
-            .sword_held_angle = PI / 6,
-            .sword_held_offset = 0.4f,
+            .origin = transform_make_trs_2d(position, 0.0f, vec2f_make(1.0f, 1.0f)),
+            .handle = transform_make_trs_2d(position, 0.0f, vec2f_make(2.8f, 1.0f)),
 
-            .handle_length = 0.3f,
-            .blade_length = 1.2f,
-            .angle = PI / 4,
-
-            .flip_x = false,
-        }
+            .angle_a = -30.0f,
+            .angle_b = 60.0f,
+            .animator = ti_make(0.2f),
+        }   
     };
 
     array_list_append(&global_state->phys_boxes, &global_state->player.p_box);
@@ -1133,7 +1129,7 @@ void draw_sword_line(Sword *s);
 
 float test_angle_a = 60.0f;
 float test_angle_b = -30.0f;
-T_Interpolator test_ti = ti_make(2.0f);
+T_Interpolator test_ti = ti_make(0.8f);
 
 s32 load_counter = 5;
 
@@ -1282,12 +1278,27 @@ void plug_update(Plug_State *state) {
 
 
     // Test interpolation of angle matrix.
-    Transform mat = transform_make_trs_2d(VEC2F_ORIGIN, 0.0f, vec2f_make(2.3f, 0.6f));
+    Transform mat = transform_make_trs_2d(VEC2F_ORIGIN, deg2rad(30.0f), vec2f_make(1.0f, 2.0f));
+    Transform reflection = transform_make_scale_2d(vec2f_make(-1.0f, 1.0f));
+    mat = matrix4f_multiplication(&reflection, &mat);
+
+    // if (is_pressed_keycode(SDLK_p)) {
+    //     matrix4f_print(mat);
+    // }
 
     // transform_set_translation_2d(&mat, vec2f_make(-2.0f, -1.0f));
 
-    transform_set_rotation_2d(&mat, deg2rad(lerp(test_angle_a, test_angle_b, ease_in_back(ti_elapsed_percent(&test_ti)) )));
-    ti_update(&test_ti, state->t->delta_time);
+    // transform_set_rotation_2d(&mat, deg2rad(lerp(test_angle_a, test_angle_b, ease_in_back(ti_elapsed_percent(&test_ti)) )));
+
+    // ti_update(&test_ti, state->t->delta_time);
+
+    // if (ti_is_complete(&test_ti)) {
+    //     float temp = test_angle_a;
+    //     test_angle_a = test_angle_b;
+    //     test_angle_b = temp;
+
+    //     ti_reset(&test_ti);
+    // }
 
 
 
@@ -1334,21 +1345,17 @@ void update_player(Player *p) {
     if (is_hold_keycode(SDLK_d)) {
         x_vel = 1.0f;
 
-        p->sword.sword_held_angle = -fabsf(p->sword.sword_held_angle);
-        p->sword.angle = -fabsf(p->sword.angle);
-        p->sword.flip_x = false;
-    }
-    else if (is_hold_keycode(SDLK_a)) {
+        transform_set_flip_x(&p->sword.handle, 1.0f);
+        transform_set_flip_x(&p->sword.origin, 1.0f);
+    } else if (is_hold_keycode(SDLK_a)) {
         x_vel = -1.0f;
 
-        p->sword.sword_held_angle = fabsf(p->sword.sword_held_angle);
-        p->sword.angle = fabsf(p->sword.angle);
-        p->sword.flip_x = true;
+        transform_set_flip_x(&p->sword.handle, -1.0f);
+        transform_set_flip_x(&p->sword.origin, -1.0f);
     }
 
-    x_vel *= p->speed;
 
-    p->p_box.body.velocity.x = lerp(p->p_box.body.velocity.x, x_vel, 0.5f);
+    p->p_box.body.velocity.x = lerp(p->p_box.body.velocity.x, x_vel * p->speed, 0.5f);
 
     if (is_pressed_keycode(SDLK_SPACE) && p->p_box.grounded) {
         phys_apply_force(&p->p_box.body, vec2f_make(0.0f, 140.0f));
@@ -1360,11 +1367,22 @@ void update_player(Player *p) {
     p->p_box.body.mass_center = p->p_box.bound_box.center;
 
     // Updating sword.
-    p->sword.origin = p->p_box.bound_box.center;
 
-    if (global_state->mouse_input.left_pressed) {
-        p->sword.sword_held_angle += sig(p->sword.sword_held_angle) * PI / 2;
-        p->sword.angle += sig(p->sword.angle) * PI / 2;
+    transform_set_rotation_2d(&p->sword.origin, deg2rad(lerp(p->sword.angle_a, p->sword.angle_b, ease_in_back(ti_elapsed_percent(&p->sword.animator))) ));
+    transform_set_rotation_2d(&p->sword.handle, deg2rad(lerp(p->sword.angle_a, p->sword.angle_b, ease_in_back(ti_elapsed_percent(&p->sword.animator))) ));
+
+    transform_set_translation_2d(&p->sword.origin, p->p_box.bound_box.center);
+    transform_set_translation_2d(&p->sword.handle, matrix4f_vec2f_multiplication(p->sword.origin, VEC2F_RIGHT));
+
+    ti_update(&p->sword.animator, global_state->t->delta_time);
+
+
+    if (global_state->mouse_input.left_pressed || is_pressed_keycode(SDLK_q)) {
+        float temp = p->sword.angle_a;
+        p->sword.angle_a = p->sword.angle_b;
+        p->sword.angle_b = temp;
+
+        ti_reset(&p->sword.animator);
     }
 
 
@@ -1383,12 +1401,12 @@ void draw_sword_trail(Sword *s) {
 
 void draw_sword_line(Sword *s) {
     // Drawing sword as a stick.
-    Vec2f pivot = vec2f_sum(s->origin, vec2f_make_angle(s->sword_held_offset, s->sword_held_angle + PI / 2));
-    Vec2f p0 = vec2f_difference(pivot, vec2f_make_angle(s->handle_length, s->angle + PI / 2));
-    Vec2f p1 = vec2f_sum(pivot, vec2f_make_angle(s->blade_length, s->angle + PI / 2));
+    Vec2f right = matrix4f_vec2f_multiplication(s->handle, VEC2F_RIGHT);
+    Vec2f up = matrix4f_vec2f_multiplication(s->handle, VEC2F_UP);
+    Vec2f origin = matrix4f_vec2f_multiplication(s->handle, VEC2F_ORIGIN);
 
-
-    draw_line(p0, p1, VEC4F_PINK);
+    draw_line(origin, right, VEC4F_RED);
+    draw_line(origin, up, VEC4F_GREEN);
 }
 
 

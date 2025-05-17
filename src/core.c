@@ -719,10 +719,10 @@ Matrix4f matrix4f_multiplication(Matrix4f *multiplier, Matrix4f *target) {
 
 Transform transform_make_trs_2d(Vec2f position, float angle, Vec2f scale) {
     return (Transform) {
-        .array = { scale.x * cosf(angle),   scale.y * -sinf(angle), 0.0f, position.x, 
-                   scale.x * sinf(angle),   scale.y * cosf(angle),  0.0f, position.y,
-                   0.0f,                    0.0f,                   1.0f, 0.0f,
-                   0.0f,                    0.0f,                   0.0f, 1.0f}
+        .array = { scale.x * cosf(angle),                           sig(scale.x) * fabsf(scale.y) * -sinf(angle),   0.0f, position.x, 
+                   sig(scale.y) * fabsf(scale.x) * sinf(angle),     scale.y * cosf(angle),                          0.0f, position.y,
+                   0.0f,                                            0.0f,                                           1.0f, 0.0f,
+                   0.0f,                                            0.0f,                                           0.0f, 1.0f}
     };
 }
 
@@ -740,8 +740,8 @@ void transform_set_rotation_2d(Transform *transform, float angle) {
     float scale_y = sig(transform->array[5]) * sqrtf(transform->array[1] * transform->array[1] + transform->array[5] * transform->array[5]);
     
     transform->array[0] = scale_x * cosf(angle);
-    transform->array[4] = scale_x * sinf(angle);
-    transform->array[1] = scale_y * -sinf(angle);
+    transform->array[1] = fabsf(scale_y) * sig(scale_x) * -sinf(angle);
+    transform->array[4] = fabsf(scale_x) * sig(scale_y) * sinf(angle);
     transform->array[5] = scale_y * cosf(angle);
 }
 
@@ -751,13 +751,18 @@ void transform_set_translation_2d(Transform *transform, Vec2f position) {
 }
 
 void transform_flip_y(Transform *transform) {
-    transform->array[1] *= -1.0f;
+    transform->array[4] *= -1.0f;
     transform->array[5] *= -1.0f;
 }
 
 void transform_flip_x(Transform *transform) {
     transform->array[0] *= -1.0f;
-    transform->array[4] *= -1.0f;
+    transform->array[1] *= -1.0f;
+}
+
+void transform_set_flip_x(Transform *transform, float sign) {
+    transform->array[0] = sig(sign) * fabsf(transform->array[0]);
+    transform->array[1] = sig(sign) * -fabsf(transform->array[1]);
 }
 
 
@@ -1641,6 +1646,15 @@ void ti_update(T_Interpolator *interpolator, float delta_time) {
 float ti_elapsed_percent(T_Interpolator *interpolator) {
     return interpolator->elapsed_t / interpolator->duration;
 }
+
+bool ti_is_complete(T_Interpolator *interpolator) {
+    return fequal(interpolator->duration, interpolator->elapsed_t);
+}
+
+void ti_reset(T_Interpolator *interpolator) {
+    interpolator->elapsed_t = 0;
+}
+
 
 
 

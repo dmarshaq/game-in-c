@@ -60,16 +60,12 @@ typedef struct phys_box {
  */
 
 typedef struct sword {
-    Vec2f origin;
+    Transform origin;
+    Transform handle;
 
-    float sword_held_angle;
-    float sword_held_offset;
-
-    float handle_length;
-    float blade_length;
-    float angle;
-
-    bool flip_x;
+    float angle_a;
+    float angle_b;
+    T_Interpolator animator;
 } Sword;
 
 

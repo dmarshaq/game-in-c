@@ -361,6 +361,8 @@ void transform_set_rotation_2d(Transform *transform, float angle);
 void transform_set_translation_2d(Transform *transform, Vec2f position);
 void transform_flip_y(Transform *transform);
 void transform_flip_x(Transform *transform);
+void transform_set_flip_x(Transform *transform, float sign);
+void transform_set_flip_y(Transform *transform, float sign);
 
 
 
@@ -747,6 +749,8 @@ typedef struct time_interpolator {
 
 void ti_update(T_Interpolator *interpolator, float delta_time);
 float ti_elapsed_percent(T_Interpolator *interpolator);
+bool ti_is_complete(T_Interpolator *interpolator);
+void ti_reset(T_Interpolator *interpolator);
 
 
 
