@@ -247,58 +247,128 @@ void hash_table_print(void **table);
  */
 
 #include <math.h>
+#include <float.h>
 
 #define PI 3.14159265358979323846f
 #define TAU (PI * 2)
 
 #define deg2rad(deg)                        ((deg) * PI / 180.0f)
 #define rad2deg(rad)                        ((rad) * 180.0f / PI)
-
-#define right_triangle_hypotenuse(a, b)     (sqrtf((a) * (a) + (b) * (b)))
-#define sig(a)                              (((a) == 0.0f) ? (0.0f) : (fabsf(a) / (a)))
-#define fequal(a, b)                        (fabsf((a) - (b)) < FLT_EPSILON)
-
 #define randf()                             ((float)rand() / RAND_MAX)
 
+static inline float right_triangle_hypotenuse(float a, float b) {
+    return sqrtf(a * a + b * b);
+}
 
-#define lerp(a, b, t)                       ((a) + ((b) - (a)) * (t))
-#define ease_in_back(x)                     (((1.70158f + 1.0f) * (x) * (x) * (x)) - (1.70158f * (x) * (x)))
+static inline float sig(float a) {
+    return (a == 0.0f) ? 0.0f : fabsf(a) / a;
+}
 
+static inline int fequal(float a, float b) {
+    return fabsf(a - b) < FLT_EPSILON;
+}
 
+static inline float lerp(float a, float b, float t) {
+    return a + (b - a) * t;
+}
+
+static inline float ease_in_back(float x) {
+    float c1 = 1.70158f;
+    float c3 = c1 + 1.0f;
+    return (c3 * x * x * x) - (c1 * x * x);
+}
+
+// Vec2f
 
 typedef struct vec2f {
     float x;
     float y;
 } Vec2f;
 
-#define vec2f_make(x, y)                    ((Vec2f) { x, y } )
-#define vec2f_make_angle(mag, angle)        ((Vec2f) { (mag) * cosf(angle), (mag) * sinf(angle) } )
+static inline Vec2f vec2f_make(float x, float y) {
+    return (Vec2f){ x, y };
+}
 
-#define VEC2F_ORIGIN                        ((Vec2f) { 0.0f,  0.0f } )
-#define VEC2F_RIGHT                         ((Vec2f) { 1.0f,  0.0f } )
-#define VEC2F_LEFT                          ((Vec2f) {-1.0f,  0.0f } )
-#define VEC2F_UP                            ((Vec2f) { 0.0f,  1.0f } )
-#define VEC2F_DOWN                          ((Vec2f) { 0.0f, -1.0f } )
-#define VEC2F_UNIT                          ((Vec2f) { 1.0f,  1.0f } )
+static inline Vec2f vec2f_make_angle(float mag, float angle) {
+    return (Vec2f){ mag * cosf(angle), mag * sinf(angle) };
+}
+
+#define VEC2F_ORIGIN ((Vec2f){ 0.0f,  0.0f })
+#define VEC2F_RIGHT  ((Vec2f){ 1.0f,  0.0f })
+#define VEC2F_LEFT   ((Vec2f){-1.0f,  0.0f })
+#define VEC2F_UP     ((Vec2f){ 0.0f,  1.0f })
+#define VEC2F_DOWN   ((Vec2f){ 0.0f, -1.0f })
+#define VEC2F_UNIT   ((Vec2f){ 1.0f,  1.0f })
 
 #define vec2f_print(v1)                     printf(#v1 " = ( % 2.2f , % 2.2f )\n", v1.x, v1.y)
 
-#define vec2f_sum(v1, v2)                   vec2f_make(v1.x + v2.x, v1.y + v2.y)
-#define vec2f_difference(v1, v2)            vec2f_make(v1.x - v2.x, v1.y - v2.y) 
-#define vec2f_sum_constant(v1, c)           vec2f_make(v1.x + (c), v1.y + (c))
-#define vec2f_difference_constant(v1, c)    vec2f_make(v1.x - (c), v1.y - (c)) 
-#define vec2f_dot(v1, v2)                   (v1.x * v2.x + v1.y * v2.y)
-#define vec2f_cross(v1, v2)                 (v1.x * v2.y - v1.y * v2.x)
-#define vec2f_multi_constant(v1, c)         vec2f_make(v1.x * (c), v1.y * (c))
-#define vec2f_divide_constant(v1, c)        vec2f_make(v1.x / (c), v1.y / (c))
-#define vec2f_magnitude(v1)                 right_triangle_hypotenuse(v1.x, v1.y)
-#define vec2f_distance(v1, v2)              right_triangle_hypotenuse(v1.x - v2.x, v1.y - v2.y)
-#define vec2f_negate(v1)                    vec2f_make(-v1.x, -v1.y)
-#define vec2f_normalize(v1)                 (((v1).x == 0.0f && (v1).y == 0.0f) ? VEC2F_ORIGIN : vec2f_divide_constant(v1, vec2f_magnitude(v1)))
-#define vec2f_lerp(v1, v2, t)               vec2f_make(lerp(v1.x, v2.x, t), lerp(v1.y, v2.y, t))
-#define vec2f_rotate(v1, angle)             vec2f_make(cosf(angle) * v1.x - sinf(angle) * v1.y, sinf(angle) * v1.x + cosf(angle) * v1.y)
+static inline Vec2f vec2f_sum(Vec2f v1, Vec2f v2) {
+    return vec2f_make(v1.x + v2.x, v1.y + v2.y);
+}
+
+static inline Vec2f vec2f_difference(Vec2f v1, Vec2f v2) {
+    return vec2f_make(v1.x - v2.x, v1.y - v2.y);
+}
+
+static inline Vec2f vec2f_sum_constant(Vec2f v, float c) {
+    return vec2f_make(v.x + c, v.y + c);
+}
+
+static inline Vec2f vec2f_difference_constant(Vec2f v, float c) {
+    return vec2f_make(v.x - c, v.y - c);
+}
+
+static inline float vec2f_dot(Vec2f v1, Vec2f v2) {
+    return v1.x * v2.x + v1.y * v2.y;
+}
+
+static inline float vec2f_cross(Vec2f v1, Vec2f v2) {
+    return v1.x * v2.y - v1.y * v2.x;
+}
+
+static inline Vec2f vec2f_multi_constant(Vec2f v, float c) {
+    return vec2f_make(v.x * c, v.y * c);
+}
+
+static inline Vec2f vec2f_divide_constant(Vec2f v, float c) {
+    return vec2f_make(v.x / c, v.y / c);
+}
+
+static inline float vec2f_magnitude(Vec2f v) {
+    return sqrtf(v.x * v.x + v.y * v.y);
+}
+
+static inline float vec2f_distance(Vec2f v1, Vec2f v2) {
+    float dx = v1.x - v2.x;
+    float dy = v1.y - v2.y;
+    return sqrtf(dx * dx + dy * dy);
+}
+
+static inline Vec2f vec2f_negate(Vec2f v) {
+    return vec2f_make(-v.x, -v.y);
+}
+
+static inline Vec2f vec2f_normalize(Vec2f v) {
+    float mag = vec2f_magnitude(v);
+    return (mag == 0.0f) ? VEC2F_ORIGIN : vec2f_divide_constant(v, mag);
+}
+
+static inline Vec2f vec2f_lerp(Vec2f v1, Vec2f v2, float t) {
+    return vec2f_make(lerp(v1.x, v2.x, t), lerp(v1.y, v2.y, t));
+}
+
+static inline Vec2f vec2f_rotate(Vec2f v, float angle) {
+    float cos_a = cosf(angle);
+    float sin_a = sinf(angle);
+    return vec2f_make(
+        cos_a * v.x - sin_a * v.y,
+        sin_a * v.x + cos_a * v.y
+    );
+}
 
 float point_segment_min_distance(Vec2f p, Vec2f a, Vec2f b);
+
+// Vec3f
 
 typedef struct vec3f {
     float x;
@@ -306,9 +376,14 @@ typedef struct vec3f {
     float z;
 } Vec3f;
 
-#define vec3f_make(x, y, z)                 ((Vec3f) { x, y, z } )
+
+static inline Vec3f vec3f_make(float x, float y, float z) {
+    return (Vec3f){ x, y, z };
+}
 
 #define vec3f_print(v1)                     printf(#v1 " = ( % 2.2f , % 2.2f , %2.2f )\n", v1.x, v1.y, v1.z)
+
+// Vec4f
 
 typedef struct vec4f {
     float x;
@@ -317,7 +392,9 @@ typedef struct vec4f {
     float w;
 } Vec4f;
 
-#define vec4f_make(x, y, z, w)              ((Vec4f) { x, y, z, w } )
+static inline Vec4f vec4f_make(float x, float y, float z, float w) {
+    return (Vec4f){ x, y, z, w };
+}
 
 #define VEC4F_WHITE                         ((Vec4f) { 1.0f,  1.0f,  1.0f,  1.0f } )
 #define VEC4F_BLACK                         ((Vec4f) { 0.0f,  0.0f,  0.0f,  1.0f } )
@@ -331,6 +408,8 @@ typedef struct vec4f {
 
 #define vec4f_print(v1)                     printf(#v1 " = ( % 2.2f , % 2.2f , % 2.2f , % 2.2f )\n", v1.x, v1.y, v1.z, v1.w)
 
+// Matrix4f
+
 typedef struct matrix4f {
     float array[16];
 } Matrix4f;
@@ -340,21 +419,54 @@ typedef struct matrix4f {
 
 #define matrix4f_print(matrix)                                          printf(#matrix " =\n[[ % 2.2f , % 2.2f , % 2.2f , % 2.2f ]\n [ % 2.2f , % 2.2f , % 2.2f , % 2.2f ]\n [ % 2.2f , % 2.2f , % 2.2f , % 2.2f ]\n [ % 2.2f , % 2.2f , % 2.2f , % 2.2f ]]\n", matrix.array[0], matrix.array[1], matrix.array[2], matrix.array[3], matrix.array[4], matrix.array[5], matrix.array[6], matrix.array[7], matrix.array[8], matrix.array[9], matrix.array[10], matrix.array[11], matrix.array[12], matrix.array[13], matrix.array[14], matrix.array[15])
 
-#define matrix4f_orthographic(left, right, bottom, top, near, far)     ((Matrix4f) {{ 2.0f / ((right) - (left)), 0.0f, 0.0f, ((left) + (right)) / ((left) - (right)),    0.0f, 2.0f / ((top) - (bottom)), 0.0f, ((bottom) + (top)) / ((bottom) - (top)),    0.0f, 0.0f, 2.0f / ((near) - (far)), ((near) + (far)) / ((near) - (far)),    0.0f, 0.0f, 0.0f, 1.0f }} )
+static inline Matrix4f matrix4f_orthographic(float left, float right, float bottom, float top, float near, float far) {
+    return ((Matrix4f) {{ 2.0f / ((right) - (left)), 0.0f, 0.0f, ((left) + (right)) / ((left) - (right)),    0.0f, 2.0f / ((top) - (bottom)), 0.0f, ((bottom) + (top)) / ((bottom) - (top)),    0.0f, 0.0f, 2.0f / ((near) - (far)), ((near) + (far)) / ((near) - (far)),    0.0f, 0.0f, 0.0f, 1.0f }} );
+}
 
-#define matrix4f_vec2f_multiplication(matrix, vec2)                     ((Vec2f) { .x = matrix.array[0] * vec2.x + matrix.array[1] * vec2.y + matrix.array[3],    .y = matrix.array[4] * vec2.x + matrix.array[5] * vec2.y + matrix.array[7], } )
-#define matrix4f_vec3f_multiplication(matrix, vec3)                     ((Vec3f) { .x = matrix.array[0] * vec3.x + matrix.array[1] * vec3.y + matrix.array[2] * vec3.z,    .y = matrix.array[4] * vec3.x + matrix.array[5] * vec3.y + matrix.array[6] * vec3.z,    .z = matrix.array[8] * vec3.x + matrix.array[9] * vec3.y + matrix.array[10] * vec3.z, } )
-#define matrix4f_vec4f_multiplication(matrix, vec4)                     ((Vec4f) { .x = matrix.array[0] * vec4.x + matrix.array[1] * vec4.y + matrix.array[2] * vec4.z + matrix.array[3] * vec4.w,    .y = matrix.array[4] * vec4.x + matrix.array[5] * vec4.y + matrix.array[6] * vec4.z + matrix.array[7] * vec4.w,    .z = matrix.array[8] * vec4.x + matrix.array[9] * vec4.y + matrix.array[10] * vec4.z + matrix.array[11] * vec4.w,    .w = matrix.array[12] * vec4.x + matrix.array[13] * vec4.y + matrix.array[14] * vec4.z + matrix.array[15] * vec4.w, } )
+static inline Vec2f matrix4f_mul_vec2f(Matrix4f m, Vec2f v) {
+    return (Vec2f){
+        .x = m.array[0] * v.x + m.array[1] * v.y + m.array[3],
+        .y = m.array[4] * v.x + m.array[5] * v.y + m.array[7]
+    };
+}
+
+static inline Vec3f matrix4f_mul_vec3f(Matrix4f m, Vec3f v) {
+    return (Vec3f){
+        .x = m.array[0] * v.x + m.array[1] * v.y + m.array[2] * v.z,
+        .y = m.array[4] * v.x + m.array[5] * v.y + m.array[6] * v.z,
+        .z = m.array[8] * v.x + m.array[9] * v.y + m.array[10] * v.z
+    };
+}
+
+static inline Vec4f matrix4f_mul_vec4f(Matrix4f m, Vec4f v) {
+    return (Vec4f){
+        .x = m.array[0] * v.x + m.array[1] * v.y + m.array[2] * v.z + m.array[3] * v.w,
+        .y = m.array[4] * v.x + m.array[5] * v.y + m.array[6] * v.z + m.array[7] * v.w,
+        .z = m.array[8] * v.x + m.array[9] * v.y + m.array[10] * v.z + m.array[11] * v.w,
+        .w = m.array[12] * v.x + m.array[13] * v.y + m.array[14] * v.z + m.array[15] * v.w
+    };
+}
 
 Matrix4f matrix4f_multiplication(Matrix4f *multiplier, Matrix4f *target);
 
+// Transform
+
 typedef Matrix4f Transform;
 
-#define transform_make_translation_2d(position)                              ((Transform) {{ 1.0f, 0.0f, 0.0f, position.x,   0.0f, 1.0f, 0.0f, position.y,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} )
-#define transform_make_rotation_2d(angle)                                    ((Transform) {{ cosf(angle), -sinf(angle), 0.0f, 0.0f,    sinf(angle),  cosf(angle), 0.0f, 0.0f,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} )
-#define transform_make_scale_2d(scale)                                       ((Transform) {{ scale.x, 0.0f, 0.0f, 0.0f,   0.0f, scale.y, 0.0f, 0.0f,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} )
+static inline Transform transform_make_translation_2d(Vec2f position) {
+    return ((Transform) {{ 1.0f, 0.0f, 0.0f, position.x,   0.0f, 1.0f, 0.0f, position.y,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} );
+}
 
-// Transform transform_make_srt_2d(Vec2f position, float angle, Vec2f scale);
+static inline Transform transform_make_rotation_2d(float angle) {
+    float c = cosf(angle);
+    float s = sinf(angle);
+    return ((Transform) {{ c, -s, 0.0f, 0.0f,    s,  c, 0.0f, 0.0f,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} );
+}
+
+static inline Transform transform_make_scale_2d(Vec2f scale) {
+    return ((Transform) {{ scale.x, 0.0f, 0.0f, 0.0f,   0.0f, scale.y, 0.0f, 0.0f,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f }} );
+}
+
 Transform transform_make_trs_2d(Vec2f position, float angle, Vec2f scale);
 
 void transform_set_rotation_2d(Transform *transform, float angle);
@@ -364,13 +476,16 @@ void transform_flip_x(Transform *transform);
 void transform_set_flip_x(Transform *transform, float sign);
 void transform_set_flip_y(Transform *transform, float sign);
 
-
+// Function
 
 typedef float (*Function)(float);
 
 #define func_expr(expr) ({ float __fn(float x) { return (expr); } (Function)__fn; })
 
-
+// Shapes
+/**
+ * @Todo: Replace macros with inline functions.
+ */
 
 /**
  * This macro uses [ domain_start, domain_end ] to specify domain boundaries, and checks if value inside that domain.

@@ -1,6 +1,8 @@
 #include "plug.h"
 #include "SDL2/SDL_keycode.h"
 #include "core.h"
+#include <float.h>
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,9 +43,9 @@ Vec2f camera_screen_to_world(Vec2f point, Camera *camera);
 
 Plug_State *global_state;
 
-const Vec2f gravity_acceleration = vec2f_make(0.0f, -9.81f);
-const float jump_input_leeway = 0.4f;
-const float air_control_percent = 0.3f;
+static const Vec2f gravity_acceleration = (Vec2f){ 0.0f, -9.81f };
+static const float jump_input_leeway = 0.4f;
+static const float air_control_percent = 0.3f;
 
 float mouse_g_constant = 0.0f;
 
@@ -1282,29 +1284,10 @@ void plug_update(Plug_State *state) {
     Transform reflection = transform_make_scale_2d(vec2f_make(-1.0f, 1.0f));
     mat = matrix4f_multiplication(&reflection, &mat);
 
-    // if (is_pressed_keycode(SDLK_p)) {
-    //     matrix4f_print(mat);
-    // }
 
-    // transform_set_translation_2d(&mat, vec2f_make(-2.0f, -1.0f));
-
-    // transform_set_rotation_2d(&mat, deg2rad(lerp(test_angle_a, test_angle_b, ease_in_back(ti_elapsed_percent(&test_ti)) )));
-
-    // ti_update(&test_ti, state->t->delta_time);
-
-    // if (ti_is_complete(&test_ti)) {
-    //     float temp = test_angle_a;
-    //     test_angle_a = test_angle_b;
-    //     test_angle_b = temp;
-
-    //     ti_reset(&test_ti);
-    // }
-
-
-
-    Vec2f right = matrix4f_vec2f_multiplication(mat, VEC2F_RIGHT);
-    Vec2f up = matrix4f_vec2f_multiplication(mat, VEC2F_UP);
-    Vec2f origin = matrix4f_vec2f_multiplication(mat, VEC2F_ORIGIN);
+    Vec2f right = matrix4f_mul_vec2f(mat, VEC2F_RIGHT);
+    Vec2f up = matrix4f_mul_vec2f(mat, VEC2F_UP);
+    Vec2f origin = matrix4f_mul_vec2f(mat, VEC2F_ORIGIN);
 
     draw_line(origin, right, VEC4F_RED);
     draw_line(origin, up, VEC4F_GREEN);
@@ -1372,7 +1355,7 @@ void update_player(Player *p) {
     transform_set_rotation_2d(&p->sword.handle, deg2rad(lerp(p->sword.angle_a, p->sword.angle_b, ease_in_back(ti_elapsed_percent(&p->sword.animator))) ));
 
     transform_set_translation_2d(&p->sword.origin, p->p_box.bound_box.center);
-    transform_set_translation_2d(&p->sword.handle, matrix4f_vec2f_multiplication(p->sword.origin, VEC2F_RIGHT));
+    transform_set_translation_2d(&p->sword.handle, matrix4f_mul_vec2f(p->sword.origin, VEC2F_RIGHT));
 
     ti_update(&p->sword.animator, global_state->t->delta_time);
 
@@ -1401,9 +1384,9 @@ void draw_sword_trail(Sword *s) {
 
 void draw_sword_line(Sword *s) {
     // Drawing sword as a stick.
-    Vec2f right = matrix4f_vec2f_multiplication(s->handle, VEC2F_RIGHT);
-    Vec2f up = matrix4f_vec2f_multiplication(s->handle, VEC2F_UP);
-    Vec2f origin = matrix4f_vec2f_multiplication(s->handle, VEC2F_ORIGIN);
+    Vec2f right = matrix4f_mul_vec2f(s->handle, VEC2F_RIGHT);
+    Vec2f up = matrix4f_mul_vec2f(s->handle, VEC2F_UP);
+    Vec2f origin = matrix4f_mul_vec2f(s->handle, VEC2F_ORIGIN);
 
     draw_line(origin, right, VEC4F_RED);
     draw_line(origin, up, VEC4F_GREEN);
