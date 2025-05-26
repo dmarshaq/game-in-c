@@ -564,11 +564,6 @@ typedef struct circle {
  */
 
 /**
- * @Incomplete: Write description.
- */
-char *read_file_into_string(char *file_name, Allocator *allocator);
-    
-/**
  * Reads contents of the file into the buffer that is preemptivly allocated using malloc.
  * Return pointer to the buffer and sets buffer size in bytes into the file_size.
  * @Important: Buffer should be freed manually when not used anymore.
@@ -576,7 +571,9 @@ char *read_file_into_string(char *file_name, Allocator *allocator);
 void *read_file_into_buffer(char *file_name, u64 *file_size, Allocator *allocator);
 
 /**
- * @Incomplete: Write description.
+ * Reads contents of the file into the String_8 structure that is preemptivly allocated using malloc.
+ * Return String_8 structure with pointer to dynamically allocated memory and size of it.
+ * @Important: String_8 should be freed manually when not used anymore.
  */
 String_8 read_file_into_str8(char *file_name, Allocator *allocator);
 
@@ -625,28 +622,31 @@ bool is_unpressed_keycode(SDL_KeyCode keycode);
 
 
 /**
- * @Incomplete: Write description.
+ * Simple glGetError() wrapper that outputs OpenGL error code if it detects error at a time of calling.
+ * Returns false - failure if error was detected.
+ * Return true - success if there are no OpenGL errors.
  */
 bool check_gl_error();
 
 /**
- * @Incomplete: Write description.
+ * Wrapper around SDL Initialization.
  */
 int init_sdl_gl();
 
 /**
- * @Incomplete: Write description.
+ * Wrapper around GL window creation through SDL, with OpenGL context and GLEW initialization.
  */
 SDL_Window* create_gl_window(const char *title, int x, int y, int width, int height);
 
 /**
- * @Incomplete: Write description.
+ * Wrapper around SDL Mix, Audio initialization.
  */
 int init_sdl_audio();
 
 
 /**
- * @Incomplete: Write description.
+ * An initialization function for general purpose rendering, makes arraylists for indicies and verticies, configures GL Blending, and gets stbi to flip image vertically on load.
+ * Needs to be called before other graphics functions are called.
  */
 void graphics_init();
 
@@ -726,40 +726,42 @@ typedef struct quad_drawer {
 #define INDICIES_PER_QUAD       6
 
 /**
- * @Incomplete: Write description.
+ * Creates GL buffers based on shader vertex stride for quad drawer.
  */
 void drawer_init(Quad_Drawer *drawer, Shader *shader);
 
 /**
- * @Incomplete: Write description.
+ * Properly frees GL buffers from previously initted quad drawer.
  */
 void drawer_free(Quad_Drawer *drawer);
 
 /**
- * @Incomplete: Write description.
+ * Simply adds texture to a 32 limited array of textures being used, if its already in array returns its index, if its not, appends added texture id to the end and return it's index, if it overflows 32 textures limits, its prints error and returns -1.0f.
  */
 float add_texture_to_slots(Texture *texture);
 
 
 /**
  * Draws quad data to the screen that is stored in the buffer.
- * For example: "draw_end()" uses this function to draw verticies that are stored inside verticies array.
+ * For example: "draw_end()" uses this function to draw verticies that are stored inside verticies arraylist.
  */
-
 void draw_buffer(Quad_Drawer *drawer, void *buffer, u32 size);
+
+
 /**
- * @Incomplete: Write description.
+ * Doesn't drawcall anything, just sets drawer to be active drawer, for the graphics to know what drawer will be used in drawing of all passed data.
  */
 void draw_begin(Quad_Drawer *drawer);
 
 /**
- * @Incomplete: Write description.
+ * Wraps around "draw_buffer()" using active drawer as a parameter, and internally inited vertices arraylist as a buffer parameter.
+ * @Important: Essentially all general drawing should happen between draw_begin() and draw_end() calls.
  */
 void draw_end();
 
 
 /**
- * Simply places specified data directly into the verticies array.
+ * Simply places specified data directly into the verticies arraylist.
  */
 void draw_quad_data(float *quad_data, u32 count);
 
@@ -813,27 +815,28 @@ typedef struct line_drawer {
 #define VERTICIES_PER_LINE      2
 
 /**
- * @Incomplete: Write description.
+ * Creates GL buffers based on shader vertex stride for line drawer.
  */
 void line_drawer_init(Line_Drawer *drawer, Shader *shader);
 
 /**
- * @Incomplete: Write description.
+ * Properly frees GL buffers from previously initted line drawer.
  */
 void line_drawer_free(Line_Drawer *drawer);
 
 /**
- * @Incomplete: Write description.
+ * Doesn't drawcall anything, just sets drawer to be active line drawer, for the graphics to know what drawer will be used in drawing of all passed data.
  */
 void line_draw_begin(Line_Drawer *drawer);
 
 /**
- * @Incomplete: Write description.
+ * Uses internally inited vertices arraylist to draw GL lines.
+ * @Important: Essentially all general line drawing should happen between line_draw_begin() and line_draw_end() calls. But it cannot happen inside "draw_begin()" and "draw_end()" since both lines and quads use same verticies arraylist.
  */
 void line_draw_end();
 
 /**
- * @Incomplete: Write description.
+ * Simply places specified line data directly into the verticies arraylist.
  */
 void draw_line_data(float *line_data, u32 count);
 

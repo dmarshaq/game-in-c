@@ -805,37 +805,6 @@ AABB obb_enclose_in_aabb(OBB *box) {
  * File utils.
  */
 
-char* read_file_into_string(char *file_name, Allocator *allocator) {
-    FILE *file = fopen(file_name, "rb");
-    if (file == NULL) {
-        printf_err("Couldn't open the file \"%s\".\n", file_name);
-        return NULL;
-    }
-
-    (void)fseek(file, 0, SEEK_END);
-    size_t file_size = ftell(file);
-    rewind(file);
-
-    char *buffer = allocator_alloc(allocator, file_size + 1);
-    if (buffer == NULL) {
-        printf_err("Memory allocation for string buffer failed while reading the file \"%s\".\n", file_name);
-        (void)fclose(file);
-        return NULL;
-    }
-
-    if (fread(buffer, 1, file_size, file) != file_size) {
-        printf_err("Failure reading the file \"%s\".\n", file_name);
-        (void)fclose(file);
-        free(buffer);
-        return NULL;
-    }
-
-    buffer[file_size] = '\0';
-    (void)fclose(file);
-
-    return buffer;
-}
-
 void* read_file_into_buffer(char *file_name, u64 *file_size, Allocator *allocator) {
     FILE *file = fopen(file_name, "rb");
     if (file == NULL) {
