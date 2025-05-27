@@ -825,12 +825,18 @@ void line_drawer_init(Line_Drawer *drawer, Shader *shader);
 void line_drawer_free(Line_Drawer *drawer);
 
 /**
+ * Draws line data to the screen that is stored in the buffer.
+ * For example: "line_draw_end()" uses this function to draw verticies that are stored inside verticies arraylist.
+ */
+void line_draw_buffer(Line_Drawer *drawer, void *buffer, u32 size);
+
+/**
  * Doesn't drawcall anything, just sets drawer to be active line drawer, for the graphics to know what drawer will be used in drawing of all passed data.
  */
 void line_draw_begin(Line_Drawer *drawer);
 
 /**
- * Uses internally inited vertices arraylist to draw GL lines.
+ * Wraps around "line_draw_buffer()" using active line drawer as a parameter, and internally inited vertices arraylist as a buffer parameter.
  * @Important: Essentially all general line drawing should happen between line_draw_begin() and line_draw_end() calls. But it cannot happen inside "draw_begin()" and "draw_end()" since both lines and quads use same verticies arraylist.
  */
 void line_draw_end();

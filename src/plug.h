@@ -48,6 +48,9 @@ typedef struct phys_box {
 
 /**
  * Game entities.
+ * 
+ * @Important: Comment below is still valid to some extent, but the solution is not ideal, it strictly depended ib how data is used, and updated, so using arrays of pointers as data might not be ideal solution due to potential cache issues when updating large data sets.
+ *
  * In this game it seems unnecessary to introduce complex ECS systems, so this game will follow more basic approach where each "game entity" is predifined as its own struct containing all necessary data.
  * The problem arises when some organized generic algorithm like physics resolution tries to use these predefined entities.
  * Generally the pointer to the Phys_Box value can just be passed to some physics arraylist for it to resolve the collision and other physics related calculations.
@@ -108,6 +111,7 @@ typedef struct plug_state {
 
     Quad_Drawer drawer;
     Line_Drawer line_drawer;
+    float *debug_vert_buffer;
 
 
     Impulse *impulses;

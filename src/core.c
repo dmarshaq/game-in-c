@@ -1506,6 +1506,34 @@ void line_drawer_free(Line_Drawer *drawer) {
     drawer->vbo = 0;
 }
 
+void line_draw_buffer(Line_Drawer *drawer, void *buffer, u32 size) {
+    // Bind buffers, program, textures.
+    glUseProgram(drawer->program->id);
+
+    glBindVertexArray(drawer->vao);
+    glBindBuffer(GL_ARRAY_BUFFER, drawer->vbo);
+
+
+    u32 batch_stride = MAX_LINES_PER_BATCH * VERTICIES_PER_LINE * drawer->program->vertex_stride;
+    // Spliting all data on equal batches, and processing each batch in each draw call.
+    u32 batches = size / sizeof(float) / batch_stride;
+    for (u32 i = 0; i < batches; i++) {
+        glBufferSubData(GL_ARRAY_BUFFER, 0, batch_stride * sizeof(float), buffer + (i * batch_stride));
+        glDrawArrays(GL_LINES, 0, MAX_LINES_PER_BATCH * VERTICIES_PER_LINE);
+    }
+    
+    // Data that didn't group into full batch, rendered in last draw call.
+    u32 float_attributes_left = (size / sizeof(float) - batch_stride * batches);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, float_attributes_left * sizeof(float), buffer + (batches * batch_stride));
+    glDrawArrays(GL_LINES, 0, float_attributes_left / drawer->program->vertex_stride);
+
+
+    // Unbinding of buffers after use.
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    
+    glUseProgram(0);
+}
 
 Line_Drawer *active_line_drawer = NULL;
 
@@ -1514,32 +1542,34 @@ void line_draw_begin(Line_Drawer* drawer) {
 }
 
 void line_draw_end() {
-    // Bind buffers, program, textures.
-    glUseProgram(active_line_drawer->program->id);
+    // // Bind buffers, program, textures.
+    // glUseProgram(active_line_drawer->program->id);
 
-    glBindVertexArray(active_line_drawer->vao);
-    glBindBuffer(GL_ARRAY_BUFFER, active_line_drawer->vbo);
-
-
-    u32 batch_stride = MAX_LINES_PER_BATCH * VERTICIES_PER_LINE * active_line_drawer->program->vertex_stride;
-    // Spliting all data on equal batches, and processing each batch in each draw call.
-    u32 batches = array_list_length(&verticies) / batch_stride;
-    for (u32 i = 0; i < batches; i++) {
-        glBufferSubData(GL_ARRAY_BUFFER, 0, batch_stride * sizeof(float), verticies + (i * batch_stride));
-        glDrawArrays(GL_LINES, 0, MAX_LINES_PER_BATCH * VERTICIES_PER_LINE);
-    }
-    
-    // Data that didn't group into full batch, rendered in last draw call.
-    u32 float_attributes_left = (array_list_length(&verticies) - batch_stride * batches);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, float_attributes_left * sizeof(float), verticies + (batches * batch_stride));
-    glDrawArrays(GL_LINES, 0, float_attributes_left / active_line_drawer->program->vertex_stride);
+    // glBindVertexArray(active_line_drawer->vao);
+    // glBindBuffer(GL_ARRAY_BUFFER, active_line_drawer->vbo);
 
 
-    // Unbinding of buffers after use.
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-    
-    glUseProgram(0);
+    // u32 batch_stride = MAX_LINES_PER_BATCH * VERTICIES_PER_LINE * active_line_drawer->program->vertex_stride;
+    // // Spliting all data on equal batches, and processing each batch in each draw call.
+    // u32 batches = array_list_length(&verticies) / batch_stride;
+    // for (u32 i = 0; i < batches; i++) {
+    //     glBufferSubData(GL_ARRAY_BUFFER, 0, batch_stride * sizeof(float), verticies + (i * batch_stride));
+    //     glDrawArrays(GL_LINES, 0, MAX_LINES_PER_BATCH * VERTICIES_PER_LINE);
+    // }
+    // 
+    // // Data that didn't group into full batch, rendered in last draw call.
+    // u32 float_attributes_left = (array_list_length(&verticies) - batch_stride * batches);
+    // glBufferSubData(GL_ARRAY_BUFFER, 0, float_attributes_left * sizeof(float), verticies + (batches * batch_stride));
+    // glDrawArrays(GL_LINES, 0, float_attributes_left / active_line_drawer->program->vertex_stride);
+
+
+    // // Unbinding of buffers after use.
+    // glBindBuffer(GL_ARRAY_BUFFER, 0);
+    // glBindVertexArray(0);
+    // 
+    // glUseProgram(0);
+
+    line_draw_buffer(active_line_drawer, verticies, array_list_length(&verticies) * sizeof(float));
 
     // Clean up.
     active_line_drawer = NULL;

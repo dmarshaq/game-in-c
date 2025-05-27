@@ -1055,13 +1055,6 @@ void plug_init(Plug_State *state) {
 
 
 void plug_load(Plug_State *state) {
-    // Test
-    float dist = point_segment_min_distance(vec2f_make(1.0f, 2.0f), vec2f_make(-1.0f, 1.0f), vec2f_make(0.0f, 1.0f));
-    printf("Dist: %2.2f\n", dist);
-
-
-
-
     state->clear_color = vec4f_make(0.1f, 0.1f, 0.4f, 1.0f);
 
     // Main camera init.
@@ -1088,6 +1081,9 @@ void plug_load(Plug_State *state) {
 
     // Drawer init.
     line_drawer_init(&state->line_drawer, hash_table_get(&state->shader_table, "line", 4));
+
+    // Debug verticies buffer allocation.
+    state->debug_vert_buffer = array_list_make(float, 64, &std_allocator);
 
 
     // Font loading.
@@ -1129,6 +1125,18 @@ void draw_player(Player *p);
 void draw_sword_line(Sword *s);
 
 
+
+
+
+
+
+
+
+
+
+/**
+ * Unsorted global update variables.
+ */
 float test_angle_a = 60.0f;
 float test_angle_b = -30.0f;
 T_Interpolator test_ti = ti_make(0.8f);
@@ -1170,18 +1178,19 @@ void plug_update(Plug_State *state) {
 
 
 
-    // Testing "draw_buffer()".
+
+
+
+
+
+
+
+    /**
+     * -----------------------------------
+     *  Updating
+     * -----------------------------------
+     */
     
-
-
-
-
-
-
-
-
-
-
     // A simple and easy way to prevent delta_time jumps when loading.
     if (load_counter == 0) {
         state->t->delta_time_multi = 1.0f / (state->t->time_slow_factor % 5);
@@ -1189,12 +1198,6 @@ void plug_update(Plug_State *state) {
     if (load_counter > -1) {
         load_counter--;
     }
-
-    /**
-     * -----------------------------------
-     *  Updating
-     * -----------------------------------
-     */
 
     // Random pop up.
     if (is_pressed_keycode(SDLK_e)) {
@@ -1231,6 +1234,13 @@ void plug_update(Plug_State *state) {
     // Physics update loop.
     phys_update();
 
+
+
+
+
+
+
+
     /**
      * -----------------------------------
      *  Drawing
@@ -1253,8 +1263,6 @@ void plug_update(Plug_State *state) {
 
 
 
-
-
     // Regular quad drawing.
     state->drawer.program = quad_shader;
     draw_begin(&state->drawer);
@@ -1266,8 +1274,6 @@ void plug_update(Plug_State *state) {
 
 
 
-
-    
 
     // Line drawing.
     glLineWidth(2.0f);
@@ -1301,10 +1307,12 @@ void plug_update(Plug_State *state) {
 
 
 
+    // Before drawing UI making final call to draw debug lines that are globally added to "debug_vert_buffer" throughout the update logic, since buffer is separate from graphics api code in can be drawn using "line_draw_buffer()".
+    line_draw_buffer(&state->line_drawer, state->debug_vert_buffer, array_list_length(&state->debug_vert_buffer) * sizeof(float));
 
 
 
-    // To screen, (ui) matrix.
+    // Regular quad drawing with different projection matrix, drawing in screen space (ui).
     projection = screen_calculate_projection(state->window_width, state->window_height);
 
     shader_update_projection(quad_shader, &projection);
@@ -1316,6 +1324,9 @@ void plug_update(Plug_State *state) {
     draw_pop_up(vec2f_make(10.0f, 80.0f), VEC4F_WHITE, font_medium, 1);
 
     draw_end();
+    
+
+    // Checking for gl error.
     check_gl_error();
 }
 
@@ -1404,6 +1415,7 @@ void plug_unload(Plug_State *state) {
     
     drawer_free(&state->drawer);
     line_drawer_free(&state->line_drawer);
+    array_list_free(&state->debug_vert_buffer);
     
     font_free(hash_table_get(&state->font_table, "medium", 6));
     font_free(hash_table_get(&state->font_table, "small", 5));
