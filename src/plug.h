@@ -49,7 +49,7 @@ typedef struct phys_box {
 /**
  * Game entities.
  * 
- * @Important: Comment below is still valid to some extent, but the solution is not ideal, it strictly depended ib how data is used, and updated, so using arrays of pointers as data might not be ideal solution due to potential cache issues when updating large data sets.
+ * @Important: Comment below is still valid to some extent, but the solution is not ideal, it strictly depended on how data is used, and updated, so using arrays of pointers as data might not be ideal solution due to potential cache issues when updating large data sets.
  *
  * In this game it seems unnecessary to introduce complex ECS systems, so this game will follow more basic approach where each "game entity" is predifined as its own struct containing all necessary data.
  * The problem arises when some organized generic algorithm like physics resolution tries to use these predefined entities.
@@ -93,11 +93,12 @@ typedef struct box {
  * @Important: All global variables should be saved and organized in the struct.
  */
 typedef struct plug_state {
+    SDL_Window *window;
+    u32 window_width;
+    u32 window_height;
     SDL_Event event;
     Time_Data *t;
     bool quit;
-    u32 window_width;
-    u32 window_height;
     Mouse_Input mouse_input;
 
     /**

@@ -49,6 +49,7 @@ int main(int argc, char *argv[]) {
     state.quit = false;
     state.window_width = WINDOW_WIDTH;
     state.window_height = WINDOW_HEIGHT;
+    state.window = window;
 
     state.mouse_input = (Mouse_Input) {
         .position = VEC2F_ORIGIN,
@@ -126,9 +127,6 @@ int main(int argc, char *argv[]) {
         state.event = event;
         
         plug_update(&state);
-
-        // Swap buffers to display the rendered image.
-        SDL_GL_SwapWindow(window);
 
         if (is_pressed_keycode(SDLK_r)) {
             if(!reload_libplug()) {

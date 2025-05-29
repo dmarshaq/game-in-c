@@ -695,6 +695,14 @@ void texture_unload(Texture *texture);
  */
 UV_Region uv_slice(u32 rows, u32 cols, u32 index);
 
+/**
+ * Simply adds texture to a 32 limited array of textures being used, if its already in array returns its index, if its not, appends added texture id to the end and return it's index, if it overflows 32 textures limits, its prints error and returns -1.0f.
+ */
+float add_texture_to_slots(Texture *texture);
+
+
+
+
 
 typedef struct shader {
     u32 id;             // OpenGL program id.
@@ -712,6 +720,7 @@ Shader shader_load(char *shader_path);
 void shader_unload(Shader *shader);
 
 void shader_init_uniforms(Shader *shader);
+
 
 
 typedef struct quad_drawer {
@@ -735,17 +744,71 @@ void drawer_init(Quad_Drawer *drawer, Shader *shader);
  */
 void drawer_free(Quad_Drawer *drawer);
 
-/**
- * Simply adds texture to a 32 limited array of textures being used, if its already in array returns its index, if its not, appends added texture id to the end and return it's index, if it overflows 32 textures limits, its prints error and returns -1.0f.
- */
-float add_texture_to_slots(Texture *texture);
 
+
+
+typedef struct line_drawer {
+    u32     vao;         // OpenGL id of Vertex Array Object.
+    u32     vbo;         // OpenGL id of Vertex Buffer Object.
+    Shader  *program;    // Pointer to shader that will be used to draw.
+} Line_Drawer;
+
+#define MAX_LINES_PER_BATCH     1024
+#define VERTICIES_PER_LINE      2
+
+/**
+ * Creates GL buffers based on shader vertex stride for line drawer.
+ */
+void line_drawer_init(Line_Drawer *drawer, Shader *shader);
+
+/**
+ * Properly frees GL buffers from previously initted line drawer.
+ */
+void line_drawer_free(Line_Drawer *drawer);
+
+
+
+
+
+
+typedef float* Vertex_Buffer;
+
+/**
+ * Allocates memory on the heap for the vertex buffer, that can be used with the rest of the interface to draw to the screen.
+ */
+Vertex_Buffer vertex_buffer_make();
+
+/**
+ * Frees memory occupied by the Vertex_Buffer.
+ */
+void vertex_buffer_free(Vertex_Buffer *buffer);
+
+/**
+ * Simply adds specified vertex data to the vertex buffer.
+ */
+void vertex_buffer_append_data(Vertex_Buffer *buffer, float *vertex_data, u32 length);
 
 /**
  * Draws quad data to the screen that is stored in the buffer.
- * For example: "draw_end()" uses this function to draw verticies that are stored inside verticies arraylist.
+ * For example: "draw_end()" uses this function to draw verticies that are stored inside default vertex buffer.
  */
-void draw_buffer(Quad_Drawer *drawer, void *buffer, u32 size);
+void vertex_buffer_draw_quads(Vertex_Buffer *buffer, Quad_Drawer *drawer);
+
+/**
+ * Draws line data to the screen that is stored in the buffer.
+ * For example: "line_draw_end()" uses this function to draw verticies that are stored inside default vertex buffer.
+ */
+void vertex_buffer_draw_lines(Vertex_Buffer *buffer, Line_Drawer *drawer);
+
+/**
+ * Clears vertex buffer, by setting it's length to zero.
+ */
+void vertex_buffer_clear(Vertex_Buffer *buffer);
+
+
+
+
+
 
 
 /**
@@ -759,16 +822,51 @@ void draw_begin(Quad_Drawer *drawer);
  */
 void draw_end();
 
-
 /**
- * Simply places specified data directly into the verticies arraylist.
+ * Simply places specified data directly into the default vertex buffer.
  */
 void draw_quad_data(float *quad_data, u32 count);
+
+
+
+
+
+
+
+
+
+
+/**
+ * Doesn't drawcall anything, just sets drawer to be active line drawer, for the graphics to know what drawer will be used in drawing of all passed data.
+ */
+void line_draw_begin(Line_Drawer *drawer);
+
+/**
+ * Wraps around "line_draw_buffer()" using active line drawer as a parameter, and internally inited vertices arraylist as a buffer parameter.
+ * @Important: Essentially all general line drawing should happen between line_draw_begin() and line_draw_end() calls. But it cannot happen inside "draw_begin()" and "draw_end()" since both lines and quads use same default vertex buffer.
+ */
+void line_draw_end();
+
+/**
+ * Simply places specified line data directly into the default vertex buffer.
+ */
+void draw_line_data(float *line_data, u32 count);
+
+
+
+
 
 
 void print_verticies();
 
 void print_indicies();
+
+
+
+
+
+
+
 
 
 typedef struct camera {
@@ -804,47 +902,6 @@ Font_Baked font_bake(u8 *font_data, float font_size);
 
 void font_free(Font_Baked *font);
 
-
-typedef struct line_drawer {
-    u32     vao;         // OpenGL id of Vertex Array Object.
-    u32     vbo;         // OpenGL id of Vertex Buffer Object.
-    Shader  *program;    // Pointer to shader that will be used to draw.
-} Line_Drawer;
-
-#define MAX_LINES_PER_BATCH     1024
-#define VERTICIES_PER_LINE      2
-
-/**
- * Creates GL buffers based on shader vertex stride for line drawer.
- */
-void line_drawer_init(Line_Drawer *drawer, Shader *shader);
-
-/**
- * Properly frees GL buffers from previously initted line drawer.
- */
-void line_drawer_free(Line_Drawer *drawer);
-
-/**
- * Draws line data to the screen that is stored in the buffer.
- * For example: "line_draw_end()" uses this function to draw verticies that are stored inside verticies arraylist.
- */
-void line_draw_buffer(Line_Drawer *drawer, void *buffer, u32 size);
-
-/**
- * Doesn't drawcall anything, just sets drawer to be active line drawer, for the graphics to know what drawer will be used in drawing of all passed data.
- */
-void line_draw_begin(Line_Drawer *drawer);
-
-/**
- * Wraps around "line_draw_buffer()" using active line drawer as a parameter, and internally inited vertices arraylist as a buffer parameter.
- * @Important: Essentially all general line drawing should happen between line_draw_begin() and line_draw_end() calls. But it cannot happen inside "draw_begin()" and "draw_end()" since both lines and quads use same verticies arraylist.
- */
-void line_draw_end();
-
-/**
- * Simply places specified line data directly into the verticies arraylist.
- */
-void draw_line_data(float *line_data, u32 count);
 
 
 /**

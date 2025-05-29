@@ -995,7 +995,7 @@ Matrix4f shader_uniform_ml_matrix = MATRIX4F_IDENTITY;
 s32 shader_uniform_samplers[32] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31 };
 
 // Drawing variables.
-float *verticies;
+Vertex_Buffer verticies;
 u32 *quad_indicies;
 u32 texture_ids[32];
 
@@ -1008,7 +1008,7 @@ void graphics_init() {
     stbi_set_flip_vertically_on_load(true);
 
     // Setting drawing variables.
-    verticies = array_list_make(float, MAX_QUADS_PER_BATCH * VERTICIES_PER_QUAD * 11, &std_allocator); // @Leak
+    verticies = vertex_buffer_make(); // @Leak
     quad_indicies = array_list_make(u32, MAX_QUADS_PER_BATCH * 6, &std_allocator); // @Leak
     
     // Initing quad indicies.
@@ -1241,6 +1241,27 @@ void shader_update_projection(Shader *shader, Matrix4f *projection) {
     glUseProgram(0);
 }
 
+
+
+u8 texture_ids_filled_length = 0;
+
+float add_texture_to_slots(Texture *texture) {
+    for (u8 i = 0; i < texture_ids_filled_length; i++) {
+        if (texture_ids[i] == texture->id)
+            return i;
+    }
+    if (texture_ids_filled_length < 32) {
+        texture_ids[texture_ids_filled_length] = texture->id;
+        texture_ids_filled_length++;
+        return texture_ids_filled_length - 1;
+    }
+    printf_err("Overflow of 32 texture slots limit, can't add texture id: %d, to current draw call texture slots.\n", texture->id);
+    return -1.0f;
+}
+
+
+
+
 // @Incomplete: Finish attributes pointers setting for different types of shaders and strides.
 void drawer_init(Quad_Drawer *drawer, Shader *shader) {
     drawer->program = shader;
@@ -1295,25 +1316,60 @@ void drawer_free(Quad_Drawer *drawer) {
 }
 
 
+void line_drawer_init(Line_Drawer *drawer, Shader *shader) {
+    drawer->program = shader;
 
-u8 texture_ids_filled_length = 0;
+    // Setting Vertex Objects for render using OpenGL. Also seeting up Element Buffer Object for indices to load.
+    glGenVertexArrays(1, &drawer->vao);
+    glGenBuffers(1, &drawer->vbo);
 
-float add_texture_to_slots(Texture *texture) {
-    for (u8 i = 0; i < texture_ids_filled_length; i++) {
-        if (texture_ids[i] == texture->id)
-            return i;
-    }
-    if (texture_ids_filled_length < 32) {
-        texture_ids[texture_ids_filled_length] = texture->id;
-        texture_ids_filled_length++;
-        return texture_ids_filled_length - 1;
-    }
-    printf_err("Overflow of 32 texture slots limit, can't add texture id: %d, to current draw call texture slots.\n", texture->id);
-    return -1.0f;
+    // 1. Bind Vertex Array Object. [VAO]
+    glBindVertexArray(drawer->vao);
+    
+    // 2. Copy verticies array in a buffer for OpenGL to use. [VBO].
+    glBindBuffer(GL_ARRAY_BUFFER, drawer->vbo);
+    // printf("max: %d\n", drawer->program->vertex_stride * VERTICIES_PER_QUAD * MAX_QUADS_PER_BATCH);
+    glBufferData(GL_ARRAY_BUFFER, drawer->program->vertex_stride * VERTICIES_PER_LINE * MAX_LINES_PER_BATCH * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+
+    // 3. Set vertex attributes pointers. [VAO, VBO].
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    // 4. Unbind EBO, VBO and VAO.
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+void line_drawer_free(Line_Drawer *drawer) {
+    glDeleteVertexArrays(1, &drawer->vao); 
+    glDeleteBuffers(1, &drawer->vbo); 
+
+    drawer->program = NULL;
+    drawer->vao = 0;
+    drawer->vbo = 0;
 }
 
 
-void draw_buffer(Quad_Drawer *drawer, void *buffer, u32 size) {
+
+Vertex_Buffer vertex_buffer_make() {
+    return array_list_make(float, MAX_QUADS_PER_BATCH * VERTICIES_PER_QUAD * 11, &std_allocator);
+}
+
+void vertex_buffer_free(Vertex_Buffer *buffer) {
+    array_list_free(buffer);
+}
+
+void vertex_buffer_append_data(Vertex_Buffer *buffer, float *vertex_data, u32 length) {
+    (void)array_list_append_multiple(buffer, vertex_data, length);
+}
+
+void vertex_buffer_draw_quads(Vertex_Buffer *buffer, Quad_Drawer *drawer) {
+    u32 length = array_list_length(buffer);
+
     // Bind buffers, program, textures.
     glUseProgram(drawer->program->id);
 
@@ -1328,15 +1384,15 @@ void draw_buffer(Quad_Drawer *drawer, void *buffer, u32 size) {
 
     u32 batch_stride = MAX_QUADS_PER_BATCH * VERTICIES_PER_QUAD * drawer->program->vertex_stride;
     // Spliting all data on equal batches, and processing each batch in each draw call.
-    u32 batches = size / sizeof(float) / batch_stride;
+    u32 batches = length / batch_stride;
     for (u32 i = 0; i < batches; i++) {
-        glBufferSubData(GL_ARRAY_BUFFER, 0, batch_stride * sizeof(float), buffer + (i * batch_stride));
+        glBufferSubData(GL_ARRAY_BUFFER, 0, batch_stride * sizeof(float), *buffer + (i * batch_stride));
         glDrawElements(GL_TRIANGLES, array_list_length(&quad_indicies), GL_UNSIGNED_INT, 0);
     }
     
     // Data that didn't group into full batch, rendered in last draw call.
-    u32 float_attributes_left = (size / sizeof(float) - batch_stride * batches);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, float_attributes_left * sizeof(float), buffer + (batches * batch_stride));
+    u32 float_attributes_left = (length - batch_stride * batches);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, float_attributes_left * sizeof(float), *buffer + (batches * batch_stride));
     glDrawElements(GL_TRIANGLES, float_attributes_left / drawer->program->vertex_stride / VERTICIES_PER_QUAD * INDICIES_PER_QUAD, GL_UNSIGNED_INT, 0);
 
     // Unbinding of buffers after use.
@@ -1354,6 +1410,41 @@ void draw_buffer(Quad_Drawer *drawer, void *buffer, u32 size) {
     glUseProgram(0);
 }
 
+void vertex_buffer_draw_lines(Vertex_Buffer *buffer, Line_Drawer *drawer) {
+    u32 length = array_list_length(buffer);
+
+    // Bind buffers, program, textures.
+    glUseProgram(drawer->program->id);
+
+    glBindVertexArray(drawer->vao);
+    glBindBuffer(GL_ARRAY_BUFFER, drawer->vbo);
+
+
+    u32 batch_stride = MAX_LINES_PER_BATCH * VERTICIES_PER_LINE * drawer->program->vertex_stride;
+    // Spliting all data on equal batches, and processing each batch in each draw call.
+    u32 batches = length / batch_stride;
+    for (u32 i = 0; i < batches; i++) {
+        glBufferSubData(GL_ARRAY_BUFFER, 0, batch_stride * sizeof(float), *buffer + (i * batch_stride));
+        glDrawArrays(GL_LINES, 0, MAX_LINES_PER_BATCH * VERTICIES_PER_LINE);
+    }
+    
+    // Data that didn't group into full batch, rendered in last draw call.
+    u32 float_attributes_left = (length - batch_stride * batches);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, float_attributes_left * sizeof(float), *buffer + (batches * batch_stride));
+    glDrawArrays(GL_LINES, 0, float_attributes_left / drawer->program->vertex_stride);
+
+
+    // Unbinding of buffers after use.
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    
+    glUseProgram(0);
+}
+
+void vertex_buffer_clear(Vertex_Buffer *buffer) {
+    array_list_clear(buffer);
+}
+
 
 Quad_Drawer *active_drawer = NULL;
 
@@ -1362,46 +1453,7 @@ void draw_begin(Quad_Drawer* drawer) {
 }
 
 void draw_end() {
-    // // Bind buffers, program, textures.
-    // glUseProgram(active_drawer->program->id);
-
-    // for (u8 i = 0; i < 32; i++) {
-    //     glActiveTexture(GL_TEXTURE0 + i);
-    //     glBindTexture(GL_TEXTURE_2D, texture_ids[i]);
-    // }
-
-    // glBindVertexArray(active_drawer->vao);
-    // glBindBuffer(GL_ARRAY_BUFFER, active_drawer->vbo);
-    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, active_drawer->ebo);
-
-    // u32 batch_stride = MAX_QUADS_PER_BATCH * VERTICIES_PER_QUAD * active_drawer->program->vertex_stride;
-    // // Spliting all data on equal batches, and processing each batch in each draw call.
-    // u32 batches = array_list_length(&verticies) / batch_stride;
-    // for (u32 i = 0; i < batches; i++) {
-    //     glBufferSubData(GL_ARRAY_BUFFER, 0, batch_stride * sizeof(float), verticies + (i * batch_stride));
-    //     glDrawElements(GL_TRIANGLES, array_list_length(&quad_indicies), GL_UNSIGNED_INT, 0);
-    // }
-    // 
-    // // Data that didn't group into full batch, rendered in last draw call.
-    // u32 float_attributes_left = (array_list_length(&verticies) - batch_stride * batches);
-    // glBufferSubData(GL_ARRAY_BUFFER, 0, float_attributes_left * sizeof(float), verticies + (batches * batch_stride));
-    // glDrawElements(GL_TRIANGLES, float_attributes_left / active_drawer->program->vertex_stride / VERTICIES_PER_QUAD * INDICIES_PER_QUAD, GL_UNSIGNED_INT, 0);
-
-    // // Unbinding of buffers after use.
-    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    // glBindBuffer(GL_ARRAY_BUFFER, 0);
-    // glBindVertexArray(0);
-    // 
-    // // Unbind texture ids.
-    // for (u8 i = 0; i < 32; i++) {
-    //     glActiveTexture(GL_TEXTURE0 + i);
-    //     glBindTexture(GL_TEXTURE_2D, 0);
-    // }
-    // texture_ids_filled_length = 0;
-
-    // glUseProgram(0);
-
-    draw_buffer(active_drawer, verticies, array_list_length(&verticies) * sizeof(float));
+    vertex_buffer_draw_quads(&verticies, active_drawer);
 
     // Clean up.
     active_drawer = NULL;
@@ -1409,8 +1461,82 @@ void draw_end() {
 }
 
 void draw_quad_data(float *quad_data, u32 count) {
-    (void)array_list_append_multiple(&verticies, quad_data, count * VERTICIES_PER_QUAD * active_drawer->program->vertex_stride);
+    vertex_buffer_append_data(&verticies, quad_data, count * VERTICIES_PER_QUAD * active_drawer->program->vertex_stride);
 }
+
+
+
+
+
+
+Line_Drawer *active_line_drawer = NULL;
+
+void line_draw_begin(Line_Drawer* drawer) {
+    active_line_drawer = drawer;
+}
+
+void line_draw_end() {
+    vertex_buffer_draw_lines(&verticies, active_line_drawer);
+
+    // Clean up.
+    active_line_drawer = NULL;
+    array_list_clear(&verticies);
+}
+
+void draw_line_data(float *line_data, u32 count) {
+    vertex_buffer_append_data(&verticies, line_data, count * VERTICIES_PER_LINE * active_line_drawer->program->vertex_stride);
+}
+
+
+
+void print_verticies() {
+    u32 stride = 1;
+    if (active_drawer != NULL) {
+        stride = active_drawer->program->vertex_stride;
+    }
+    if (active_line_drawer != NULL) {
+        stride = active_line_drawer->program->vertex_stride;
+    }
+
+    (void)printf("\n---------- VERTICIES -----------\n");
+    u32 length = array_list_length(&verticies);
+    if (length == 0) {
+        (void)printf("[ ]\n");
+    }
+    else {
+        (void)printf("[ ");
+        for (u32 i = 0; i < length - 1; i++) {
+            (void)printf("%6.1f, ", verticies[i]);
+            if ((i + 1) % stride == 0)
+                (void)printf("\n  ");
+        }
+        (void)printf("%6.1f  ]\n", verticies[length - 1]);
+    }
+
+   (void)printf("Length   : %8d\n", length);
+   (void)printf("Capacity : %8d\n\n", array_list_capacity(&verticies));
+    
+}
+
+void print_indicies() {
+    (void)printf("\n----------- INDICIES -----------\n");
+    (void)printf("[\n\n  ");
+    u32 length = array_list_length(&quad_indicies);
+    for (u32 i = 0; i < length; i++) {
+        if ((i + 1) % 6 == 0)
+            (void)printf("%4d\n\n  ", quad_indicies[i]);
+        else if ((i + 1) % 3 == 0)
+            (void)printf("%4d\n  ", quad_indicies[i]);
+        else
+            (void)printf("%4d, ", quad_indicies[i]);
+    }
+   (void)printf("\r]\n");
+   (void)printf("Length   : %8d\n", length);
+   (void)printf("Capacity : %8d\n\n", array_list_capacity(&quad_indicies));
+}
+
+
+
 
 
 Font_Baked font_bake(u8 *font_data, float font_size) {
@@ -1469,164 +1595,6 @@ void font_free(Font_Baked *font) {
 }
 
 
-void line_drawer_init(Line_Drawer *drawer, Shader *shader) {
-    drawer->program = shader;
-
-    // Setting Vertex Objects for render using OpenGL. Also seeting up Element Buffer Object for indices to load.
-    glGenVertexArrays(1, &drawer->vao);
-    glGenBuffers(1, &drawer->vbo);
-
-    // 1. Bind Vertex Array Object. [VAO]
-    glBindVertexArray(drawer->vao);
-    
-    // 2. Copy verticies array in a buffer for OpenGL to use. [VBO].
-    glBindBuffer(GL_ARRAY_BUFFER, drawer->vbo);
-    // printf("max: %d\n", drawer->program->vertex_stride * VERTICIES_PER_QUAD * MAX_QUADS_PER_BATCH);
-    glBufferData(GL_ARRAY_BUFFER, drawer->program->vertex_stride * VERTICIES_PER_LINE * MAX_LINES_PER_BATCH * sizeof(float), NULL, GL_DYNAMIC_DRAW);
-
-    // 3. Set vertex attributes pointers. [VAO, VBO].
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-
-    // 4. Unbind EBO, VBO and VAO.
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-}
-
-void line_drawer_free(Line_Drawer *drawer) {
-    glDeleteVertexArrays(1, &drawer->vao); 
-    glDeleteBuffers(1, &drawer->vbo); 
-
-    drawer->program = NULL;
-    drawer->vao = 0;
-    drawer->vbo = 0;
-}
-
-void line_draw_buffer(Line_Drawer *drawer, void *buffer, u32 size) {
-    // Bind buffers, program, textures.
-    glUseProgram(drawer->program->id);
-
-    glBindVertexArray(drawer->vao);
-    glBindBuffer(GL_ARRAY_BUFFER, drawer->vbo);
-
-
-    u32 batch_stride = MAX_LINES_PER_BATCH * VERTICIES_PER_LINE * drawer->program->vertex_stride;
-    // Spliting all data on equal batches, and processing each batch in each draw call.
-    u32 batches = size / sizeof(float) / batch_stride;
-    for (u32 i = 0; i < batches; i++) {
-        glBufferSubData(GL_ARRAY_BUFFER, 0, batch_stride * sizeof(float), buffer + (i * batch_stride));
-        glDrawArrays(GL_LINES, 0, MAX_LINES_PER_BATCH * VERTICIES_PER_LINE);
-    }
-    
-    // Data that didn't group into full batch, rendered in last draw call.
-    u32 float_attributes_left = (size / sizeof(float) - batch_stride * batches);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, float_attributes_left * sizeof(float), buffer + (batches * batch_stride));
-    glDrawArrays(GL_LINES, 0, float_attributes_left / drawer->program->vertex_stride);
-
-
-    // Unbinding of buffers after use.
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-    
-    glUseProgram(0);
-}
-
-Line_Drawer *active_line_drawer = NULL;
-
-void line_draw_begin(Line_Drawer* drawer) {
-    active_line_drawer = drawer;
-}
-
-void line_draw_end() {
-    // // Bind buffers, program, textures.
-    // glUseProgram(active_line_drawer->program->id);
-
-    // glBindVertexArray(active_line_drawer->vao);
-    // glBindBuffer(GL_ARRAY_BUFFER, active_line_drawer->vbo);
-
-
-    // u32 batch_stride = MAX_LINES_PER_BATCH * VERTICIES_PER_LINE * active_line_drawer->program->vertex_stride;
-    // // Spliting all data on equal batches, and processing each batch in each draw call.
-    // u32 batches = array_list_length(&verticies) / batch_stride;
-    // for (u32 i = 0; i < batches; i++) {
-    //     glBufferSubData(GL_ARRAY_BUFFER, 0, batch_stride * sizeof(float), verticies + (i * batch_stride));
-    //     glDrawArrays(GL_LINES, 0, MAX_LINES_PER_BATCH * VERTICIES_PER_LINE);
-    // }
-    // 
-    // // Data that didn't group into full batch, rendered in last draw call.
-    // u32 float_attributes_left = (array_list_length(&verticies) - batch_stride * batches);
-    // glBufferSubData(GL_ARRAY_BUFFER, 0, float_attributes_left * sizeof(float), verticies + (batches * batch_stride));
-    // glDrawArrays(GL_LINES, 0, float_attributes_left / active_line_drawer->program->vertex_stride);
-
-
-    // // Unbinding of buffers after use.
-    // glBindBuffer(GL_ARRAY_BUFFER, 0);
-    // glBindVertexArray(0);
-    // 
-    // glUseProgram(0);
-
-    line_draw_buffer(active_line_drawer, verticies, array_list_length(&verticies) * sizeof(float));
-
-    // Clean up.
-    active_line_drawer = NULL;
-    array_list_clear(&verticies);
-}
-
-void draw_line_data(float *line_data, u32 count) {
-    (void)array_list_append_multiple(&verticies, line_data, count * VERTICIES_PER_LINE * active_line_drawer->program->vertex_stride);
-}
-
-
-
-void print_verticies() {
-    u32 stride = 1;
-    if (active_drawer != NULL) {
-        stride = active_drawer->program->vertex_stride;
-    }
-    if (active_line_drawer != NULL) {
-        stride = active_line_drawer->program->vertex_stride;
-    }
-
-    (void)printf("\n---------- VERTICIES -----------\n");
-    u32 length = array_list_length(&verticies);
-    if (length == 0) {
-        (void)printf("[ ]\n");
-    }
-    else {
-        (void)printf("[ ");
-        for (u32 i = 0; i < length - 1; i++) {
-            (void)printf("%6.1f, ", verticies[i]);
-            if ((i + 1) % stride == 0)
-                (void)printf("\n  ");
-        }
-        (void)printf("%6.1f  ]\n", verticies[length - 1]);
-    }
-
-   (void)printf("Length   : %8d\n", length);
-   (void)printf("Capacity : %8d\n\n", array_list_capacity(&verticies));
-    
-}
-
-void print_indicies() {
-    (void)printf("\n----------- INDICIES -----------\n");
-    (void)printf("[\n\n  ");
-    u32 length = array_list_length(&quad_indicies);
-    for (u32 i = 0; i < length; i++) {
-        if ((i + 1) % 6 == 0)
-            (void)printf("%4d\n\n  ", quad_indicies[i]);
-        else if ((i + 1) % 3 == 0)
-            (void)printf("%4d\n  ", quad_indicies[i]);
-        else
-            (void)printf("%4d, ", quad_indicies[i]);
-    }
-   (void)printf("\r]\n");
-   (void)printf("Length   : %8d\n", length);
-   (void)printf("Capacity : %8d\n\n", array_list_capacity(&quad_indicies));
-}
 
 
 

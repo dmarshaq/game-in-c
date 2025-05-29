@@ -14,27 +14,27 @@
  */
 
 // Drawing basics.
-void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle);
-void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale);
-void draw_line(Vec2f p0, Vec2f p1, Vec4f color);
-void draw_dot(Vec2f position, Vec4f color);
+void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle, Vertex_Buffer *buffer);
+void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale, Vertex_Buffer *buffer);
+void draw_line(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer);
+void draw_dot(Vec2f position, Vec4f color, Vertex_Buffer *buffer);
 
 // Drawing frames.
-void draw_quad_outline(Vec2f p0, Vec2f p1, Vec4f color, float offset_angle);
-void draw_circle_outline(Vec2f position, float radius, u32 detail, Vec4f color);
+void draw_quad_outline(Vec2f p0, Vec2f p1, Vec4f color, float offset_angle, Vertex_Buffer *buffer);
+void draw_circle_outline(Vec2f position, float radius, u32 detail, Vec4f color, Vertex_Buffer *buffer);
 
 // Drawing function.
-void draw_function(float x0, float x1, Function y, u32 detail, Vec4f color);
-void draw_polar(float t0, float t1, Function r, u32 detail, Vec4f color);
-void draw_parametric(float t0, float t1, Function x, Function y, u32 detail, Vec4f color);
+void draw_function(float x0, float x1, Function y, u32 detail, Vec4f color, Vertex_Buffer *buffer);
+void draw_polar(float t0, float t1, Function r, u32 detail, Vec4f color, Vertex_Buffer *buffer);
+void draw_parametric(float t0, float t1, Function x, Function y, u32 detail, Vec4f color, Vertex_Buffer *buffer);
 
 // Drawing area under the curve.
-void draw_area_function(float x0, float x1, Function y, u32 rect_count, Vec4f color);
-void draw_area_polar(float t0, float t1, Function r, u32 rect_count, Vec4f color);
-void draw_area_parametric(float t0, float t1, Function x, Function y, u32 rect_count, Vec4f color);
+void draw_area_function(float x0, float x1, Function y, u32 rect_count, Vec4f color, Vertex_Buffer *buffer);
+void draw_area_polar(float t0, float t1, Function r, u32 rect_count, Vec4f color, Vertex_Buffer *buffer);
+void draw_area_parametric(float t0, float t1, Function x, Function y, u32 rect_count, Vec4f color, Vertex_Buffer *buffer);
 
 // Viewport manipulation.
-void draw_viewport(u32 x, u32 y, u32 width, u32 height, Vec4f color, Camera *camera);
+void draw_viewport(u32 x, u32 y, u32 width, u32 height, Vec4f color, Camera *camera, Vertex_Buffer *buffer);
 void viewport_reset(Plug_State *state);
 
 
@@ -81,7 +81,7 @@ void draw_pop_up(Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale) 
     color.w = lerp(color.w, 0.0f, pop_up_lerp_t);
     position.y = lerp(position.y, position.y + 25.0f, pop_up_lerp_t);
 
-    draw_text(pop_up_buffer, position, color, font, unit_scale);
+    draw_text(pop_up_buffer, position, color, font, unit_scale, NULL);
 
     pop_up_lerp_t += 0.002f;
 
@@ -878,7 +878,7 @@ void update_boxes() {
 }
 
 
-#define PHYS_ITERATIONS 8
+#define PHYS_ITERATIONS 16
 #define PHYS_ITERATION_STEP_TIME (1.0f / PHYS_ITERATIONS)
 
 u32 grabbed_index = UINT_MAX;
@@ -890,7 +890,6 @@ void phys_update() {
     Phys_Box *box1;
     Phys_Box *box2;
 
-    line_draw_begin(&global_state->line_drawer);
     for (u32 it = 0; it < PHYS_ITERATIONS; it++) {
 
         for (u32 i = 0; i < length; i++) {
@@ -922,6 +921,12 @@ void phys_update() {
             box1->bound_box.center = vec2f_sum(box1->bound_box.center, vec2f_multi_constant(box1->body.velocity, global_state->t->delta_time * PHYS_ITERATION_STEP_TIME));
             box1->bound_box.rot += box1->body.angular_velocity * global_state->t->delta_time * PHYS_ITERATION_STEP_TIME;
             box1->body.mass_center = box1->bound_box.center;
+
+            // Debug drawing.
+            draw_line(box1->bound_box.center, vec2f_sum(box1->bound_box.center, vec2f_multi_constant(box1->body.velocity, global_state->t->delta_time * PHYS_ITERATION_STEP_TIME)), VEC4F_RED, &global_state->debug_vert_buffer);
+            // Debug drawing.
+            draw_quad_outline(obb_p0(&box1->bound_box), obb_p1(&box1->bound_box), VEC4F_RED, box1->bound_box.rot, &global_state->debug_vert_buffer);
+
         }
 
 
@@ -930,6 +935,8 @@ void phys_update() {
         u32 contacts_count;
         // Collision.
         for (u32 i = 0; i < length; i++) {
+
+
             box1 = global_state->phys_boxes[i];
             for (u32 j = i + 1; j < length; j++) {
                 box2 = global_state->phys_boxes[j];
@@ -965,45 +972,28 @@ void phys_update() {
                     box2->body.mass_center = box2->bound_box.center;
 
 
-                    // Set box1 state to grounded if normal of collision is in the same general direction as the force of gravity.
-
-
-                    // printf_ok("dot: %2.2f\n", vec2f_dot(vec2f_normalize(gravity_acceleration), normal));
-
-
                     /**
                      * @Todo: Remove physics resolution abstraction, and generalize for different types of phys boxes collisions.
                      */
                     contacts_count = phys_find_contanct_points_obb(&box1->bound_box, &box2->bound_box, contacts);
-                    // phys_resolve_dynamic_body_collision_with_friction(&box1->body, &box2->body, normal, contacts, contacts_count);
                     phys_resolve_phys_box_collision_with_rotation_friction(box1, box2, normal, contacts, contacts_count);
-
-                    // if (box1->rotatable && box2->rotatable) {
-                    //     contacts_count = phys_find_contanct_points_obb(&box1->bound_box, &box2->bound_box, contacts);
-                    //     phys_resolve_dynamic_body_collision_with_friction(&box1->body, &box2->body, normal, contacts, contacts_count);
-                    //     // phys_resolve_dynamic_body_collision(&box1->body, &box2->body, normal, contacts, contacts_count);
-                    // }
-                    // else {
-                    //     phys_resolve_dynamic_body_collision_basic(&box1->body, &box2->body, normal);
-                    // }
                 }
             }
         }
     }
-    line_draw_end();
 }
 
 void draw_boxes() {
     for (u32 i = 0; i < MAX_BOXES; i++) {
         if (!global_state->boxes[i].destroyed)
-            draw_quad(obb_p0(&global_state->boxes[i].p_box.bound_box), obb_p1(&global_state->boxes[i].p_box.bound_box), global_state->boxes[i].color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, global_state->boxes[i].p_box.bound_box.rot);
+            draw_quad(obb_p0(&global_state->boxes[i].p_box.bound_box), obb_p1(&global_state->boxes[i].p_box.bound_box), global_state->boxes[i].color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, global_state->boxes[i].p_box.bound_box.rot, NULL);
     }
 }
 
 void draw_boxes_outline() {
     for (u32 i = 0; i < MAX_BOXES; i++) {
         if (!global_state->boxes[i].destroyed)
-            draw_quad_outline(obb_p0(&global_state->boxes[i].p_box.bound_box), obb_p1(&global_state->boxes[i].p_box.bound_box), vec4f_make(1.0f, 1.0f, 1.0f, 0.6f), global_state->boxes[i].p_box.bound_box.rot);
+            draw_quad_outline(obb_p0(&global_state->boxes[i].p_box.bound_box), obb_p1(&global_state->boxes[i].p_box.bound_box), vec4f_make(1.0f, 1.0f, 1.0f, 0.6f), global_state->boxes[i].p_box.bound_box.rot, NULL);
     }
 }
 
@@ -1015,6 +1005,12 @@ void plug_init(Plug_State *state) {
     srand((u32)time(NULL));
     global_state = state;
 
+
+    // Debug verticies buffer allocation.
+    state->debug_vert_buffer = vertex_buffer_make(); // @Leak
+
+
+
     /**
      * Setting hash tables for resources. 
      * Since they are dynamically allocated pointers will not change after hot reloading.
@@ -1022,7 +1018,13 @@ void plug_init(Plug_State *state) {
     state->shader_table = hash_table_make(Shader, 8, &std_allocator);
     state->font_table = hash_table_make(Font_Baked, 8, &std_allocator);
     
+
+
+
     phys_init();
+
+
+
 
     global_state->boxes = malloc(MAX_BOXES * sizeof(Box));
     if (global_state->boxes == NULL)
@@ -1035,21 +1037,13 @@ void plug_init(Plug_State *state) {
     
     
 
-
     spawn_rect(vec2f_make(-8.0f, -5.0f), vec2f_make(8.0f, -6.0f), vec4f_make(randf(), randf(), randf(), 0.4f));
     spawn_obstacle(vec2f_make(4.0f, -1.0f), 6.0f, 1.0f, vec4f_make(randf(), randf(), randf(), 0.4f), PI / 6);
     spawn_obstacle(vec2f_make(-4.0f, 1.5f), 6.0f, 1.0f, vec4f_make(randf(), randf(), randf(), 0.4f), -PI / 6);
 
     spawn_player(VEC2F_ORIGIN, vec4f_make(0.0f, 1.0f, 0.0f, 0.2f));
 
-    // for (u32 i = 0; i < 10; i++) {
-    //     spawn_box(vec2f_make(randf() * 10.0f - 5.0f, randf() * 10.0f - 5.0f), vec4f_make(randf(), randf(), randf(), 1.0f));
-    // }
-    
-    // spawn_rect(vec2f_make(-8.0f, 5.0f), vec2f_make(8.0f, 6.0f), vec4f_make(randf(), randf(), randf(), 1.0f), 0.0f);
-    // spawn_rect(vec2f_make(-8.0f, -5.0f), vec2f_make(8.0f, -6.0f), vec4f_make(randf(), randf(), randf(), 1.0f), 0.0f);
-    // spawn_rect(vec2f_make(-9.0f, -6.0f), vec2f_make(-8.0f, 6.0f), vec4f_make(randf(), randf(), randf(), 1.0f), 0.0f);
-    // spawn_rect(vec2f_make(8.0f, -6.0f), vec2f_make(9.0f, 6.0f), vec4f_make(randf(), randf(), randf(), 1.0f), 0.0f);
+
 
 }
 
@@ -1082,8 +1076,6 @@ void plug_load(Plug_State *state) {
     // Drawer init.
     line_drawer_init(&state->line_drawer, hash_table_get(&state->shader_table, "line", 4));
 
-    // Debug verticies buffer allocation.
-    state->debug_vert_buffer = array_list_make(float, 64, &std_allocator);
 
 
     // Font loading.
@@ -1255,7 +1247,7 @@ void plug_update(Plug_State *state) {
     Vec2f p0, p1;
     p0 = vec2f_make(-8.0f, -5.0f);
     p1 = vec2f_make(8.0f, 5.0f);
-    draw_quad(p0, p1, vec4f_make(0.8f, 0.8f, 0.8f, 0.6f), NULL, p0, p1, NULL, 0.0f);
+    draw_quad(p0, p1, vec4f_make(0.8f, 0.8f, 0.8f, 0.6f), NULL, p0, p1, NULL, 0.0f, NULL);
 
     draw_end();
 
@@ -1295,8 +1287,8 @@ void plug_update(Plug_State *state) {
     Vec2f up = matrix4f_mul_vec2f(mat, VEC2F_UP);
     Vec2f origin = matrix4f_mul_vec2f(mat, VEC2F_ORIGIN);
 
-    draw_line(origin, right, VEC4F_RED);
-    draw_line(origin, up, VEC4F_GREEN);
+    draw_line(origin, right, VEC4F_RED, NULL);
+    draw_line(origin, up, VEC4F_GREEN, NULL);
 
 
 
@@ -1307,8 +1299,10 @@ void plug_update(Plug_State *state) {
 
 
 
-    // Before drawing UI making final call to draw debug lines that are globally added to "debug_vert_buffer" throughout the update logic, since buffer is separate from graphics api code in can be drawn using "line_draw_buffer()".
-    line_draw_buffer(&state->line_drawer, state->debug_vert_buffer, array_list_length(&state->debug_vert_buffer) * sizeof(float));
+    // Before drawing UI making final call to draw debug lines that are globally added to "debug_vert_buffer" throughout the update logic.
+    vertex_buffer_draw_lines(&state->debug_vert_buffer, &state->line_drawer);
+    vertex_buffer_clear(&state->debug_vert_buffer);
+    
 
 
 
@@ -1328,6 +1322,10 @@ void plug_update(Plug_State *state) {
 
     // Checking for gl error.
     check_gl_error();
+
+
+    // Swap buffers to display the rendered image.
+    SDL_GL_SwapWindow(state->window);
 }
 
 
@@ -1384,7 +1382,7 @@ void update_player(Player *p) {
 
 void draw_player(Player *p) {
     // Drawing player as a quad.
-    draw_quad(obb_p0(&p->p_box.bound_box), obb_p1(&p->p_box.bound_box), p->color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, p->p_box.bound_box.rot);
+    draw_quad(obb_p0(&p->p_box.bound_box), obb_p1(&p->p_box.bound_box), p->color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, p->p_box.bound_box.rot, NULL);
 
     
 }
@@ -1399,8 +1397,8 @@ void draw_sword_line(Sword *s) {
     Vec2f up = matrix4f_mul_vec2f(s->handle, VEC2F_UP);
     Vec2f origin = matrix4f_mul_vec2f(s->handle, VEC2F_ORIGIN);
 
-    draw_line(origin, right, VEC4F_RED);
-    draw_line(origin, up, VEC4F_GREEN);
+    draw_line(origin, right, VEC4F_RED, NULL);
+    draw_line(origin, up, VEC4F_GREEN, NULL);
 }
 
 
@@ -1415,7 +1413,6 @@ void plug_unload(Plug_State *state) {
     
     drawer_free(&state->drawer);
     line_drawer_free(&state->line_drawer);
-    array_list_free(&state->debug_vert_buffer);
     
     font_free(hash_table_get(&state->font_table, "medium", 6));
     font_free(hash_table_get(&state->font_table, "small", 5));
@@ -1425,7 +1422,7 @@ void plug_unload(Plug_State *state) {
 /**
  * Helper drawing functions.
  */
-void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle) {
+void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle, Vertex_Buffer *buffer) {
     float texture_slot = -1.0f; // @Important: -1.0f slot signifies shader to use color, not texture.
     float mask_slot = -1.0f;
 
@@ -1447,11 +1444,14 @@ void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec
         p3.x, p3.y, 0.0f, color.x, color.y, color.z, color.w, uv0.x, uv1.y, texture_slot, mask_slot,
         p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, uv1.x, uv1.y, texture_slot, mask_slot,
     };
-
-    draw_quad_data(quad_data, 1);
+    
+    if (buffer == NULL)
+        draw_quad_data(quad_data, 1);
+    else
+        vertex_buffer_append_data(buffer, quad_data, VERTICIES_PER_QUAD * 11);
 }
 
-void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *font, u32 unit_scale) {
+void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *font, u32 unit_scale, Vertex_Buffer *buffer) {
     u64 text_length = strlen(text);
 
     // Scale and adjust current_point.
@@ -1481,29 +1481,32 @@ void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *f
             width  = font->chars[font_char_index].x1 - font->chars[font_char_index].x0;
             height = font->chars[font_char_index].y1 - font->chars[font_char_index].y0;
 
-            draw_quad(vec2f_divide_constant(vec2f_make(current_point.x + c->xoff, current_point.y - c->yoff - height), (float)unit_scale), vec2f_divide_constant(vec2f_make(current_point.x + c->xoff + width, current_point.y - c->yoff), (float)unit_scale), color, NULL, vec2f_make(c->x0 / (float)font->bitmap.width, c->y1 / (float)font->bitmap.height), vec2f_make(c->x1 / (float)font->bitmap.width, c->y0 / (float)font->bitmap.height), &font->bitmap, 0.0f);
+            draw_quad(vec2f_divide_constant(vec2f_make(current_point.x + c->xoff, current_point.y - c->yoff - height), (float)unit_scale), vec2f_divide_constant(vec2f_make(current_point.x + c->xoff + width, current_point.y - c->yoff), (float)unit_scale), color, NULL, vec2f_make(c->x0 / (float)font->bitmap.width, c->y1 / (float)font->bitmap.height), vec2f_make(c->x1 / (float)font->bitmap.width, c->y0 / (float)font->bitmap.height), &font->bitmap, 0.0f, buffer);
 
             current_point.x += font->chars[font_char_index].xadvance;
         }
     }
 }
 
-void draw_line(Vec2f p0, Vec2f p1, Vec4f color) {
+void draw_line(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer) {
     float line_data[14] = {
         p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w,
         p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w,
     };
 
-    draw_line_data(line_data, 1);
+    if (buffer == NULL)
+        draw_line_data(line_data, 1);
+    else
+        vertex_buffer_append_data(buffer, line_data, VERTICIES_PER_LINE * 7);
 }
 
 #define DOT_SCALE 0.005f
 
-void draw_dot(Vec2f position, Vec4f color) {
-    draw_quad(vec2f_make(position.x - (float)global_state->main_camera.unit_scale * DOT_SCALE, position.y), vec2f_make(position.x + (float)global_state->main_camera.unit_scale * DOT_SCALE, position.y), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, PI/4);
+void draw_dot(Vec2f position, Vec4f color, Vertex_Buffer *buffer) {
+    draw_quad(vec2f_make(position.x - (float)global_state->main_camera.unit_scale * DOT_SCALE, position.y), vec2f_make(position.x + (float)global_state->main_camera.unit_scale * DOT_SCALE, position.y), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, PI/4, buffer);
 }
 
-void draw_quad_outline(Vec2f p0, Vec2f p1, Vec4f color, float offset_angle) {
+void draw_quad_outline(Vec2f p0, Vec2f p1, Vec4f color, float offset_angle, Vertex_Buffer *buffer) {
     
     Vec2f k = vec2f_make(cosf(offset_angle), sinf(offset_angle));
     k = vec2f_multi_constant(k, vec2f_dot(k, vec2f_difference(p1, p0)));
@@ -1522,10 +1525,13 @@ void draw_quad_outline(Vec2f p0, Vec2f p1, Vec4f color, float offset_angle) {
         p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w,
     };
 
-    draw_line_data(line_data, 4);
+    if (buffer == NULL)
+        draw_line_data(line_data, 4);
+    else
+        vertex_buffer_append_data(buffer, line_data, 4 * VERTICIES_PER_LINE * 7);
 }
 
-void draw_circle_outline(Vec2f position, float radius, u32 detail, Vec4f color) {
+void draw_circle_outline(Vec2f position, float radius, u32 detail, Vec4f color, Vertex_Buffer *buffer) {
 
     float line_data[detail * 14];
 
@@ -1549,10 +1555,13 @@ void draw_circle_outline(Vec2f position, float radius, u32 detail, Vec4f color) 
     }
     
    
-    draw_line_data(line_data, detail);
+    if (buffer == NULL)
+        draw_line_data(line_data, detail);
+    else
+        vertex_buffer_append_data(buffer, line_data, detail * VERTICIES_PER_LINE * 7);
 }
 
-void draw_function(float x0, float x1, Function y, u32 detail, Vec4f color) {
+void draw_function(float x0, float x1, Function y, u32 detail, Vec4f color, Vertex_Buffer *buffer) {
     float line_data[detail * 14];
 
     float step = (x1 - x0) / (float)detail;
@@ -1575,10 +1584,13 @@ void draw_function(float x0, float x1, Function y, u32 detail, Vec4f color) {
     }
     
    
-    draw_line_data(line_data, detail);
+    if (buffer == NULL)
+        draw_line_data(line_data, detail);
+    else
+        vertex_buffer_append_data(buffer, line_data, detail * VERTICIES_PER_LINE * 7);
 }
 
-void draw_polar(float t0, float t1, Function r, u32 detail, Vec4f color) {
+void draw_polar(float t0, float t1, Function r, u32 detail, Vec4f color, Vertex_Buffer *buffer) {
     float line_data[detail * 14];
 
     float step = (t1 - t0) / (float)detail;
@@ -1604,10 +1616,13 @@ void draw_polar(float t0, float t1, Function r, u32 detail, Vec4f color) {
     }
     
    
-    draw_line_data(line_data, detail);
+    if (buffer == NULL)
+        draw_line_data(line_data, detail);
+    else
+        vertex_buffer_append_data(buffer, line_data, detail * VERTICIES_PER_LINE * 7);
 }
 
-void draw_parametric(float t0, float t1, Function x, Function y, u32 detail, Vec4f color) {
+void draw_parametric(float t0, float t1, Function x, Function y, u32 detail, Vec4f color, Vertex_Buffer *buffer) {
     float line_data[detail * 14];
 
     float step = (t1 - t0) / (float)detail;
@@ -1630,17 +1645,20 @@ void draw_parametric(float t0, float t1, Function x, Function y, u32 detail, Vec
     }
     
    
-    draw_line_data(line_data, detail);
+    if (buffer == NULL)
+        draw_line_data(line_data, detail);
+    else
+        vertex_buffer_append_data(buffer, line_data, detail * VERTICIES_PER_LINE * 7);
 }
 
-void draw_area_function(float x0, float x1, Function y, u32 rect_count, Vec4f color) {
+void draw_area_function(float x0, float x1, Function y, u32 rect_count, Vec4f color, Vertex_Buffer *buffer) {
     float step = (x1 - x0) / (float)rect_count;
     for (u32 i = 0; i < rect_count; i++) {
-        draw_quad(vec2f_make(x0 + step * i, 0.0f), vec2f_make(x0 + step * (i + 1), y(x0 + step * (i + 1))), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f);
+        draw_quad(vec2f_make(x0 + step * i, 0.0f), vec2f_make(x0 + step * (i + 1), y(x0 + step * (i + 1))), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f, buffer);
     }
 }
 
-void draw_area_polar(float t0, float t1, Function r, u32 rect_count, Vec4f color) {
+void draw_area_polar(float t0, float t1, Function r, u32 rect_count, Vec4f color, Vertex_Buffer *buffer) {
     float quad_data[rect_count * VERTICIES_PER_QUAD * 11];
 
     float step = (t1 - t0) / (float)rect_count;
@@ -1697,25 +1715,28 @@ void draw_area_polar(float t0, float t1, Function r, u32 rect_count, Vec4f color
         quad_data[43 + i * VERTICIES_PER_QUAD * 11] = -1.0f;
     }
     
-   
-    draw_quad_data(quad_data, rect_count);
+    if (buffer == NULL)
+        draw_quad_data(quad_data, rect_count);
+    else
+        vertex_buffer_append_data(buffer, quad_data, rect_count * VERTICIES_PER_QUAD * 11);
+
 }
 
-void draw_area_parametric(float t0, float t1, Function x, Function y, u32 rect_count, Vec4f color) {
+void draw_area_parametric(float t0, float t1, Function x, Function y, u32 rect_count, Vec4f color, Vertex_Buffer *buffer) {
     float step = (t1 - t0) / (float)rect_count;
     for (u32 i = 0; i < rect_count; i++) {
-        draw_quad(vec2f_make(x(t0 + step * i), 0.0f), vec2f_make(x(t0 + step * (i + 1)), y(t0 + step * (i + 1))), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f);
+        draw_quad(vec2f_make(x(t0 + step * i), 0.0f), vec2f_make(x(t0 + step * (i + 1)), y(t0 + step * (i + 1))), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f, buffer);
     }
 }
 
 
-void draw_viewport(u32 x, u32 y, u32 width, u32 height, Vec4f color, Camera *camera) {
+void draw_viewport(u32 x, u32 y, u32 width, u32 height, Vec4f color, Camera *camera, Vertex_Buffer *buffer) {
     glViewport(x, y, width, height);
     
     Vec2f p1 = vec2f_make((float)width / 2 / (float)camera->unit_scale, (float)height / 2 / (float)camera->unit_scale);
     Vec2f p0 = vec2f_negate(p1);
     
-    draw_quad(p0, p1, color, NULL, p0, p1, NULL, 0.0f);
+    draw_quad(p0, p1, color, NULL, p0, p1, NULL, 0.0f, buffer);
 
 }
 
