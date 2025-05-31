@@ -1,15 +1,28 @@
 # Compiler and flags
 CC = gcc
-CFLAGS = -std=gnu11 -g
+CFLAGS = -std=gnu11
+DEV_CFLAGS = -g -O0 -DDEBUG -DDEV
+RELEASE_CFLAGS = -O2 -DNDEBUG
 LIBFLAGS = -lmingw32 -lSDL2main -lSDL2 -lSDL2_mixer -lopengl32 -lglew32
 
+# Build mode: dev or release
+BUILD ?= dev
+	
+ifeq ($(BUILD),dev)
+    CFLAGS += $(DEV_CFLAGS)
+	BUILD_DIR := .
+else
+    CFLAGS += $(RELEASE_CFLAGS)
+	BUILD_DIR := build/$(BUILD)
+endif
+
 # Directories
-SRC_DIR = src
-OBJ_DIR = obj
-BIN_DIR = bin
+OBJ_DIR := $(BUILD_DIR)/obj
+BIN_DIR := $(BUILD_DIR)/bin
+SRC_DIR := src
 
 # Target executable
-TARGET = $(BIN_DIR)/main.exe
+TARGET_MAIN_EXE = $(BIN_DIR)/main.exe
 
 # Target plug dll
 TARGET_PLUG_DLL = $(BIN_DIR)/plug.dll
@@ -17,51 +30,49 @@ TARGET_PLUG_DLL = $(BIN_DIR)/plug.dll
 # Target core dll
 TARGET_CORE_DLL = $(BIN_DIR)/core.dll
 
-# Automatic sourcing.
-## SRC_FILES = $(wildcard $(SRC_DIR)/*.c)
-## OBJ_FILES = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_FILES))
+# Release executable
+TARGET_RELEASE = $(BIN_DIR)/release.exe
 
-# Manual sourcing.
-SRC_FILES = $(SRC_DIR)/main.c
-OBJ_FILES = $(OBJ_DIR)/main.o
-
-# Default target
-all: clean core plug main
-	./$(TARGET)
-
-# # Link object files into the final executable
-# $(TARGET): $(OBJ_FILES) | $(BIN_DIR)
-# 	$(CC) $(CFLAGS) -o $@ $^ $(LIBFLAGS) -Lbin/ -lcore
-# 
-# # Compile each source file into an object file
-# $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
-# 	$(CC) $(CFLAGS) -c $< -o $@
-
-# Create directories if they don't exist
-$(OBJ_DIR):
-	mkdir $(OBJ_DIR)
-
-$(BIN_DIR):
-	mkdir $(BIN_DIR)
+# Default target logic
+all: 
+ifeq ($(BUILD),dev)
+	$(MAKE) clean core plug main
+else
+	$(MAKE) clean release
+endif
 
 # Link into core dll
-$(TARGET_CORE_DLL):
-	$(CC) $(CFLAGS) -o ./$(TARGET_CORE_DLL) -fPIC -shared src/core.c $(LIBFLAGS)
+$(TARGET_CORE_DLL): | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ -fPIC -shared $(SRC_DIR)/core.c $(LIBFLAGS)
 
 # Link into plug dll
-$(TARGET_PLUG_DLL):
-	$(CC) $(CFLAGS) -o ./$(TARGET_PLUG_DLL) -fPIC -shared src/plug.c $(LIBFLAGS) -Lbin/ -lcore
+$(TARGET_PLUG_DLL): | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ -fPIC -shared $(SRC_DIR)/plug.c $(LIBFLAGS) -L$(BIN_DIR) -lcore
 
 # Link into main exe
-$(TARGET):
-	$(CC) $(CFLAGS) -o ./$(TARGET) src/main.c $(LIBFLAGS) -Lbin/ -lcore
+$(TARGET_MAIN_EXE): | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/main.c $(LIBFLAGS) -L$(BIN_DIR) -lcore
+
+# Link all into a single main exe
+$(TARGET_RELEASE): | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/main.c $(SRC_DIR)/core.c $(SRC_DIR)/plug.c $(LIBFLAGS)
 
 
 core: $(TARGET_CORE_DLL)
 
 plug: $(TARGET_PLUG_DLL)
 
-main: $(TARGET)
+main: $(TARGET_MAIN_EXE)
+
+release: clean $(TARGET_RELEASE)
+	@echo "Copying resources to $(BUILD_DIR)/res..."
+	@mkdir -p $(BUILD_DIR)/res
+	@cp -r res/* $(BUILD_DIR)/res/
+
+
+
+$(BIN_DIR) $(OBJ_DIR):
+	mkdir -p $@
 
 
 # Clean build artifacts

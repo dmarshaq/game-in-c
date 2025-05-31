@@ -126,10 +126,17 @@ typedef struct plug_state {
     Player player;
 } Plug_State;
 
+
+#ifdef DEV
 typedef void (*Plug_Init)(Plug_State *state);
 typedef void (*Plug_Update)(Plug_State *state);
-
 typedef void (*Plug_Load)(Plug_State *state);
 typedef void (*Plug_Unload)(Plug_State *state);
+#else
+void plug_init(Plug_State *state);
+void plug_update(Plug_State *state);
+void plug_load(Plug_State *state);
+void plug_unload(Plug_State *state);
+#endif
 
 #endif

@@ -2,7 +2,11 @@
 #include "SDL2/SDL_mouse.h"
 #include "core.h"
 #include "plug.h"
+#include <SDL2/SDL_video.h>
+
+#ifdef DEV
 #include <windows.h>
+#endif
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
@@ -11,6 +15,7 @@ const char* APP_NAME = "Game in C";
 
 Time_Data t;
 
+#ifdef DEV
 bool reload_libplug();
 bool plug_inited = false;
 
@@ -18,9 +23,15 @@ Plug_Init plug_init = NULL;
 Plug_Load plug_load = NULL;
 Plug_Unload plug_unload = NULL;
 Plug_Update plug_update = NULL;
+#endif
+
 Plug_State state;
 
 int main(int argc, char *argv[]) {
+
+    #ifdef DEV
+    fprintf(stdout, "Dev build is launched.\n");
+    #endif
 
     if (init_sdl_gl()) {
         fprintf(stderr, "%s Couldn't init SDL and GL.\n", debug_error_str);
@@ -61,7 +72,13 @@ int main(int argc, char *argv[]) {
         .right_unpressed = false,
     };
 
+    #ifdef DEV
     reload_libplug();
+    #else
+    plug_init(&state);
+    plug_load(&state);
+    #endif
+
 
     SDL_Event event;
 
@@ -128,17 +145,26 @@ int main(int argc, char *argv[]) {
         
         plug_update(&state);
 
+        #ifdef DEV
         if (is_pressed_keycode(SDLK_r)) {
             if(!reload_libplug()) {
                 fprintf(stderr, "%s Failed to hot reload plug.dll.\n", debug_error_str);
             }
         }
+        #endif
 
         keyboard_state_old_update();
     }
 
+    #ifndef DEV
+    plug_unload(&state);
+    #endif
+
     return 0;
 }
+
+
+#ifdef DEV
 
 HMODULE mod = NULL;
 
@@ -191,3 +217,4 @@ bool reload_libplug() {
     return true;
 }
 
+#endif
