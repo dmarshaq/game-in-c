@@ -46,6 +46,16 @@ typedef struct phys_box {
 
 } Phys_Box;
 
+
+
+
+typedef enum game_state {
+    PLAY,
+    MENU,
+} Game_State;
+
+
+
 /**
  * Game entities.
  * 
@@ -124,6 +134,8 @@ typedef struct plug_state {
      * Unsorted.
      */
     Player player;
+    Game_State gs;
+
 } Plug_State;
 
 
