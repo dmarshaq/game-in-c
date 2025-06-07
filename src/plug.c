@@ -26,6 +26,7 @@
 // Drawing basics.
 void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle, Vertex_Buffer *buffer);
 void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale, Vertex_Buffer *buffer);
+Vec2f text_size(const char *text, Font_Baked *font);
 void draw_line(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer);
 void draw_dot(Vec2f position, Vec4f color, Vertex_Buffer *buffer);
 
@@ -61,7 +62,6 @@ Vec2f camera_screen_to_world(Vec2f point, Camera *camera);
 
 
 
-
 /**
  * Constants.
  */
@@ -75,6 +75,7 @@ static const float MAX_PLAYER_SPEED = 6.0f;
 static const float DOT_SCALE = 0.005f;
 
 
+
 // Global state.
 static Plug_State *state;
 
@@ -83,6 +84,81 @@ static Plug_State *state;
 
 
 
+/**
+ * User Interface.
+ */
+
+void ui_init() {
+    state->ui.cursor = vec2f_make(20, 20);
+    state->ui.gap = 8;
+
+    state->ui.theme = (UI_Theme) {
+        .bg             = (Vec4f){ 0.12f, 0.12f, 0.14f, 1.0f },   // Dark slate background
+        .light          = (Vec4f){ 0.85f, 0.85f, 0.88f, 1.0f },   // Soft light gray
+        .btn_bg         = (Vec4f){ 0.12f, 0.16f, 0.28f, 1.0f },   // Deeper, richer base button
+        .btn_bg_hover   = (Vec4f){ 0.20f, 0.26f, 0.40f, 1.0f },   // Gentle contrast on hover
+        .btn_bg_press   = (Vec4f){ 0.08f, 0.10f, 0.22f, 1.0f },   // Subtle shadowy press state
+        .text           = (Vec4f){ 0.97f, 0.96f, 0.92f, 1.0f },   // Warm white text
+    };
+}
+
+bool ui_is_hover(Vec2f size) {
+    return value_inside_domain(state->ui.cursor.x, state->ui.cursor.x + size.x, state->mouse_input.position.x) && value_inside_domain(state->ui.cursor.y, state->ui.cursor.y + size.y, state->mouse_input.position.y);
+}
+
+void ui_cursor_reset() {
+    state->ui.cursor = vec2f_make(20, 20);
+}
+
+void ui_cursor_advance(Vec2f size) {
+    state->ui.cursor.y += size.y + state->ui.gap;
+}
+
+void ui_draw_text_centered(Vec2f size, const char *text) {
+    if (text == NULL)
+        return;
+
+    Vec2f t_size = text_size(text, state->ui.font);
+
+    // Following draw_text calculations are for the system where y axis points up, and x axis to the right.
+    draw_text(text, vec2f_make(state->ui.cursor.x + (size.x - t_size.x) * 0.5f, state->ui.cursor.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text, state->ui.font, 1.0f, NULL);
+}
+
+void ui_draw_box(Vec2f size, Vec4f color) {
+    Vec2f p0 = state->ui.cursor;
+    Vec2f p1 = vec2f_sum(state->ui.cursor, size);
+    float aspect = size.x / size.y;
+
+    float quad_data[44] = {
+        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 0.0f, aspect, -1.0f,
+        p1.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 0.0f, aspect, -1.0f,
+        p0.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 1.0f, aspect, -1.0f,
+        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 1.0f, aspect, -1.0f,
+    };
+    
+    draw_quad_data(quad_data, 1);
+}
+
+
+bool ui_button(Vec2f size, const char *text) {
+    if (ui_is_hover(size)) {
+        if (state->mouse_input.left_hold) {
+            ui_draw_box(size, state->ui.theme.btn_bg_press);
+        } else {
+            ui_draw_box(size, state->ui.theme.btn_bg_hover);
+        }
+        
+        ui_draw_text_centered(size, text);
+        ui_cursor_advance(size);
+        return state->mouse_input.left_unpressed;
+    }
+
+    ui_draw_box(size, state->ui.theme.btn_bg);
+
+    ui_draw_text_centered(size, text);
+    ui_cursor_advance(size); 
+    return false;
+}
 
 
 
@@ -103,45 +179,45 @@ static Plug_State *state;
  * Pop up message.
  */
 
-static char pop_up_buffer[256];
-static u32 pop_up_buffer_start = 0;
-static float pop_up_lerp_t = 0.0f;
-
-
-void pop_up_log(char *format, ...) {
-    va_list args;
-    va_start(args, format);
-    s32 bytes_written = vsnprintf(pop_up_buffer + pop_up_buffer_start, sizeof(pop_up_buffer) - pop_up_buffer_start, format, args);
-    va_end(args);
-    pop_up_lerp_t = 0.0f;
-
-    if (bytes_written > 0)
-        pop_up_buffer_start += bytes_written;
-}
-
-
-/**
- * Draws pop_up text that is stored in "pop_up_mesg", doesn't draw anything if it is NULL.
- * Use "pop_up_log(char *format, ...)" to log message;
- */
-void draw_pop_up(Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale) {
-    if (pop_up_buffer[0] == '\0')
-        return;
-    
-    color.w = lerp(color.w, 0.0f, pop_up_lerp_t);
-    position.y = lerp(position.y, position.y + 25.0f, pop_up_lerp_t);
-
-    draw_text(pop_up_buffer, position, color, font, unit_scale, NULL);
-
-    pop_up_lerp_t += 0.002f;
-
-    if (pop_up_lerp_t >= 1.0f) {
-        pop_up_buffer[0] = '\0';
-        pop_up_lerp_t = 0.0f;
-    }
-
-    pop_up_buffer_start = 0;
-}
+// static char pop_up_buffer[256];
+// static u32 pop_up_buffer_start = 0;
+// static float pop_up_lerp_t = 0.0f;
+// 
+// 
+// void pop_up_log(char *format, ...) {
+//     va_list args;
+//     va_start(args, format);
+//     s32 bytes_written = vsnprintf(pop_up_buffer + pop_up_buffer_start, sizeof(pop_up_buffer) - pop_up_buffer_start, format, args);
+//     va_end(args);
+//     pop_up_lerp_t = 0.0f;
+// 
+//     if (bytes_written > 0)
+//         pop_up_buffer_start += bytes_written;
+// }
+// 
+// 
+// /**
+//  * Draws pop_up text that is stored in "pop_up_mesg", doesn't draw anything if it is NULL.
+//  * Use "pop_up_log(char *format, ...)" to log message;
+//  */
+// void draw_pop_up(Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale) {
+//     if (pop_up_buffer[0] == '\0')
+//         return;
+//     
+//     color.w = lerp(color.w, 0.0f, pop_up_lerp_t);
+//     position.y = lerp(position.y, position.y + 25.0f, pop_up_lerp_t);
+// 
+//     draw_text(pop_up_buffer, position, color, font, unit_scale, NULL);
+// 
+//     pop_up_lerp_t += 0.002f;
+// 
+//     if (pop_up_lerp_t >= 1.0f) {
+//         pop_up_buffer[0] = '\0';
+//         pop_up_lerp_t = 0.0f;
+//     }
+// 
+//     pop_up_buffer_start = 0;
+// }
 
 
 
@@ -1013,7 +1089,7 @@ void update_player(Player *p) {
     ti_update(&p->sword.animator, state->t->delta_time);
 
 
-    if (state->mouse_input.left_pressed || is_pressed_keycode(SDLK_q)) {
+    if (is_pressed_keycode(SDLK_q)) {
         float temp = p->sword.angle_a;
         p->sword.angle_a = p->sword.angle_b;
         p->sword.angle_b = temp;
@@ -1077,12 +1153,6 @@ void game_update() {
      * -----------------------------------
      */
 
-    // Pop up.
-    if (is_pressed_keycode(SDLK_e)) {
-        for (s32 i = 0; i < 4; i++) {
-            pop_up_log("Pop up: i = %d\n", i);
-        }
-    }
 
     // Spawning box.
     if (state->mouse_input.right_pressed) {
@@ -1098,7 +1168,7 @@ void game_update() {
         state->t->time_slow_factor++;
         state->t->delta_time_multi = 1.0f / (state->t->time_slow_factor % 5);
         
-        pop_up_log("Delta Time Multiplier: %f\n", state->t->delta_time_multi);
+        printf("Delta Time Multiplier: %f\n", state->t->delta_time_multi);
     }
 
     // Player logic.
@@ -1221,19 +1291,33 @@ void game_draw() {
     
 
 
+    // Get neccessary to draw resource: (Shaders, Fonts, Textures, etc.).
+    state->ui.font = font_medium;
 
-    // Regular quad drawing with different projection matrix, drawing in screen space (ui).
+    Shader *ui_quad_shader = hash_table_get(&state->shader_table, "ui_quad", 7);
+
     projection = screen_calculate_projection(state->window_width, state->window_height);
+    shader_update_projection(ui_quad_shader, &projection);
 
-    shader_update_projection(quad_shader, &projection);
+    state->drawer.program = ui_quad_shader;
 
 
-    state->drawer.program = quad_shader;
     draw_begin(&state->drawer);
 
-    draw_pop_up(vec2f_make(10.0f, 80.0f), VEC4F_WHITE, font_medium, 1);
+
+    // Drawing button.
+    if (ui_button(vec2f_make(100, 50), "Menu")) {
+        state->gs = MENU;
+    }
+
+    if (ui_button(vec2f_make(120, 80), "Spawn box")) {
+        spawn_box(VEC2F_ORIGIN, vec4f_make(randf(), randf(), randf(), 0.4f));
+    }
 
     draw_end();
+
+    // Resetting UI cursor.
+    ui_cursor_reset();
     
 }
 
@@ -1252,13 +1336,56 @@ void menu_update() {
 }
 
 
+static const Vec2f EX_BUTTON_P0 = (Vec2f){ 200.0f, 300.0f };
+static const Vec2f EX_BUTTON_P1 = (Vec2f){ 600.0f, 500.0f };
+
+bool toggle;
+
 void menu_draw() {
     // Reset viewport.
     viewport_reset();
 
     // Clear screen.
-    glClearColor(0.2f, 0.3f, 0.8f, 1.0f);
+    glClearColor(0.1f, 0.0f, 0.1f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
+
+    // Get neccessary to draw resource: (Shaders, Fonts, Textures, etc.).
+    Font_Baked *font_medium = hash_table_get(&state->font_table, "medium", 6);
+    state->ui.font = font_medium;
+
+    Shader *ui_quad_shader = hash_table_get(&state->shader_table, "ui_quad", 7);
+    Shader *line_shader = hash_table_get(&state->shader_table, "line", 4);
+
+    Matrix4f projection = screen_calculate_projection(state->window_width, state->window_height);
+    shader_update_projection(ui_quad_shader, &projection);
+    shader_update_projection(line_shader, &projection);
+
+    state->drawer.program = ui_quad_shader;
+    state->line_drawer.program = line_shader;
+
+
+    draw_begin(&state->drawer);
+
+
+    // Drawing button.
+    if (ui_button(vec2f_make(100, 50), "Click me")) {
+        toggle = !toggle;
+    }
+    if (toggle) {
+        ui_button(vec2f_make(200, 100), "UI Buttons");
+        if (ui_button(vec2f_make(200, 100), "GO BACK")) {
+            state->gs = PLAY;
+        }
+        ui_button(vec2f_make(200, 100), "Centered text");
+    }
+
+    draw_end();
+
+    vertex_buffer_draw_lines(&state->debug_vert_buffer, &state->line_drawer);
+    vertex_buffer_clear(&state->debug_vert_buffer);
+
+    // Resetting UI cursor.
+    ui_cursor_reset();
 }
 
 
@@ -1289,11 +1416,12 @@ void plug_init(Plug_State *s) {
     
 
 
+    ui_init();
     phys_init();
 
 
 
-    state->boxes = malloc(MAX_BOXES * sizeof(Box));
+    state->boxes = malloc(MAX_BOXES * sizeof(Box)); // @Leak.
     if (state->boxes == NULL)
         printf_err("Couldn't allocate boxes array.\n");
     
@@ -1320,7 +1448,7 @@ void plug_load(Plug_State *s) {
     state->clear_color = vec4f_make(0.1f, 0.1f, 0.4f, 1.0f);
 
     // Main camera init.
-    state->main_camera = camera_make(VEC2F_ORIGIN, 32);
+    state->main_camera = camera_make(VEC2F_ORIGIN, 48);
 
     // Shader loading.
     Shader quad_shader = shader_load("res/shader/quad.glsl");
@@ -1337,6 +1465,11 @@ void plug_load(Plug_State *s) {
     shader_init_uniforms(&line_shader);
     line_shader.vertex_stride = 7;
     hash_table_put(&state->shader_table, line_shader, "line", 4);
+
+    Shader ui_quad_shader = shader_load("res/shader/ui_quad.glsl");
+    shader_init_uniforms(&ui_quad_shader);
+    ui_quad_shader.vertex_stride = 11;
+    hash_table_put(&state->shader_table, ui_quad_shader, "ui_quad", 7);
 
     // Drawer init.
     drawer_init(&state->drawer, hash_table_get(&state->shader_table, "quad", 4));
@@ -1496,8 +1629,6 @@ void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *f
     stbtt_bakedchar *c;
 
     for (u64 i = 0; i < text_length; i++) {
-        // printf("%d\n", font_char_index);
-
         // @Incomplete: Handle special characters / symbols.
         if (text[i] == '\n') {
             current_point.x = origin_x;
@@ -1518,6 +1649,50 @@ void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *f
         }
     }
 }
+
+Vec2f text_size(const char *text, Font_Baked *font) {
+    u64 text_length = strlen(text);
+
+    // Result.
+    Vec2f result = VEC2F_ORIGIN;
+
+    // Scale and adjust current_point.
+    Vec2f current_point = VEC2F_ORIGIN;
+    float origin_x = current_point.x;
+    current_point.y += (float)font->baseline;
+
+    // Text rendering variables.
+    s32 font_char_index;
+
+    for (u64 i = 0; i < text_length; i++) {
+        // Handle special characters / symbols.
+        if (text[i] == '\n') {
+            result.y += (float)font->line_height;
+            if (result.x < current_point.x)
+                result.x = current_point.x;
+
+            current_point.x = origin_x;
+            current_point.y -= (float)font->line_height;
+            continue;
+        }
+
+        // Character iterating.
+        font_char_index = (s32)text[i] - font->first_char_code;
+        if (font_char_index < font->chars_count) {
+
+            current_point.x += font->chars[font_char_index].xadvance;
+        }
+    }
+    
+    // Since last line dimensions is not handled in the loop, it can be done here.
+    result.y += (float)font->line_height;
+    if (result.x < current_point.x)
+        result.x = current_point.x;
+
+    return result;
+}
+
+
 
 void draw_line(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer) {
     float line_data[14] = {
@@ -1777,6 +1952,10 @@ void viewport_reset() {
 Vec2f camera_screen_to_world(Vec2f point, Camera *camera) {
     return vec2f_make(camera->center.x + (point.x - (float)state->window_width / 2) / (float)camera->unit_scale, camera->center.y + (point.y - (float)state->window_height / 2) / (float)state->main_camera.unit_scale);
 }
+
+
+
+
 
 
 

@@ -55,6 +55,24 @@ typedef enum game_state {
 } Game_State;
 
 
+typedef struct ui_theme {
+    Vec4f bg;
+    Vec4f light;
+    Vec4f btn_bg;
+    Vec4f btn_bg_hover;
+    Vec4f btn_bg_press;
+    Vec4f text;
+} UI_Theme;
+
+typedef struct ui_state {
+    Vec2f cursor;
+    float gap;
+
+    Font_Baked *font;
+    UI_Theme theme;
+} UI_State;
+
+
 
 /**
  * Game entities.
@@ -135,6 +153,7 @@ typedef struct plug_state {
      */
     Player player;
     Game_State gs;
+    UI_State ui;
 
 } Plug_State;
 
