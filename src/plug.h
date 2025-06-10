@@ -67,6 +67,9 @@ typedef struct ui_theme {
 typedef struct ui_state {
     Vec2f cursor;
     float gap;
+    Vec2f element_size;
+    Vec2f origin;
+    bool sameline;
 
     Font_Baked *font;
     UI_Theme theme;

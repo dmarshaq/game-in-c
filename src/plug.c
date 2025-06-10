@@ -90,7 +90,11 @@ static Plug_State *state;
 
 void ui_init() {
     state->ui.cursor = vec2f_make(20, 20);
+    state->ui.origin = vec2f_make(20, 20);
     state->ui.gap = 8;
+
+    state->ui.element_size = VEC2F_ORIGIN;
+    state->ui.sameline = false;
 
     state->ui.theme = (UI_Theme) {
         .bg             = (Vec4f){ 0.12f, 0.12f, 0.14f, 1.0f },   // Dark slate background
@@ -107,11 +111,30 @@ bool ui_is_hover(Vec2f size) {
 }
 
 void ui_cursor_reset() {
-    state->ui.cursor = vec2f_make(20, 20);
+    state->ui.cursor = state->ui.origin;
+    state->ui.element_size = VEC2F_ORIGIN;
+    state->ui.sameline = false;
+}
+
+void ui_cursor_set(Vec2f pos) {
+    state->ui.cursor = pos;
+    state->ui.element_size = VEC2F_ORIGIN;
+    state->ui.sameline = false;
 }
 
 void ui_cursor_advance(Vec2f size) {
-    state->ui.cursor.y += size.y + state->ui.gap;
+    if (state->ui.sameline) {
+        state->ui.cursor.x += state->ui.element_size.x + state->ui.gap;
+        state->ui.sameline = false;
+    } else {
+        state->ui.cursor.x = state->ui.origin.x;
+        state->ui.cursor.y += state->ui.element_size.y + state->ui.gap;
+    }
+    state->ui.element_size = size;
+}
+
+void ui_sameline() {
+    state->ui.sameline = true;
 }
 
 void ui_draw_text_centered(Vec2f size, const char *text) {
@@ -120,7 +143,7 @@ void ui_draw_text_centered(Vec2f size, const char *text) {
 
     Vec2f t_size = text_size(text, state->ui.font);
 
-    // Following draw_text calculations are for the system where y axis points up, and x axis to the right.
+    // Following draw_text centered calculations are for the system where y axis points up, and x axis to the right.
     draw_text(text, vec2f_make(state->ui.cursor.x + (size.x - t_size.x) * 0.5f, state->ui.cursor.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text, state->ui.font, 1.0f, NULL);
 }
 
@@ -141,6 +164,8 @@ void ui_draw_box(Vec2f size, Vec4f color) {
 
 
 bool ui_button(Vec2f size, const char *text) {
+    ui_cursor_advance(size);
+
     if (ui_is_hover(size)) {
         if (state->mouse_input.left_hold) {
             ui_draw_box(size, state->ui.theme.btn_bg_press);
@@ -149,15 +174,24 @@ bool ui_button(Vec2f size, const char *text) {
         }
         
         ui_draw_text_centered(size, text);
-        ui_cursor_advance(size);
         return state->mouse_input.left_unpressed;
     }
 
     ui_draw_box(size, state->ui.theme.btn_bg);
 
     ui_draw_text_centered(size, text);
-    ui_cursor_advance(size); 
     return false;
+}
+
+void ui_text(const char *text) {
+    Vec2f t_size = text_size(text, state->ui.font);
+    ui_cursor_advance(t_size);
+    draw_text(text, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + t_size.y), state->ui.theme.text, state->ui.font, 1.0f, NULL);
+}
+
+void ui_frame(Vec2f size) {
+    ui_cursor_advance(size);
+    ui_draw_box(size, state->ui.theme.bg);
 }
 
 
@@ -1302,6 +1336,10 @@ void game_draw() {
     state->drawer.program = ui_quad_shader;
 
 
+    // Resetting UI cursor.
+    ui_cursor_reset();
+
+
     draw_begin(&state->drawer);
 
 
@@ -1310,15 +1348,17 @@ void game_draw() {
         state->gs = MENU;
     }
 
+    ui_sameline();
+
     if (ui_button(vec2f_make(120, 80), "Spawn box")) {
         spawn_box(VEC2F_ORIGIN, vec4f_make(randf(), randf(), randf(), 0.4f));
     }
 
+    ui_cursor_set(vec2f_make(20, state->window_height - 40));
+    ui_text("Game");
+
     draw_end();
 
-    // Resetting UI cursor.
-    ui_cursor_reset();
-    
 }
 
 
@@ -1335,9 +1375,6 @@ void menu_update() {
     }
 }
 
-
-static const Vec2f EX_BUTTON_P0 = (Vec2f){ 200.0f, 300.0f };
-static const Vec2f EX_BUTTON_P1 = (Vec2f){ 600.0f, 500.0f };
 
 bool toggle;
 
@@ -1364,13 +1401,20 @@ void menu_draw() {
     state->line_drawer.program = line_shader;
 
 
+    // Resetting UI cursor.
+    ui_cursor_reset();
+
     draw_begin(&state->drawer);
 
 
-    // Drawing button.
+    // Buttons.
+
+
+
     if (ui_button(vec2f_make(100, 50), "Click me")) {
         toggle = !toggle;
     }
+
     if (toggle) {
         ui_button(vec2f_make(200, 100), "UI Buttons");
         if (ui_button(vec2f_make(200, 100), "GO BACK")) {
@@ -1379,13 +1423,14 @@ void menu_draw() {
         ui_button(vec2f_make(200, 100), "Centered text");
     }
 
+    ui_cursor_set(vec2f_make(20, state->window_height - 40));
+    ui_text("Menu");
+
     draw_end();
 
     vertex_buffer_draw_lines(&state->debug_vert_buffer, &state->line_drawer);
     vertex_buffer_clear(&state->debug_vert_buffer);
 
-    // Resetting UI cursor.
-    ui_cursor_reset();
 }
 
 
