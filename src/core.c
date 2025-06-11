@@ -1138,7 +1138,20 @@ bool check_shader(u32 id, char *shader_path) {
     return true;
 }
 
+s32 components_of(GLenum type) {
+    switch (type) {
+        case GL_FLOAT: return 1;
+        case GL_FLOAT_VEC2: return 2;
+        case GL_FLOAT_VEC3: return 3;
+        case GL_FLOAT_VEC4: return 4;
+        case GL_FLOAT_MAT4: return 16;
+        default: return 0;
+    }
+}
+
 Shader shader_load(char *shader_path) {
+    Shader shader;
+
     /**
      * @Important: To avoid error while compiling glsl file we need to ensure that "#version ...\n" line comes before anything else in the final shader string. 
      * That said, we can't just have "#define ...\n" come before version tag. 
@@ -1185,9 +1198,9 @@ Shader shader_load(char *shader_path) {
     // Check results for errors.
     (void)check_shader(fragment_shader, shader_path);
     
-    Shader shader = {
-        .id = glCreateProgram(),
-    };
+
+
+    shader.id = glCreateProgram();
 
     glAttachShader(shader.id, vertex_shader);
     glAttachShader(shader.id, fragment_shader);
@@ -1200,6 +1213,27 @@ Shader shader_load(char *shader_path) {
     glDeleteShader(fragment_shader);
     
     str8_free(&shader_source, &std_allocator);
+    
+
+    // Cache all attributes in shader based on shader location as index.
+    shader.attributes_count = 0;
+    shader.vertex_stride = 0;
+    glGetProgramiv(shader.id, GL_ACTIVE_ATTRIBUTES, &shader.attributes_count);
+
+    if (shader.attributes_count > MAX_ATTRIBUTES_PER_SHADER) {
+        printf_err("Shader of %s, exceeded maximum attributes per shader limit on loading.\n", shader_path);
+        exit(1);
+    }
+    
+    Attribute attribute;
+    for (s32 i = 0; i < shader.attributes_count; i++) {
+        glGetActiveAttrib(shader.id, i, MAX_ATTRIBUTE_NAME_LENGTH, NULL, &attribute.length, &attribute.type, attribute.name);
+        attribute.components = components_of(attribute.type);
+        shader.vertex_stride += attribute.components;
+        shader.attributes[glGetAttribLocation(shader.id, attribute.name)] = attribute;
+    }
+
+    
 
     return shader;
 }
@@ -1282,22 +1316,33 @@ void drawer_init(Quad_Drawer *drawer, Shader *shader) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, drawer->ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, array_list_length(&quad_indicies) * sizeof(float), quad_indicies, GL_STATIC_DRAW);
     
-    // 3. Set vertex attributes pointers. [VAO, VBO, EBO].
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
+    // 3. Set vertex attributes pointers. [VAO, VBO, EBO]. @Old.
+    // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)0);
+    // glEnableVertexAttribArray(0);
 
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
+    // glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(3 * sizeof(float)));
+    // glEnableVertexAttribArray(1);
+    // 
+    // glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(7 * sizeof(float)));
+    // glEnableVertexAttribArray(2);
+    // 
+    // glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(9 * sizeof(float)));
+    // glEnableVertexAttribArray(3);
+    // 
+    // glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(10 * sizeof(float)));
+    // glEnableVertexAttribArray(4);
+
+    // 3. Set vertex attributes pointers. [VAO, VBO, EBO].
+    u64 offset = 0;
+    for (s32 i = 0; i < shader->attributes_count; i++) {
+        glVertexAttribPointer(i, shader->attributes[i].components, ATTRIBUTE_COMPONENT_TYPE, GL_FALSE, drawer->program->vertex_stride * ATTRIBUTE_COMPONENT_SIZE, (void*)(offset * ATTRIBUTE_COMPONENT_SIZE));
+        glEnableVertexAttribArray(i);
+        offset += shader->attributes[i].components; 
+    }
+
     
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(7 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    
-    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(9 * sizeof(float)));
-    glEnableVertexAttribArray(3);
-    
-    glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, drawer->program->vertex_stride * sizeof(float), (void*)(10 * sizeof(float)));
-    glEnableVertexAttribArray(4);
-    
+
+
     // 4. Unbind EBO, VBO and VAO.
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);

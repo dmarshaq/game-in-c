@@ -25,6 +25,7 @@
 
 // Drawing basics.
 void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle, Vertex_Buffer *buffer);
+void draw_grid(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer);
 void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale, Vertex_Buffer *buffer);
 Vec2f text_size(const char *text, Font_Baked *font);
 void draw_line(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer);
@@ -1262,22 +1263,22 @@ void game_draw() {
     glClear(GL_COLOR_BUFFER_BIT);
 
 
-    // Grid quad drawing.
-    state->drawer.program = grid_shader;
-    draw_begin(&state->drawer);
+    // Grid drawing.
+    draw_begin(&state->grid_drawer);
 
     Vec2f p0, p1;
     p0 = vec2f_make(-8.0f, -5.0f);
     p1 = vec2f_make(8.0f, 5.0f);
-    draw_quad(p0, p1, vec4f_make(0.8f, 0.8f, 0.8f, 0.6f), NULL, p0, p1, NULL, 0.0f, NULL);
+    // draw_quad(p0, p1, vec4f_make(0.8f, 0.8f, 0.8f, 0.6f), NULL, p0, p1, NULL, 0.0f, NULL);
+    draw_grid(p0, p1, vec4f_make(0.8f, 0.8f, 0.8f, 0.6f), NULL);
 
     draw_end();
 
 
 
     // Regular quad drawing.
-    state->drawer.program = quad_shader;
-    draw_begin(&state->drawer);
+    state->quad_drawer.program = quad_shader;
+    draw_begin(&state->quad_drawer);
 
     draw_player(&state->player);
     draw_boxes();
@@ -1333,14 +1334,14 @@ void game_draw() {
     projection = screen_calculate_projection(state->window_width, state->window_height);
     shader_update_projection(ui_quad_shader, &projection);
 
-    state->drawer.program = ui_quad_shader;
+    state->quad_drawer.program = ui_quad_shader;
 
 
     // Resetting UI cursor.
     ui_cursor_reset();
 
 
-    draw_begin(&state->drawer);
+    draw_begin(&state->quad_drawer);
 
 
     // Drawing button.
@@ -1397,14 +1398,14 @@ void menu_draw() {
     shader_update_projection(ui_quad_shader, &projection);
     shader_update_projection(line_shader, &projection);
 
-    state->drawer.program = ui_quad_shader;
+    state->quad_drawer.program = ui_quad_shader;
     state->line_drawer.program = line_shader;
 
 
     // Resetting UI cursor.
     ui_cursor_reset();
 
-    draw_begin(&state->drawer);
+    draw_begin(&state->quad_drawer);
 
 
     // Buttons.
@@ -1496,15 +1497,16 @@ void plug_load(Plug_State *s) {
     state->main_camera = camera_make(VEC2F_ORIGIN, 48);
 
     // Shader loading.
-    Shader quad_shader = shader_load("res/shader/quad.glsl");
-    shader_init_uniforms(&quad_shader);
-    quad_shader.vertex_stride = 11;
-    hash_table_put(&state->shader_table, quad_shader, "quad", 4);
-    
     Shader grid_shader = shader_load("res/shader/grid.glsl");
     shader_init_uniforms(&grid_shader);
-    grid_shader.vertex_stride = 11;
+    printf("stride: %d\n", grid_shader.vertex_stride);
     hash_table_put(&state->shader_table, grid_shader, "grid", 4);
+
+    Shader quad_shader = shader_load("res/shader/quad.glsl");
+    shader_init_uniforms(&quad_shader);
+    printf("stride: %d\n", quad_shader.vertex_stride);
+    hash_table_put(&state->shader_table, quad_shader, "quad", 4);
+    
 
     Shader line_shader = shader_load("res/shader/line.glsl");
     shader_init_uniforms(&line_shader);
@@ -1516,10 +1518,9 @@ void plug_load(Plug_State *s) {
     ui_quad_shader.vertex_stride = 11;
     hash_table_put(&state->shader_table, ui_quad_shader, "ui_quad", 7);
 
-    // Drawer init.
-    drawer_init(&state->drawer, hash_table_get(&state->shader_table, "quad", 4));
-
-    // Drawer init.
+    // Drawers init.
+    drawer_init(&state->quad_drawer, hash_table_get(&state->shader_table, "quad", 4));
+    drawer_init(&state->grid_drawer, hash_table_get(&state->shader_table, "grid", 4));
     line_drawer_init(&state->line_drawer, hash_table_get(&state->shader_table, "line", 4));
 
 
@@ -1591,7 +1592,8 @@ void plug_unload(Plug_State *s) {
     shader_unload(hash_table_get(&state->shader_table, "grid", 4));
     shader_unload(hash_table_get(&state->shader_table, "line", 4));
     
-    drawer_free(&state->drawer);
+    drawer_free(&state->quad_drawer);
+    drawer_free(&state->grid_drawer);
     line_drawer_free(&state->line_drawer);
     
     font_free(hash_table_get(&state->font_table, "medium", 6));
@@ -1658,6 +1660,23 @@ void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec
         draw_quad_data(quad_data, 1);
     else
         vertex_buffer_append_data(buffer, quad_data, VERTICIES_PER_QUAD * 11);
+}
+
+void draw_grid(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer) {
+    Vec2f p2 = vec2f_make(p1.x, p0.y);
+    Vec2f p3 = vec2f_make(p0.x, p1.y);
+    
+    float quad_data[36] = {
+        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, p0.x, p0.y,
+        p2.x, p2.y, 0.0f, color.x, color.y, color.z, color.w, p2.x, p2.y,
+        p3.x, p3.y, 0.0f, color.x, color.y, color.z, color.w, p3.x, p3.y,
+        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, p1.x, p1.y,
+    };
+    
+    if (buffer == NULL)
+        draw_quad_data(quad_data, 1);
+    else
+        vertex_buffer_append_data(buffer, quad_data, VERTICIES_PER_QUAD * 9);
 }
 
 void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *font, u32 unit_scale, Vertex_Buffer *buffer) {

@@ -702,11 +702,23 @@ float add_texture_to_slots(Texture *texture);
 
 
 
+#define MAX_ATTRIBUTES_PER_SHADER 8
+#define MAX_ATTRIBUTE_NAME_LENGTH 128
+#define ATTRIBUTE_COMPONENT_SIZE 4
+#define ATTRIBUTE_COMPONENT_TYPE GL_FLOAT
 
+typedef struct attribute {
+    char name[MAX_ATTRIBUTE_NAME_LENGTH];
+    GLenum type;
+    s32 length;
+    s32 components;
+} Attribute;
 
 typedef struct shader {
     u32 id;             // OpenGL program id.
     u32 vertex_stride;  // Stride length in bytes needed to be allocated per vertex for shader to run correctly for each vertex.
+    s32 attributes_count;
+    Attribute attributes[MAX_ATTRIBUTES_PER_SHADER];
 } Shader;
 
 /**

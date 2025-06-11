@@ -141,7 +141,8 @@ typedef struct plug_state {
     Shader *shader_table;
     Font_Baked *font_table;
 
-    Quad_Drawer drawer;
+    Quad_Drawer quad_drawer;
+    Quad_Drawer grid_drawer;
     Line_Drawer line_drawer;
     float *debug_vert_buffer;
 
