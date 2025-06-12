@@ -138,26 +138,78 @@ void ui_sameline() {
     state->ui.sameline = true;
 }
 
-void ui_draw_text_centered(Vec2f size, const char *text) {
+void ui_draw_text(const char *text, Vec2f position, Vec4f color) {
+    u64 text_length = strlen(text);
+
+    // Scale and adjust current_point.
+    Vec2f current_point = position;
+    Font_Baked *font = state->ui.font;
+    float origin_x = current_point.x;
+    current_point.y += (float)font->baseline;
+
+    // Text rendering variables.
+    s32 font_char_index;
+    u16 width, height;
+    stbtt_bakedchar *c;
+
+    for (u64 i = 0; i < text_length; i++) {
+        if (text[i] == '\n') {
+            current_point.x = origin_x;
+            current_point.y -= (float)font->line_height;
+            continue;
+        }
+
+        // Character drawing.
+        font_char_index = (s32)text[i] - font->first_char_code;
+        if (font_char_index < font->chars_count) {
+            c = &font->chars[font_char_index];
+            width  = font->chars[font_char_index].x1 - font->chars[font_char_index].x0;
+            height = font->chars[font_char_index].y1 - font->chars[font_char_index].y0;
+
+
+            Vec2f p0 = vec2f_make(current_point.x + c->xoff, current_point.y - c->yoff - height);
+            Vec2f p1 = vec2f_make(current_point.x + c->xoff + width, current_point.y - c->yoff);
+
+            Vec2f uv0 = vec2f_make(c->x0 / (float)font->bitmap.width, c->y1 / (float)font->bitmap.height);
+            Vec2f uv1 = vec2f_make(c->x1 / (float)font->bitmap.width, c->y0 / (float)font->bitmap.height);
+
+            float mask_slot = add_texture_to_slots(&font->bitmap);              
+
+            float quad_data[48] = {
+                p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, uv0.x, uv0.y, 1.0f, 1.0f, mask_slot,
+                p1.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, uv1.x, uv0.y, 1.0f, 1.0f, mask_slot,
+                p0.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, uv0.x, uv1.y, 1.0f, 1.0f, mask_slot,
+                p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, uv1.x, uv1.y, 1.0f, 1.0f, mask_slot,
+            };
+
+            draw_quad_data(quad_data, 1);
+
+
+            current_point.x += font->chars[font_char_index].xadvance;
+        }
+
+    }
+}
+
+void ui_draw_text_centered(const char *text, Vec2f position, Vec2f size) {
     if (text == NULL)
         return;
 
     Vec2f t_size = text_size(text, state->ui.font);
 
-    // Following draw_text centered calculations are for the system where y axis points up, and x axis to the right.
-    // And it is based of quad shader not ui.
-    // draw_text(text, vec2f_make(state->ui.cursor.x + (size.x - t_size.x) * 0.5f, state->ui.cursor.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text, state->ui.font, 1.0f, NULL);
+    // Following ui_draw_text centered calculations are for the system where y axis points up, and x axis to the right.
+    ui_draw_text(text, vec2f_make(position.x + (size.x - t_size.x) * 0.5f, position.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text);
 }
 
-void ui_draw_box(Vec2f size, Vec4f color) {
-    Vec2f p0 = state->ui.cursor;
-    Vec2f p1 = vec2f_sum(state->ui.cursor, size);
+void ui_draw_box(Vec2f position, Vec2f size, Vec4f color) {
+    Vec2f p0 = position;
+    Vec2f p1 = vec2f_sum(position, size);
 
-    float quad_data[44] = {
-        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 0.0f, size.x, size.y,
-        p1.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 0.0f, size.x, size.y,
-        p0.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 1.0f, size.x, size.y,
-        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 1.0f, size.x, size.y,
+    float quad_data[48] = {
+        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 0.0f, size.x, size.y, -1.0f,
+        p1.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 0.0f, size.x, size.y, -1.0f,
+        p0.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 1.0f, size.x, size.y, -1.0f,
+        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 1.0f, size.x, size.y, -1.0f,
     };
     
     draw_quad_data(quad_data, 1);
@@ -169,30 +221,30 @@ bool ui_button(Vec2f size, const char *text) {
 
     if (ui_is_hover(size)) {
         if (state->mouse_input.left_hold) {
-            ui_draw_box(size, state->ui.theme.btn_bg_press);
+            ui_draw_box(state->ui.cursor, size, state->ui.theme.btn_bg_press);
         } else {
-            ui_draw_box(size, state->ui.theme.btn_bg_hover);
+            ui_draw_box(state->ui.cursor, size, state->ui.theme.btn_bg_hover);
         }
         
-        ui_draw_text_centered(size, text);
+        ui_draw_text_centered(text, state->ui.cursor, size);
         return state->mouse_input.left_unpressed;
     }
 
-    ui_draw_box(size, state->ui.theme.btn_bg);
+    ui_draw_box(state->ui.cursor, size, state->ui.theme.btn_bg);
 
-    ui_draw_text_centered(size, text);
+    ui_draw_text_centered(text, state->ui.cursor, size);
     return false;
 }
 
 void ui_text(const char *text) {
     Vec2f t_size = text_size(text, state->ui.font);
     ui_cursor_advance(t_size);
-    // draw_text(text, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + t_size.y), state->ui.theme.text, state->ui.font, 1.0f, NULL);
+    ui_draw_text(text, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + t_size.y), state->ui.theme.text);
 }
 
 void ui_frame(Vec2f size) {
     ui_cursor_advance(size);
-    ui_draw_box(size, state->ui.theme.bg);
+    ui_draw_box(state->ui.cursor, size, state->ui.theme.bg);
 }
 
 
@@ -1382,7 +1434,7 @@ void menu_draw() {
     viewport_reset();
 
     // Clear screen.
-    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    glClearColor(0.3f, 0.1f, 0.4f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     // Get neccessary to draw resource: (Shaders, Fonts, Textures, etc.).
