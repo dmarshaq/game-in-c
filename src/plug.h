@@ -143,6 +143,7 @@ typedef struct plug_state {
 
     Quad_Drawer quad_drawer;
     Quad_Drawer grid_drawer;
+    Quad_Drawer ui_drawer;
     Line_Drawer line_drawer;
     float *debug_vert_buffer;
 

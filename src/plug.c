@@ -145,19 +145,19 @@ void ui_draw_text_centered(Vec2f size, const char *text) {
     Vec2f t_size = text_size(text, state->ui.font);
 
     // Following draw_text centered calculations are for the system where y axis points up, and x axis to the right.
-    draw_text(text, vec2f_make(state->ui.cursor.x + (size.x - t_size.x) * 0.5f, state->ui.cursor.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text, state->ui.font, 1.0f, NULL);
+    // And it is based of quad shader not ui.
+    // draw_text(text, vec2f_make(state->ui.cursor.x + (size.x - t_size.x) * 0.5f, state->ui.cursor.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text, state->ui.font, 1.0f, NULL);
 }
 
 void ui_draw_box(Vec2f size, Vec4f color) {
     Vec2f p0 = state->ui.cursor;
     Vec2f p1 = vec2f_sum(state->ui.cursor, size);
-    float aspect = size.x / size.y;
 
     float quad_data[44] = {
-        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 0.0f, aspect, -1.0f,
-        p1.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 0.0f, aspect, -1.0f,
-        p0.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 1.0f, aspect, -1.0f,
-        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 1.0f, aspect, -1.0f,
+        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 0.0f, size.x, size.y,
+        p1.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 0.0f, size.x, size.y,
+        p0.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 1.0f, size.x, size.y,
+        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 1.0f, size.x, size.y,
     };
     
     draw_quad_data(quad_data, 1);
@@ -187,7 +187,7 @@ bool ui_button(Vec2f size, const char *text) {
 void ui_text(const char *text) {
     Vec2f t_size = text_size(text, state->ui.font);
     ui_cursor_advance(t_size);
-    draw_text(text, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + t_size.y), state->ui.theme.text, state->ui.font, 1.0f, NULL);
+    // draw_text(text, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + t_size.y), state->ui.theme.text, state->ui.font, 1.0f, NULL);
 }
 
 void ui_frame(Vec2f size) {
@@ -1277,7 +1277,6 @@ void game_draw() {
 
 
     // Regular quad drawing.
-    state->quad_drawer.program = quad_shader;
     draw_begin(&state->quad_drawer);
 
     draw_player(&state->player);
@@ -1334,14 +1333,13 @@ void game_draw() {
     projection = screen_calculate_projection(state->window_width, state->window_height);
     shader_update_projection(ui_quad_shader, &projection);
 
-    state->quad_drawer.program = ui_quad_shader;
 
 
     // Resetting UI cursor.
     ui_cursor_reset();
 
 
-    draw_begin(&state->quad_drawer);
+    draw_begin(&state->ui_drawer);
 
 
     // Drawing button.
@@ -1384,7 +1382,7 @@ void menu_draw() {
     viewport_reset();
 
     // Clear screen.
-    glClearColor(0.1f, 0.0f, 0.1f, 1.0f);
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     // Get neccessary to draw resource: (Shaders, Fonts, Textures, etc.).
@@ -1398,14 +1396,11 @@ void menu_draw() {
     shader_update_projection(ui_quad_shader, &projection);
     shader_update_projection(line_shader, &projection);
 
-    state->quad_drawer.program = ui_quad_shader;
-    state->line_drawer.program = line_shader;
-
 
     // Resetting UI cursor.
     ui_cursor_reset();
 
-    draw_begin(&state->quad_drawer);
+    draw_begin(&state->ui_drawer);
 
 
     // Buttons.
@@ -1499,28 +1494,24 @@ void plug_load(Plug_State *s) {
     // Shader loading.
     Shader grid_shader = shader_load("res/shader/grid.glsl");
     shader_init_uniforms(&grid_shader);
-    printf("stride: %d\n", grid_shader.vertex_stride);
     hash_table_put(&state->shader_table, grid_shader, "grid", 4);
 
     Shader quad_shader = shader_load("res/shader/quad.glsl");
     shader_init_uniforms(&quad_shader);
-    printf("stride: %d\n", quad_shader.vertex_stride);
     hash_table_put(&state->shader_table, quad_shader, "quad", 4);
-    
-
-    Shader line_shader = shader_load("res/shader/line.glsl");
-    shader_init_uniforms(&line_shader);
-    line_shader.vertex_stride = 7;
-    hash_table_put(&state->shader_table, line_shader, "line", 4);
 
     Shader ui_quad_shader = shader_load("res/shader/ui_quad.glsl");
     shader_init_uniforms(&ui_quad_shader);
-    ui_quad_shader.vertex_stride = 11;
     hash_table_put(&state->shader_table, ui_quad_shader, "ui_quad", 7);
+
+    Shader line_shader = shader_load("res/shader/line.glsl");
+    shader_init_uniforms(&line_shader);
+    hash_table_put(&state->shader_table, line_shader, "line", 4);
 
     // Drawers init.
     drawer_init(&state->quad_drawer, hash_table_get(&state->shader_table, "quad", 4));
     drawer_init(&state->grid_drawer, hash_table_get(&state->shader_table, "grid", 4));
+    drawer_init(&state->ui_drawer, hash_table_get(&state->shader_table, "ui_quad", 7));
     line_drawer_init(&state->line_drawer, hash_table_get(&state->shader_table, "line", 4));
 
 
@@ -1590,10 +1581,12 @@ void plug_unload(Plug_State *s) {
 
     shader_unload(hash_table_get(&state->shader_table, "quad", 4));
     shader_unload(hash_table_get(&state->shader_table, "grid", 4));
+    shader_unload(hash_table_get(&state->shader_table, "ui_quad", 7));
     shader_unload(hash_table_get(&state->shader_table, "line", 4));
     
     drawer_free(&state->quad_drawer);
     drawer_free(&state->grid_drawer);
+    drawer_free(&state->ui_drawer);
     line_drawer_free(&state->line_drawer);
     
     font_free(hash_table_get(&state->font_table, "medium", 6));

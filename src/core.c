@@ -1003,6 +1003,7 @@ void graphics_init() {
     // Enable Blending (Rendering with alpha channels in mind).
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    // glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
     // Make stbi flip images vertically when loading.
     stbi_set_flip_vertically_on_load(true);
