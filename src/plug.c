@@ -215,23 +215,38 @@ void ui_draw_box(Vec2f position, Vec2f size, Vec4f color) {
     draw_quad_data(quad_data, 1);
 }
 
+s32 BTN_ACTIVE_LINE_ID = -1;
 
-bool ui_button(Vec2f size, const char *text) {
+#define UI_BUTTON(size, text) ui_button(size, text, __LINE__)
+
+bool ui_button(Vec2f size, const char *text, s32 id) {
     ui_cursor_advance(size);
 
     if (ui_is_hover(size)) {
-        if (state->mouse_input.left_hold) {
+        if (BTN_ACTIVE_LINE_ID == id) {
+            if (state->mouse_input.left_unpressed) {
+                ui_draw_box(state->ui.cursor, size, state->ui.theme.btn_bg_hover);
+                ui_draw_text_centered(text, state->ui.cursor, size);
+                BTN_ACTIVE_LINE_ID = -1;
+                return true;
+            }
             ui_draw_box(state->ui.cursor, size, state->ui.theme.btn_bg_press);
-        } else {
-            ui_draw_box(state->ui.cursor, size, state->ui.theme.btn_bg_hover);
+            ui_draw_text_centered(text, state->ui.cursor, size);
+            return false;
         }
-        
+
+        if (state->mouse_input.left_pressed) {
+            BTN_ACTIVE_LINE_ID = id;
+        }
+
+        ui_draw_box(state->ui.cursor, size, state->ui.theme.btn_bg_hover);
         ui_draw_text_centered(text, state->ui.cursor, size);
-        return state->mouse_input.left_unpressed;
-    }
+        return false;
+    } else if (BTN_ACTIVE_LINE_ID == id) {
+        BTN_ACTIVE_LINE_ID = -1;
+    } 
 
     ui_draw_box(state->ui.cursor, size, state->ui.theme.btn_bg);
-
     ui_draw_text_centered(text, state->ui.cursor, size);
     return false;
 }
@@ -241,6 +256,11 @@ void ui_text(const char *text) {
     ui_cursor_advance(t_size);
     ui_draw_text(text, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + t_size.y), state->ui.theme.text);
 }
+
+#define UI_FRAME(width, height, code) \
+    printf("Created and entered ui frame with %d width and %d height.\n", width, height); \
+    code \
+    printf("Exited ui frame with %d width and %d height.\n", width, height); \
 
 void ui_frame(Vec2f size) {
     ui_cursor_advance(size);
@@ -1395,13 +1415,13 @@ void game_draw() {
 
 
     // Drawing button.
-    if (ui_button(vec2f_make(100, 50), "Menu")) {
+    if (UI_BUTTON(vec2f_make(100, 50), "Menu")) {
         state->gs = MENU;
     }
 
     ui_sameline();
 
-    if (ui_button(vec2f_make(120, 80), "Spawn box")) {
+    if (UI_BUTTON(vec2f_make(120, 80), "Spawn box")) {
         spawn_box(VEC2F_ORIGIN, vec4f_make(randf(), randf(), randf(), 0.4f));
     }
 
@@ -1459,16 +1479,16 @@ void menu_draw() {
 
 
 
-    if (ui_button(vec2f_make(100, 50), "Click me")) {
+    if (UI_BUTTON(vec2f_make(100, 50), "Click me")) {
         toggle = !toggle;
     }
 
     if (toggle) {
-        ui_button(vec2f_make(200, 100), "UI Buttons");
-        if (ui_button(vec2f_make(200, 100), "GO BACK")) {
+        UI_BUTTON(vec2f_make(200, 100), "UI Buttons");
+        if (UI_BUTTON(vec2f_make(200, 100), "GO BACK")) {
             state->gs = PLAY;
         }
-        ui_button(vec2f_make(200, 100), "Centered text");
+        UI_BUTTON(vec2f_make(200, 100), "Centered text");
     }
 
     ui_cursor_set(vec2f_make(20, state->window_height - 40));
@@ -1583,6 +1603,10 @@ void plug_load(Plug_State *s) {
 
     // Player loading.
     state->player.speed = 5.0f;
+
+    UI_FRAME(100, 500, 
+        printf("Inside a frame logic :) \n");
+    )
 }
 
 
