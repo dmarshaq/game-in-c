@@ -64,17 +64,36 @@ typedef struct ui_theme {
     Vec4f text;
 } UI_Theme;
 
-typedef struct ui_state {
-    Vec2f cursor;
-    Vec2f *origin_stack;
-    
 
+typedef struct ui_frame {
+    Vec2f origin;
+    Vec2f size;
+} UI_Frame;
+
+typedef enum ui_alignment : s8 {
+    UI_ALIGN_DEFAULT  = 0,
+    UI_ALIGN_OPPOSITE = 1,
+} UI_Alignment;
+
+typedef struct ui_state {
+    // Cursor
+    Vec2f cursor;
+    UI_Frame *frame_stack;
+
+    // Alignment
+    UI_Alignment x_axis;
+    UI_Alignment y_axis;
+    
+    // Advancing
+    float line_height;
     Vec2f element_size;
     bool sameline;
 
+    // Element activation
     s32 acitve_line_id;
     s32 active_prefix_id;
 
+    // Customization
     Font_Baked *font;
     UI_Theme theme;
 } UI_State;
