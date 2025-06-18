@@ -89,13 +89,37 @@ static Plug_State *state;
  * User Interface.
  */
 
+
+
+// UI Origin logic.
+Vec2f ui_current_origin() {
+    if (array_list_length(&state->ui.origin_stack) < 1) {
+        printf_err("UI Current origin doesn't exist.\n");
+        return VEC2F_ORIGIN;
+    }
+    return state->ui.origin_stack[array_list_length(&state->ui.origin_stack) - 1];
+}
+
+void ui_push_origin(Vec2f origin) {
+    array_list_append(&state->ui.origin_stack, origin);
+}
+
+void ui_pop_origin() {
+    array_list_pop(&state->ui.origin_stack);
+}
+
+
+
+// UI Init
 void ui_init() {
-    state->ui.cursor = vec2f_make(20, 20);
-    state->ui.origin = vec2f_make(20, 20);
-    state->ui.gap = 8;
+    state->ui.cursor = vec2f_make(0, 0);
+    state->ui.origin_stack = array_list_make(Vec2f, 8, &std_allocator); // Maybe replace with the custom defined arena allocator later. @Leak.
+    ui_push_origin(VEC2F_ORIGIN);
 
     state->ui.element_size = VEC2F_ORIGIN;
     state->ui.sameline = false;
+
+    state->ui.acitve_line_id = -1;
 
     state->ui.theme = (UI_Theme) {
         .bg             = (Vec4f){ 0.12f, 0.12f, 0.14f, 1.0f },   // Dark slate background
@@ -107,12 +131,11 @@ void ui_init() {
     };
 }
 
-bool ui_is_hover(Vec2f size) {
-    return value_inside_domain(state->ui.cursor.x, state->ui.cursor.x + size.x, state->mouse_input.position.x) && value_inside_domain(state->ui.cursor.y, state->ui.cursor.y + size.y, state->mouse_input.position.y);
-}
 
+
+// UI Cursor related logic.
 void ui_cursor_reset() {
-    state->ui.cursor = state->ui.origin;
+    state->ui.cursor = ui_current_origin();
     state->ui.element_size = VEC2F_ORIGIN;
     state->ui.sameline = false;
 }
@@ -123,19 +146,65 @@ void ui_cursor_set(Vec2f pos) {
     state->ui.sameline = false;
 }
 
+/**
+ * This function doesn't actually advance cursor by the passed parameter "size", it only advances cursor by previously stored element size, a.k.a. any previously placed UI element.
+ * Needs to be split on separate functions...
+ */
 void ui_cursor_advance(Vec2f size) {
     if (state->ui.sameline) {
-        state->ui.cursor.x += state->ui.element_size.x + state->ui.gap;
+        state->ui.cursor.x += state->ui.element_size.x;
         state->ui.sameline = false;
     } else {
-        state->ui.cursor.x = state->ui.origin.x;
-        state->ui.cursor.y += state->ui.element_size.y + state->ui.gap;
+        state->ui.cursor.x = ui_current_origin().x;
+        state->ui.cursor.y += state->ui.element_size.y;
     }
     state->ui.element_size = size;
 }
 
 void ui_sameline() {
     state->ui.sameline = true;
+}
+
+
+
+
+// UI Frame.
+
+void ui_draw_frame(Vec2f position, Vec2f size, Vec4f color) {
+    Vec2f p0 = position;
+    Vec2f p1 = vec2f_sum(position, size);
+
+    float quad_data[48] = {
+        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 0.0f, size.x, size.y, -1.0f,
+        p1.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 0.0f, size.x, size.y, -1.0f,
+        p0.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 1.0f, size.x, size.y, -1.0f,
+        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 1.0f, size.x, size.y, -1.0f,
+    };
+    
+    draw_quad_data(quad_data, 1);
+}
+
+
+#define UI_FRAME(width, height, code)\
+    ui_cursor_advance(vec2f_make(width, height));\
+    ui_push_origin(state->ui.cursor);\
+    ui_draw_frame(state->ui.cursor, vec2f_make(width, height), state->ui.theme.bg);\
+    ui_cursor_reset();\
+    code\
+    state->ui.cursor = ui_current_origin();\
+    state->ui.element_size = vec2f_make(width, height);\
+    ui_pop_origin();\
+
+    
+
+
+
+
+
+
+
+bool ui_is_hover(Vec2f size) {
+    return value_inside_domain(state->ui.cursor.x, state->ui.cursor.x + size.x, state->mouse_input.position.x) && value_inside_domain(state->ui.cursor.y, state->ui.cursor.y + size.y, state->mouse_input.position.y);
 }
 
 void ui_draw_text(const char *text, Vec2f position, Vec4f color) {
@@ -201,52 +270,36 @@ void ui_draw_text_centered(const char *text, Vec2f position, Vec2f size) {
     ui_draw_text(text, vec2f_make(position.x + (size.x - t_size.x) * 0.5f, position.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text);
 }
 
-void ui_draw_box(Vec2f position, Vec2f size, Vec4f color) {
-    Vec2f p0 = position;
-    Vec2f p1 = vec2f_sum(position, size);
-
-    float quad_data[48] = {
-        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 0.0f, size.x, size.y, -1.0f,
-        p1.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 0.0f, size.x, size.y, -1.0f,
-        p0.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 1.0f, size.x, size.y, -1.0f,
-        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 1.0f, size.x, size.y, -1.0f,
-    };
-    
-    draw_quad_data(quad_data, 1);
-}
-
-s32 BTN_ACTIVE_LINE_ID = -1;
-
 #define UI_BUTTON(size, text) ui_button(size, text, __LINE__)
 
 bool ui_button(Vec2f size, const char *text, s32 id) {
     ui_cursor_advance(size);
 
     if (ui_is_hover(size)) {
-        if (BTN_ACTIVE_LINE_ID == id) {
+        if (state->ui.acitve_line_id == id) {
             if (state->mouse_input.left_unpressed) {
-                ui_draw_box(state->ui.cursor, size, state->ui.theme.btn_bg_hover);
+                ui_draw_frame(state->ui.cursor, size, state->ui.theme.btn_bg_hover);
                 ui_draw_text_centered(text, state->ui.cursor, size);
-                BTN_ACTIVE_LINE_ID = -1;
+                state->ui.acitve_line_id = -1;
                 return true;
             }
-            ui_draw_box(state->ui.cursor, size, state->ui.theme.btn_bg_press);
+            ui_draw_frame(state->ui.cursor, size, state->ui.theme.btn_bg_press);
             ui_draw_text_centered(text, state->ui.cursor, size);
             return false;
         }
 
         if (state->mouse_input.left_pressed) {
-            BTN_ACTIVE_LINE_ID = id;
+            state->ui.acitve_line_id = id;
         }
 
-        ui_draw_box(state->ui.cursor, size, state->ui.theme.btn_bg_hover);
+        ui_draw_frame(state->ui.cursor, size, state->ui.theme.btn_bg_hover);
         ui_draw_text_centered(text, state->ui.cursor, size);
         return false;
-    } else if (BTN_ACTIVE_LINE_ID == id) {
-        BTN_ACTIVE_LINE_ID = -1;
+    } else if (state->ui.acitve_line_id == id) {
+        state->ui.acitve_line_id = -1;
     } 
 
-    ui_draw_box(state->ui.cursor, size, state->ui.theme.btn_bg);
+    ui_draw_frame(state->ui.cursor, size, state->ui.theme.btn_bg);
     ui_draw_text_centered(text, state->ui.cursor, size);
     return false;
 }
@@ -257,15 +310,6 @@ void ui_text(const char *text) {
     ui_draw_text(text, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + t_size.y), state->ui.theme.text);
 }
 
-#define UI_FRAME(width, height, code) \
-    printf("Created and entered ui frame with %d width and %d height.\n", width, height); \
-    code \
-    printf("Exited ui frame with %d width and %d height.\n", width, height); \
-
-void ui_frame(Vec2f size) {
-    ui_cursor_advance(size);
-    ui_draw_box(state->ui.cursor, size, state->ui.theme.bg);
-}
 
 
 
@@ -1407,23 +1451,35 @@ void game_draw() {
 
 
 
-    // Resetting UI cursor.
-    ui_cursor_reset();
 
 
     draw_begin(&state->ui_drawer);
 
+    // Resetting UI cursor.
+    ui_cursor_reset();
 
-    // Drawing button.
-    if (UI_BUTTON(vec2f_make(100, 50), "Menu")) {
-        state->gs = MENU;
-    }
+    // Pushing new origin.
+    UI_FRAME(300, 400, 
+        if (UI_BUTTON(vec2f_make(120, 80), "Spawn box")) {
+            spawn_box(VEC2F_ORIGIN, vec4f_make(randf(), randf(), randf(), 0.4f));
+        }
 
+        ui_sameline();
+
+        UI_FRAME(100, 120, 
+            if (UI_BUTTON(vec2f_make(100, 40), "Menu")) {
+                state->gs = MENU;
+            }
+            if (UI_BUTTON(vec2f_make(100, 40), "Menu")) {
+                state->gs = MENU;
+            }
+            if (UI_BUTTON(vec2f_make(100, 40), "Menu")) {
+                state->gs = MENU;
+            }
+        )
+    )
     ui_sameline();
-
-    if (UI_BUTTON(vec2f_make(120, 80), "Spawn box")) {
-        spawn_box(VEC2F_ORIGIN, vec4f_make(randf(), randf(), randf(), 0.4f));
-    }
+    UI_FRAME(200, 300, )
 
     ui_cursor_set(vec2f_make(20, state->window_height - 40));
     ui_text("Game");
@@ -1470,15 +1526,14 @@ void menu_draw() {
 
 
     // Resetting UI cursor.
-    ui_cursor_reset();
-
     draw_begin(&state->ui_drawer);
 
+    // Pushing new origin.
+    array_list_append(&state->ui.origin_stack, VEC2F_ORIGIN);
+
+    ui_cursor_reset();
 
     // Buttons.
-
-
-
     if (UI_BUTTON(vec2f_make(100, 50), "Click me")) {
         toggle = !toggle;
     }
@@ -1493,6 +1548,8 @@ void menu_draw() {
 
     ui_cursor_set(vec2f_make(20, state->window_height - 40));
     ui_text("Menu");
+
+    array_list_pop(&state->ui.origin_stack);
 
     draw_end();
 
@@ -1604,9 +1661,6 @@ void plug_load(Plug_State *s) {
     // Player loading.
     state->player.speed = 5.0f;
 
-    UI_FRAME(100, 500, 
-        printf("Inside a frame logic :) \n");
-    )
 }
 
 

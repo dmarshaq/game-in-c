@@ -66,10 +66,14 @@ typedef struct ui_theme {
 
 typedef struct ui_state {
     Vec2f cursor;
-    float gap;
+    Vec2f *origin_stack;
+    
+
     Vec2f element_size;
-    Vec2f origin;
     bool sameline;
+
+    s32 acitve_line_id;
+    s32 active_prefix_id;
 
     Font_Baked *font;
     UI_Theme theme;
