@@ -90,8 +90,9 @@ typedef struct ui_state {
     bool sameline;
 
     // Element activation
-    s32 acitve_line_id;
+    s32 active_line_id;
     s32 active_prefix_id;
+    s32 set_prefix_id;
 
     // Customization
     Font_Baked *font;

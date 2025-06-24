@@ -127,13 +127,15 @@ void ui_init() {
     state->ui.frame_stack = array_list_make(UI_Frame, 8, &std_allocator); // Maybe replace with the custom defined arena allocator later. @Leak.
     ui_push_frame(0, 0, state->window_width, state->window_height);
 
-    state->ui.x_axis= UI_ALIGN_OPPOSITE;
-    state->ui.y_axis= UI_ALIGN_OPPOSITE;
+    state->ui.x_axis = UI_ALIGN_OPPOSITE;
+    state->ui.y_axis = UI_ALIGN_OPPOSITE;
 
     state->ui.element_size = VEC2F_ORIGIN;
     state->ui.sameline = false;
 
-    state->ui.acitve_line_id = -1;
+    state->ui.active_line_id = -1;
+    state->ui.active_prefix_id = -1;
+    state->ui.set_prefix_id = -1;
 
     state->ui.theme = (UI_Theme) {
         .bg             = (Vec4f){ 0.12f, 0.12f, 0.14f, 1.0f },   // Dark slate background
@@ -143,6 +145,17 @@ void ui_init() {
         .btn_bg_press   = (Vec4f){ 0.08f, 0.10f, 0.22f, 1.0f },   // Subtle shadowy press state
         .text           = (Vec4f){ 0.97f, 0.96f, 0.92f, 1.0f },   // Warm white text
     };
+}
+
+// UI prefix id.
+void ui_set_prefix(s32 id) {
+    state->ui.set_prefix_id = id;
+}
+
+s32 ui_get_prefix() {
+    s32 id = state->ui.set_prefix_id;
+    state->ui.set_prefix_id = -1;
+    return id;
 }
 
 // UI Alignment.
@@ -173,7 +186,6 @@ void ui_cursor_advance(Vec2f size) {
         state->ui.line_height = size.y > state->ui.line_height ? size.y : state->ui.line_height;
         state->ui.cursor.x += !state->ui.x_axis * state->ui.element_size.x - state->ui.x_axis * size.x;
         state->ui.sameline = false;
-
     } else {
         state->ui.line_height = size.y;
         state->ui.cursor.x = ui_current_aligned_origin().x - state->ui.x_axis * size.x;
@@ -302,40 +314,157 @@ void ui_draw_text_centered(const char *text, Vec2f position, Vec2f size) {
     ui_draw_text(text, vec2f_make(position.x + (size.x - t_size.x) * 0.5f, position.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text);
 }
 
-#define UI_BUTTON(size, text) ui_button(size, text, __LINE__)
 
-bool ui_button(Vec2f size, const char *text, s32 id) {
+// UI Button
+
+#define UI_BUTTON(size, text) ui_button(size, text, __LINE__, ui_get_prefix())
+
+bool ui_button(Vec2f size, const char *text, s32 id, s32 prefix_id) {
     ui_cursor_advance(size);
     ui_set_element_size(size);
 
+    Vec4f res_color = state->ui.theme.btn_bg;
+    bool  res_ret   = false;
+    
+
     if (ui_is_hover(size)) {
-        if (state->ui.acitve_line_id == id) {
+        if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
             if (state->mouse_input.left_unpressed) {
-                ui_draw_rect(state->ui.cursor, size, state->ui.theme.btn_bg_hover);
-                ui_draw_text_centered(text, state->ui.cursor, size);
-                state->ui.acitve_line_id = -1;
-                return true;
+                state->ui.active_line_id = -1;
+                state->ui.active_prefix_id = -1;
+
+                res_color = state->ui.theme.btn_bg_hover;
+                res_ret   = true;
+                goto leave_draw;
             }
-            ui_draw_rect(state->ui.cursor, size, state->ui.theme.btn_bg_press);
-            ui_draw_text_centered(text, state->ui.cursor, size);
-            return false;
+
+            res_color = state->ui.theme.btn_bg_press;
+            goto leave_draw;
         }
 
         if (state->mouse_input.left_pressed) {
-            state->ui.acitve_line_id = id;
+            state->ui.active_line_id = id;
+            state->ui.active_prefix_id = prefix_id;
         }
 
-        ui_draw_rect(state->ui.cursor, size, state->ui.theme.btn_bg_hover);
-        ui_draw_text_centered(text, state->ui.cursor, size);
-        return false;
-    } else if (state->ui.acitve_line_id == id) {
-        state->ui.acitve_line_id = -1;
+        res_color = state->ui.theme.btn_bg_hover;
+
+    } else if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
+        state->ui.active_line_id = -1;
+        state->ui.active_prefix_id = -1;
     } 
 
-    ui_draw_rect(state->ui.cursor, size, state->ui.theme.btn_bg);
+leave_draw:
+
+    ui_draw_rect(state->ui.cursor, size, res_color);
     ui_draw_text_centered(text, state->ui.cursor, size);
-    return false;
+    return res_ret;
 }
+
+
+// UI Slider
+
+
+#define UI_SLIDER_INT(size, output, min, max) ui_slider_int(size, output, min, max, __LINE__, ui_get_prefix())
+
+bool ui_slider_int(Vec2f size, s32 *output, s32 min, s32 max, s32 id, s32 prefix_id) {
+    ui_cursor_advance(size);
+    ui_set_element_size(size);
+
+    float scale = (max - min) / size.x;
+
+    Vec4f res_color = state->ui.theme.btn_bg;
+    Vec4f res_knob_color = state->ui.theme.btn_bg_hover;
+    bool  res_ret   = false;
+    
+    if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
+        if (state->mouse_input.left_hold) {
+            // If was pressed, and holding.
+            float a = state->mouse_input.position.x * scale - (state->ui.cursor.x * scale - min);
+            *output = (s32)clamp(a, min, max);
+
+            res_color = state->ui.theme.btn_bg_press;
+            res_knob_color = state->ui.theme.text;
+            res_ret   = true;
+            goto leave_draw;
+        } else {
+            // If was pressed, but not holding anymore.
+            state->ui.active_line_id = -1;
+            state->ui.active_prefix_id = -1;
+            goto leave_draw;
+        }
+    }
+    
+    if (ui_is_hover(size)) {
+        // If just pressed.
+        if (state->mouse_input.left_pressed) {
+            state->ui.active_line_id = id;
+            state->ui.active_prefix_id = prefix_id;
+        }
+
+        res_color = state->ui.theme.btn_bg_hover;
+    } 
+
+
+leave_draw:
+
+    ui_draw_rect(vec2f_make(state->ui.cursor.x, state->ui.cursor.y + size.y * 0.5f - 5), vec2f_make(size.x, 10), res_color); // Slider line.
+    ui_draw_rect(vec2f_make(state->ui.cursor.x + (*output - min) / scale - 8, state->ui.cursor.y + size.y * 0.5f - 8), vec2f_make(16, 16), res_knob_color); // Slider knob.
+    return res_ret;
+}
+
+#define UI_SLIDER_FLOAT(size, output, min, max) ui_slider_float(size, output, min, max, __LINE__, ui_get_prefix())
+
+bool ui_slider_float(Vec2f size, float *output, float min, float max, s32 id, s32 prefix_id) {
+    ui_cursor_advance(size);
+    ui_set_element_size(size);
+
+    float scale = (max - min) / size.x;
+
+    Vec4f res_color = state->ui.theme.btn_bg;
+    Vec4f res_knob_color = state->ui.theme.btn_bg_hover;
+    bool  res_ret   = false;
+    
+    if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
+        if (state->mouse_input.left_hold) {
+            // If was pressed, and holding.
+            float a = state->mouse_input.position.x * scale - (state->ui.cursor.x * scale - min);
+            *output = clamp(a, min, max);
+
+            res_color = state->ui.theme.btn_bg_press;
+            res_knob_color = state->ui.theme.text;
+            res_ret   = true;
+            goto leave_draw;
+        } else {
+            // If was pressed, but not holding anymore.
+            state->ui.active_line_id = -1;
+            state->ui.active_prefix_id = -1;
+            goto leave_draw;
+        }
+    }
+    
+    if (ui_is_hover(size)) {
+        // If just pressed.
+        if (state->mouse_input.left_pressed) {
+            state->ui.active_line_id = id;
+            state->ui.active_prefix_id = prefix_id;
+        }
+
+        res_color = state->ui.theme.btn_bg_hover;
+    } 
+
+
+leave_draw:
+
+    ui_draw_rect(vec2f_make(state->ui.cursor.x, state->ui.cursor.y + size.y * 0.5f - 5), vec2f_make(size.x, 10), res_color); // Slider line.
+    ui_draw_rect(vec2f_make(state->ui.cursor.x + (*output - min) / scale - 8, state->ui.cursor.y + size.y * 0.5f - 8), vec2f_make(16, 16), res_knob_color); // Slider knob.
+    // ui_draw_rect(vec2f_make(state->ui.cursor.x + (*output - min) / scale - 5, state->ui.cursor.y), vec2f_make(10, size.y), res_knob_color); // Slider knob bar.
+    return res_ret;
+}
+
+
+
+
 
 void ui_text(const char *text) {
     Vec2f t_size = text_size(text, state->ui.font);
@@ -1380,6 +1509,8 @@ void game_update() {
 void game_ui_function() {
 }
 
+float slider_val = 0.0f;
+s32 slider_int = 0;
 void game_draw() {
 
     /**
@@ -1489,7 +1620,6 @@ void game_draw() {
 
 
 
-
     draw_begin(&state->ui_drawer);
 
 
@@ -1516,24 +1646,29 @@ void game_draw() {
         ui_sameline();
 
         UI_FRAME(100, 120, 
-            if (UI_BUTTON(vec2f_make(100, 40), "Menu")) {
-                state->gs = MENU;
+            for (s32 i = 0; i < 1; i++) {
+                ui_set_prefix(i);
+                if (UI_BUTTON(vec2f_make(100, 40), "Menu")) {
+                    state->gs = MENU;
+                }
             }
-            if (UI_BUTTON(vec2f_make(100, 40), "Menu")) {
-                state->gs = MENU;
-            }
-            if (UI_BUTTON(vec2f_make(100, 40), "Menu")) {
-                state->gs = MENU;
-            }
+            UI_SLIDER_FLOAT(vec2f_make(100, 40), &slider_val, -0.0f, 1.0f);
+            UI_SLIDER_INT(vec2f_make(100, 40), &slider_int, -1, 12942);
         );
+        
+
+        UI_SLIDER_FLOAT(vec2f_make(220, 40), &slider_val, -2.0f, 2.0f);
+        UI_SLIDER_FLOAT(vec2f_make(220, 40), &slider_val, -4.0f, 4.0f);
     );
 
-    u32 info_buffer_size = 128;
+    u32 info_buffer_size = 256;
     s32 written = 0;
     char info_buffer[info_buffer_size];
 
     written += snprintf(info_buffer + written, info_buffer_size - written, "FPS: %3.2f\n", 1 / state->t->delta_time);
-    written += snprintf(info_buffer + written, info_buffer_size - written, "Phys Box Count: %u", array_list_length(&state->phys_boxes));
+    written += snprintf(info_buffer + written, info_buffer_size - written, "Phys Box Count: %u\n", array_list_length(&state->phys_boxes));
+    written += snprintf(info_buffer + written, info_buffer_size - written, "Slider value %2.2f\n", slider_val);
+    written += snprintf(info_buffer + written, info_buffer_size - written, "Slider int value %2d\n", slider_int);
     
     state->ui.x_axis = UI_ALIGN_DEFAULT;
     state->ui.y_axis = UI_ALIGN_OPPOSITE;

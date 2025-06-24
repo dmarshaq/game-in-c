@@ -39,7 +39,7 @@ in vec2 v_uv0;
 in vec2 v_size;
 in float v_mask_index;
 
-#define ROUNDNESS 10.0
+#define ROUNDNESS 5.0
 #define BORDER 2.0
 #define AA 1.0
 

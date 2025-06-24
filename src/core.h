@@ -252,6 +252,7 @@ void hash_table_print(void **table);
 #define PI 3.14159265358979323846f
 #define TAU (PI * 2)
 
+// Change deg2rad and rad2deg to just MACROS
 #define deg2rad(deg)                        ((deg) * PI / 180.0f)
 #define rad2deg(rad)                        ((rad) * 180.0f / PI)
 #define randf()                             ((float)rand() / RAND_MAX)
@@ -272,11 +273,14 @@ static inline float lerp(float a, float b, float t) {
     return a + (b - a) * t;
 }
 
-static inline float ease_in_back(float x) {
-    float c1 = 1.70158f;
-    float c3 = c1 + 1.0f;
-    return (c3 * x * x * x) - (c1 * x * x);
+static inline float clamp(float a, float min, float max) {
+    return fmaxf(min, fminf(a, max));
 }
+
+static inline float ease_in_back(float x) {
+    return (2.70158f * x * x * x) - (1.70158f * x * x);
+}
+
 
 // Vec2f
 
