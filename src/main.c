@@ -8,8 +8,8 @@
 #include <windows.h>
 #endif
 
-#define WINDOW_WIDTH 800
-#define WINDOW_HEIGHT 600
+#define WINDOW_WIDTH 1280
+#define WINDOW_HEIGHT 720
 
 const char* APP_NAME = "Game in C";
 
@@ -98,12 +98,12 @@ int main(int argc, char *argv[]) {
         t.delta_time = (float)(t.delta_time_milliseconds) / 1000.0f;
         t.accumilated_time = t.accumilated_time % t.update_step_time;
 
-
+        // Clear inputs.
         state.mouse_input.left_pressed = false;
         state.mouse_input.left_unpressed = false;
-
         state.mouse_input.right_pressed = false;
         state.mouse_input.right_unpressed = false;
+        state.text_input[0] = '\0';
 
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
@@ -137,6 +137,9 @@ int main(int argc, char *argv[]) {
                         state.mouse_input.right_hold = false;
                     }
                     break;
+                case SDL_TEXTINPUT:
+                    strcpy(state.text_input, event.text.text);
+                    break;
                 default:
                     break;
             }
@@ -146,7 +149,7 @@ int main(int argc, char *argv[]) {
         plug_update(&state);
 
         #ifdef DEV
-        if (is_pressed_keycode(SDLK_r)) {
+        if (is_pressed_keycode(SDLK_r) && !state.keybinds.text_input) {
             if(!reload_libplug()) {
                 fprintf(stderr, "%s Failed to hot reload plug.dll.\n", debug_error_str);
             }

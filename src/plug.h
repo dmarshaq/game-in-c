@@ -143,6 +143,14 @@ typedef struct box {
     bool destroyed;
 } Box;
 
+
+typedef struct keybinds {
+    bool dev;
+    bool game;
+    bool menu;
+    bool text_input;
+} Keybinds;
+
 /**
  * Definition of plug_state.
  * @Important: All global variables should be saved and organized in the struct.
@@ -155,6 +163,8 @@ typedef struct plug_state {
     Time_Data *t;
     bool quit;
     Mouse_Input mouse_input;
+    char text_input[SDL_TEXTINPUTEVENT_TEXT_SIZE];
+    Keybinds keybinds;
 
     /**
      * Globals, @Important: Must be loaded or/and unloaded when hot reloading plug.
@@ -185,6 +195,10 @@ typedef struct plug_state {
     UI_State ui;
 
 } Plug_State;
+
+
+
+
 
 
 #ifdef DEV

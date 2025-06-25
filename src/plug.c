@@ -1,6 +1,7 @@
 #include "plug.h"
 #include "SDL2/SDL_keycode.h"
 #include "core.h"
+#include <SDL2/SDL_keyboard.h>
 #include <float.h>
 #include <limits.h>
 #include <math.h>
@@ -77,8 +78,24 @@ static const float DOT_SCALE = 0.005f;
 
 
 
+
 // Global state.
 static Plug_State *state;
+
+
+
+
+// Keybinds. @Temporary: Until all of the keybinds will be obtained from some serialized file format. Doesn't have to be thisn complex
+#define INPUT_HOT_RELOAD        (!state->keybinds.text_input && is_pressed_keycode(SDLK_r) && state->keybinds.dev)
+#define INPUT_PLAYER_JUMP       (!state->keybinds.text_input && is_pressed_keycode(SDLK_SPACE) && state->keybinds.game)
+#define INPUT_PLAYER_MOVE_RIGHT (!state->keybinds.text_input && is_hold_keycode(SDLK_d) && state->keybinds.game)
+#define INPUT_PLAYER_MOVE_LEFT  (!state->keybinds.text_input && is_hold_keycode(SDLK_a) && state->keybinds.game)
+#define INPUT_PLAYER_ATTACK     (!state->keybinds.text_input && is_pressed_keycode(SDLK_q) && state->keybinds.game)
+#define INPUT_MENU_TOGGLE       (!state->keybinds.text_input && is_pressed_keycode(SDLK_m) && (state->keybinds.game || state->keybinds.menu))
+#define INPUT_TIME_TOGGLE       (!state->keybinds.text_input && is_pressed_keycode(SDLK_t) && state->keybinds.dev)
+#define INPUT_TEXT_BACKSPACE    (state->keybinds.text_input && is_pressed_keycode(SDLK_BACKSPACE))
+
+
 
 
 
@@ -460,6 +477,78 @@ leave_draw:
     ui_draw_rect(vec2f_make(state->ui.cursor.x + (*output - min) / scale - 8, state->ui.cursor.y + size.y * 0.5f - 8), vec2f_make(16, 16), res_knob_color); // Slider knob.
     // ui_draw_rect(vec2f_make(state->ui.cursor.x + (*output - min) / scale - 5, state->ui.cursor.y), vec2f_make(10, size.y), res_knob_color); // Slider knob bar.
     return res_ret;
+}
+
+
+// UI Input field
+
+#define UI_INPUT_FIELD(size, buffer, buffer_size) ui_input_field(size, buffer, buffer_size, __LINE__, ui_get_prefix())
+
+s32 ui_input_field(Vec2f size, char *buffer, s32 buffer_size, s32 id, s32 prefix_id) {
+    ui_cursor_advance(size);
+    ui_set_element_size(size);
+
+    Vec4f res_color = state->ui.theme.btn_bg;
+    Vec4f res_bar_color = state->ui.theme.btn_bg_hover;
+    s32   res_written = 0;
+    
+    if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
+        if (state->mouse_input.left_pressed) {
+            // If was pressed but was pressed again outside (deselected)
+            state->ui.active_line_id = -1;
+            state->ui.active_prefix_id = -1;
+            SDL_StopTextInput();
+            state->keybinds.text_input = false;
+
+            goto leave_draw;
+        }
+        
+        res_color = state->ui.theme.btn_bg_press;
+
+        // If is still active.
+        s32 input_length = strlen(state->text_input);
+        if (input_length > 0) {
+            if (strlen(buffer) + input_length < buffer_size - 1) {
+                strcpy(buffer + strlen(buffer), state->text_input);
+                res_bar_color = state->ui.theme.text;
+                res_written = input_length;
+            } else {
+                strcpy(buffer + buffer_size - 4, "...");
+                res_written = -1;
+            }
+            goto leave_draw;
+        }
+
+        if (INPUT_TEXT_BACKSPACE) {
+            buffer[strlen(buffer) - 1] = '\0';
+            res_bar_color = state->ui.theme.text;
+            goto leave_draw;
+        }
+
+    }
+
+
+
+    if (ui_is_hover(size)) {
+        // If just pressed.
+        if (state->mouse_input.left_pressed) {
+            state->ui.active_line_id = id;
+            state->ui.active_prefix_id = prefix_id;
+            SDL_StartTextInput();
+            state->keybinds.text_input = true;
+        }
+
+        res_color = state->ui.theme.btn_bg_hover;
+    }
+
+
+
+leave_draw:
+    Vec2f t_size = text_size(buffer, state->ui.font);
+    ui_draw_rect(state->ui.cursor, size, res_color); // Input field.
+    ui_draw_rect(vec2f_make(state->ui.cursor.x + t_size.x, state->ui.cursor.y), vec2f_make(10, size.y), res_bar_color); // Input bar.
+    ui_draw_text(buffer, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text);
+    return res_written;
 }
 
 
@@ -1369,12 +1458,12 @@ void spawn_player(Vec2f position, Vec4f color) {
 
 void update_player(Player *p) {
     float x_vel = 0.0f;
-    if (is_hold_keycode(SDLK_d)) {
+    if (INPUT_PLAYER_MOVE_RIGHT) {
         x_vel = 1.0f;
 
         transform_set_flip_x(&p->sword.handle, 1.0f);
         transform_set_flip_x(&p->sword.origin, 1.0f);
-    } else if (is_hold_keycode(SDLK_a)) {
+    } else if (INPUT_PLAYER_MOVE_LEFT) {
         x_vel = -1.0f;
 
         transform_set_flip_x(&p->sword.handle, -1.0f);
@@ -1384,7 +1473,7 @@ void update_player(Player *p) {
 
     p->p_box.body.velocity.x = lerp(p->p_box.body.velocity.x, x_vel * p->speed, 0.5f);
 
-    if (is_pressed_keycode(SDLK_SPACE) && p->p_box.grounded) {
+    if (INPUT_PLAYER_JUMP && p->p_box.grounded) {
         phys_apply_force(&p->p_box.body, vec2f_make(0.0f, 140.0f));
     }
 
@@ -1403,7 +1492,7 @@ void update_player(Player *p) {
     ti_update(&p->sword.animator, state->t->delta_time);
 
 
-    if (is_pressed_keycode(SDLK_q)) {
+    if (INPUT_PLAYER_ATTACK) {
         float temp = p->sword.angle_a;
         p->sword.angle_a = p->sword.angle_b;
         p->sword.angle_b = temp;
@@ -1478,7 +1567,7 @@ void game_update() {
 
     
     // Time slow down input.
-    if (is_pressed_keycode(SDLK_t)) {
+    if (INPUT_TIME_TOGGLE) {
         state->t->time_slow_factor++;
         state->t->delta_time_multi = 1.0f / (state->t->time_slow_factor % 5);
         
@@ -1499,7 +1588,7 @@ void game_update() {
 
 
     // Switching game state to menu.
-    if (is_pressed_keycode(SDLK_m)) {
+    if (INPUT_MENU_TOGGLE) {
         state->gs = MENU;
     }
 
@@ -1511,6 +1600,11 @@ void game_ui_function() {
 
 float slider_val = 0.0f;
 s32 slider_int = 0;
+
+#define INPUT_FIELD_SIZE 120
+char input_buffer_field[INPUT_FIELD_SIZE] = "";
+
+
 void game_draw() {
 
     /**
@@ -1657,9 +1751,14 @@ void game_draw() {
         );
         
 
-        UI_SLIDER_FLOAT(vec2f_make(220, 40), &slider_val, -2.0f, 2.0f);
-        UI_SLIDER_FLOAT(vec2f_make(220, 40), &slider_val, -4.0f, 4.0f);
+        // UI_SLIDER_FLOAT(vec2f_make(220, 40), &slider_val, -2.0f, 2.0f);
+        // UI_SLIDER_FLOAT(vec2f_make(220, 40), &slider_val, -4.0f, 4.0f);
     );
+
+    
+
+
+
 
     u32 info_buffer_size = 256;
     s32 written = 0;
@@ -1667,14 +1766,16 @@ void game_draw() {
 
     written += snprintf(info_buffer + written, info_buffer_size - written, "FPS: %3.2f\n", 1 / state->t->delta_time);
     written += snprintf(info_buffer + written, info_buffer_size - written, "Phys Box Count: %u\n", array_list_length(&state->phys_boxes));
-    written += snprintf(info_buffer + written, info_buffer_size - written, "Slider value %2.2f\n", slider_val);
-    written += snprintf(info_buffer + written, info_buffer_size - written, "Slider int value %2d\n", slider_int);
+    written += snprintf(info_buffer + written, info_buffer_size - written, "Slider value: %2.2f\n", slider_val);
+    written += snprintf(info_buffer + written, info_buffer_size - written, "Slider int value: %2d\n", slider_int);
+    written += snprintf(info_buffer + written, info_buffer_size - written, "Input field length: %2d\n", strlen(input_buffer_field));
     
     state->ui.x_axis = UI_ALIGN_DEFAULT;
     state->ui.y_axis = UI_ALIGN_OPPOSITE;
 
     UI_BEGIN();
 
+    UI_INPUT_FIELD(vec2f_make(state->window_width, 40), input_buffer_field, INPUT_FIELD_SIZE);
     ui_text(info_buffer);
 
 
@@ -1781,6 +1882,15 @@ void menu_draw() {
 
 void plug_init(Plug_State *s) {
     state = s;
+
+    // Setting inputs.
+    #ifdef DEV
+    state->keybinds.dev = true;
+    #else
+    state->keybinds.dev = false;
+    #endif
+    state->keybinds.game = true;
+    state->keybinds.menu = false;
 
     // Setting random seed.
     srand((u32)time(NULL));
@@ -1899,10 +2009,14 @@ void plug_update(Plug_State *s) {
     // Switch to handle different game states.
     switch (state->gs) {
         case PLAY:
+            state->keybinds.game = true;
+            state->keybinds.menu = false;
             game_update();
             game_draw();
             break;
         case MENU:
+            state->keybinds.game = false;
+            state->keybinds.menu = true;
             menu_update();
             menu_draw();
             break;
