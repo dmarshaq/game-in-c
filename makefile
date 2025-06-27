@@ -21,6 +21,13 @@ OBJ_DIR := $(BUILD_DIR)/obj
 BIN_DIR := $(BUILD_DIR)/bin
 SRC_DIR := src
 
+MAIN_SRC := $(SRC_DIR)/main.c
+GAME_SRC := $(wildcard $(SRC_DIR)/game/*.c)
+CORE_SRC :=	$(wildcard $(SRC_DIR)/core/*.c)
+
+INCLUDES := -I$(SRC_DIR)
+
+
 # Target executable
 TARGET_MAIN_EXE = $(BIN_DIR)/main.exe
 
@@ -43,19 +50,19 @@ endif
 
 # Link into core dll
 $(TARGET_CORE_DLL): | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ -fPIC -shared $(SRC_DIR)/core.c $(LIBFLAGS)
+	$(CC) $(CFLAGS) -o $@ -fPIC -shared $(INCLUDES) $(CORE_SRC) $(LIBFLAGS)
 
 # Link into plug dll
 $(TARGET_PLUG_DLL): | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ -fPIC -shared $(SRC_DIR)/plug.c $(LIBFLAGS) -L$(BIN_DIR) -lcore
+	$(CC) $(CFLAGS) -o $@ -fPIC -shared $(INCLUDES) $(GAME_SRC) $(LIBFLAGS) -L$(BIN_DIR) -lcore
 
 # Link into main exe
 $(TARGET_MAIN_EXE): | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/main.c $(LIBFLAGS) -L$(BIN_DIR) -lcore
+	$(CC) $(CFLAGS) -o $@ $(INCLUDES) $(MAIN_SRC) $(LIBFLAGS) -L$(BIN_DIR) -lcore
 
 # Link all into a single main exe
 $(TARGET_RELEASE): | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/main.c $(SRC_DIR)/core.c $(SRC_DIR)/plug.c $(LIBFLAGS)
+	$(CC) $(CFLAGS) -o $@ $(INCLUDES) $(MAIN_SRC) $(CORE_SRC) $(GAME_SRC) $(LIBFLAGS)
 
 
 core: $(TARGET_CORE_DLL)
@@ -80,6 +87,7 @@ clean:
 	rm -f $(OBJ_DIR)/*.o
 	rm -f $(BIN_DIR)/*.dll
 	rm -f $(BIN_DIR)/*.exe
+
 
 
 

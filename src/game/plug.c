@@ -1,6 +1,6 @@
-#include "plug.h"
+#include "game/plug.h"
 #include "SDL2/SDL_keycode.h"
-#include "core.h"
+#include "core/core.h"
 #include <SDL2/SDL_keyboard.h>
 #include <float.h>
 #include <limits.h>

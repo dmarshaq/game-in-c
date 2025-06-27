@@ -1,7 +1,7 @@
 #include "SDL2/SDL_events.h"
 #include "SDL2/SDL_mouse.h"
-#include "core.h"
-#include "plug.h"
+#include "core/core.h"
+#include "game/plug.h"
 #include <SDL2/SDL_video.h>
 
 #ifdef DEV

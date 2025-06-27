@@ -1,7 +1,7 @@
 #ifndef PLUG_H_
 #define PLUG_H_
 
-#include "core.h"
+#include "core/core.h"
 
 #define calculate_obb_inertia(mass, width, height)                                          ((1.0f / 12.0f) * mass * (height * height + width * width))
 
