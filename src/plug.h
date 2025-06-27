@@ -93,6 +93,7 @@ typedef struct ui_state {
     s32 active_line_id;
     s32 active_prefix_id;
     s32 set_prefix_id;
+    bool activate_next;
 
     // Customization
     Font_Baked *font;
@@ -144,12 +145,13 @@ typedef struct box {
 } Box;
 
 
-typedef struct keybinds {
-    bool dev;
-    bool game;
-    bool menu;
-    bool text_input;
-} Keybinds;
+typedef struct text_input_info {
+    bool enabled;
+    char text[SDL_TEXTINPUTEVENT_TEXT_SIZE];
+    T_Interpolator backspace_timer;
+    T_Interpolator key_repeat_timer;
+} Text_Input_Info;
+
 
 /**
  * Definition of plug_state.
@@ -163,8 +165,7 @@ typedef struct plug_state {
     Time_Data *t;
     bool quit;
     Mouse_Input mouse_input;
-    char text_input[SDL_TEXTINPUTEVENT_TEXT_SIZE];
-    Keybinds keybinds;
+    Text_Input_Info text_input;
 
     /**
      * Globals, @Important: Must be loaded or/and unloaded when hot reloading plug.

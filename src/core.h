@@ -942,7 +942,7 @@ typedef struct time_interpolator {
     float elapsed_t;
 } T_Interpolator;
 
-#define ti_make(duration)                   ((T_Interpolator) { duration, 0.0f })\
+#define ti_make(duration)                   ((T_Interpolator) { duration, 0.0f })
 
 void ti_update(T_Interpolator *interpolator, float delta_time);
 float ti_elapsed_percent(T_Interpolator *interpolator);

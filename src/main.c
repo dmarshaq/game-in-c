@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
         state.mouse_input.left_unpressed = false;
         state.mouse_input.right_pressed = false;
         state.mouse_input.right_unpressed = false;
-        state.text_input[0] = '\0';
+        state.text_input.text[0] = '\0';
 
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
@@ -138,7 +138,7 @@ int main(int argc, char *argv[]) {
                     }
                     break;
                 case SDL_TEXTINPUT:
-                    strcpy(state.text_input, event.text.text);
+                    strcpy(state.text_input.text, event.text.text);
                     break;
                 default:
                     break;
@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
         plug_update(&state);
 
         #ifdef DEV
-        if (is_pressed_keycode(SDLK_r) && !state.keybinds.text_input) {
+        if (is_pressed_keycode(SDLK_r) && !state.text_input.enabled) {
             if(!reload_libplug()) {
                 fprintf(stderr, "%s Failed to hot reload plug.dll.\n", debug_error_str);
             }

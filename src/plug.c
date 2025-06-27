@@ -85,19 +85,23 @@ static Plug_State *state;
 
 
 
-// Keybinds. @Temporary: Until all of the keybinds will be obtained from some serialized file format. Doesn't have to be thisn complex
-#define INPUT_HOT_RELOAD        (!state->keybinds.text_input && is_pressed_keycode(SDLK_r) && state->keybinds.dev)
-#define INPUT_PLAYER_JUMP       (!state->keybinds.text_input && is_pressed_keycode(SDLK_SPACE) && state->keybinds.game)
-#define INPUT_PLAYER_MOVE_RIGHT (!state->keybinds.text_input && is_hold_keycode(SDLK_d) && state->keybinds.game)
-#define INPUT_PLAYER_MOVE_LEFT  (!state->keybinds.text_input && is_hold_keycode(SDLK_a) && state->keybinds.game)
-#define INPUT_PLAYER_ATTACK     (!state->keybinds.text_input && is_pressed_keycode(SDLK_q) && state->keybinds.game)
-#define INPUT_MENU_TOGGLE       (!state->keybinds.text_input && is_pressed_keycode(SDLK_m) && (state->keybinds.game || state->keybinds.menu))
-#define INPUT_TIME_TOGGLE       (!state->keybinds.text_input && is_pressed_keycode(SDLK_t) && state->keybinds.dev)
-#define INPUT_TEXT_BACKSPACE    (state->keybinds.text_input && is_pressed_keycode(SDLK_BACKSPACE))
 
 
 
+// Keybinds (Simple).
+static const s32 KEYBIND_PLAYER_JUMP       = SDLK_SPACE;
+static const s32 KEYBIND_PLAYER_MOVE_RIGHT = SDLK_d;
+static const s32 KEYBIND_PLAYER_MOVE_LEFT  = SDLK_a;
+static const s32 KEYBIND_PLAYER_ATTACK     = SDLK_q;
+static const s32 KEYBIND_MENU_ENTER        = SDLK_m;
+static const s32 KEYBIND_MENU_EXIT         = SDLK_m;
+static const s32 KEYBIND_TIME_TOGGLE       = SDLK_t;
+static const s32 KEYBIND_CONSOLE_TOGGLE    = SDLK_BACKQUOTE;
+static const s32 KEYBIND_CONSOLE_ENTER     = SDLK_RETURN;
 
+#define BIND_PRESSED(keybind)   (!state->text_input.enabled && is_pressed_keycode(keybind))
+#define BIND_HOLD(keybind)      (!state->text_input.enabled && is_hold_keycode(keybind))
+#define BIND_UNPRESSED(keybind) (!state->text_input.enabled && is_unpressed_keycode(keybind))
 
 
 
@@ -169,10 +173,13 @@ void ui_set_prefix(s32 id) {
     state->ui.set_prefix_id = id;
 }
 
-s32 ui_get_prefix() {
-    s32 id = state->ui.set_prefix_id;
+void ui_activate_next() {
+    state->ui.activate_next = true;
+}
+
+void ui_end_element() {
     state->ui.set_prefix_id = -1;
-    return id;
+    state->ui.activate_next = false;
 }
 
 // UI Alignment.
@@ -321,30 +328,32 @@ void ui_draw_text(const char *text, Vec2f position, Vec4f color) {
     }
 }
 
-void ui_draw_text_centered(const char *text, Vec2f position, Vec2f size) {
+void ui_draw_text_centered(const char *text, Vec2f position, Vec2f size, Vec4f color) {
     if (text == NULL)
         return;
 
     Vec2f t_size = text_size(text, state->ui.font);
 
     // Following ui_draw_text centered calculations are for the system where y axis points up, and x axis to the right.
-    ui_draw_text(text, vec2f_make(position.x + (size.x - t_size.x) * 0.5f, position.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text);
+    ui_draw_text(text, vec2f_make(position.x + (size.x - t_size.x) * 0.5f, position.y + (size.y + t_size.y) * 0.5f), color);
 }
 
 
 // UI Button
 
-#define UI_BUTTON(size, text) ui_button(size, text, __LINE__, ui_get_prefix())
+#define UI_BUTTON(size, text) ui_button(size, text, __LINE__)
 
-bool ui_button(Vec2f size, const char *text, s32 id, s32 prefix_id) {
+bool ui_button(Vec2f size, const char *text, s32 id) {
     ui_cursor_advance(size);
     ui_set_element_size(size);
+
+    s32 prefix_id = state->ui.set_prefix_id;
 
     Vec4f res_color = state->ui.theme.btn_bg;
     bool  res_ret   = false;
     
 
-    if (ui_is_hover(size)) {
+    if (ui_is_hover(size) || state->ui.activate_next) {
         if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
             if (state->mouse_input.left_unpressed) {
                 state->ui.active_line_id = -1;
@@ -359,7 +368,7 @@ bool ui_button(Vec2f size, const char *text, s32 id, s32 prefix_id) {
             goto leave_draw;
         }
 
-        if (state->mouse_input.left_pressed) {
+        if (state->mouse_input.left_pressed || state->ui.activate_next) {
             state->ui.active_line_id = id;
             state->ui.active_prefix_id = prefix_id;
         }
@@ -372,9 +381,12 @@ bool ui_button(Vec2f size, const char *text, s32 id, s32 prefix_id) {
     } 
 
 leave_draw:
-
+    
     ui_draw_rect(state->ui.cursor, size, res_color);
-    ui_draw_text_centered(text, state->ui.cursor, size);
+    ui_draw_text_centered(text, state->ui.cursor, size, state->ui.theme.text);
+
+    ui_end_element();
+
     return res_ret;
 }
 
@@ -382,11 +394,13 @@ leave_draw:
 // UI Slider
 
 
-#define UI_SLIDER_INT(size, output, min, max) ui_slider_int(size, output, min, max, __LINE__, ui_get_prefix())
+#define UI_SLIDER_INT(size, output, min, max) ui_slider_int(size, output, min, max, __LINE__)
 
-bool ui_slider_int(Vec2f size, s32 *output, s32 min, s32 max, s32 id, s32 prefix_id) {
+bool ui_slider_int(Vec2f size, s32 *output, s32 min, s32 max, s32 id) {
     ui_cursor_advance(size);
     ui_set_element_size(size);
+
+    s32 prefix_id = state->ui.set_prefix_id;
 
     float scale = (max - min) / size.x;
 
@@ -427,14 +441,19 @@ leave_draw:
 
     ui_draw_rect(vec2f_make(state->ui.cursor.x, state->ui.cursor.y + size.y * 0.5f - 5), vec2f_make(size.x, 10), res_color); // Slider line.
     ui_draw_rect(vec2f_make(state->ui.cursor.x + (*output - min) / scale - 8, state->ui.cursor.y + size.y * 0.5f - 8), vec2f_make(16, 16), res_knob_color); // Slider knob.
+
+    ui_end_element();
+
     return res_ret;
 }
 
-#define UI_SLIDER_FLOAT(size, output, min, max) ui_slider_float(size, output, min, max, __LINE__, ui_get_prefix())
+#define UI_SLIDER_FLOAT(size, output, min, max) ui_slider_float(size, output, min, max, __LINE__)
 
-bool ui_slider_float(Vec2f size, float *output, float min, float max, s32 id, s32 prefix_id) {
+bool ui_slider_float(Vec2f size, float *output, float min, float max, s32 id) {
     ui_cursor_advance(size);
     ui_set_element_size(size);
+
+    s32 prefix_id = state->ui.set_prefix_id;
 
     float scale = (max - min) / size.x;
 
@@ -476,29 +495,36 @@ leave_draw:
     ui_draw_rect(vec2f_make(state->ui.cursor.x, state->ui.cursor.y + size.y * 0.5f - 5), vec2f_make(size.x, 10), res_color); // Slider line.
     ui_draw_rect(vec2f_make(state->ui.cursor.x + (*output - min) / scale - 8, state->ui.cursor.y + size.y * 0.5f - 8), vec2f_make(16, 16), res_knob_color); // Slider knob.
     // ui_draw_rect(vec2f_make(state->ui.cursor.x + (*output - min) / scale - 5, state->ui.cursor.y), vec2f_make(10, size.y), res_knob_color); // Slider knob bar.
+
+    ui_end_element();
+
     return res_ret;
 }
 
 
 // UI Input field
 
-#define UI_INPUT_FIELD(size, buffer, buffer_size) ui_input_field(size, buffer, buffer_size, __LINE__, ui_get_prefix())
+#define UI_INPUT_FIELD(size, buffer, buffer_size) ui_input_field(size, buffer, buffer_size, __LINE__)
 
-s32 ui_input_field(Vec2f size, char *buffer, s32 buffer_size, s32 id, s32 prefix_id) {
+bool ui_input_field(Vec2f size, char *buffer, s32 buffer_size, s32 id) {
     ui_cursor_advance(size);
     ui_set_element_size(size);
 
+    s32 prefix_id = state->ui.set_prefix_id;
+
     Vec4f res_color = state->ui.theme.btn_bg;
     Vec4f res_bar_color = state->ui.theme.btn_bg_hover;
-    s32   res_written = 0;
+    bool  res_flushed = false;
     
     if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
         if (state->mouse_input.left_pressed) {
+stop_text_input:
             // If was pressed but was pressed again outside (deselected)
             state->ui.active_line_id = -1;
             state->ui.active_prefix_id = -1;
+
             SDL_StopTextInput();
-            state->keybinds.text_input = false;
+            state->text_input.enabled = false;
 
             goto leave_draw;
         }
@@ -506,36 +532,62 @@ s32 ui_input_field(Vec2f size, char *buffer, s32 buffer_size, s32 id, s32 prefix
         res_color = state->ui.theme.btn_bg_press;
 
         // If is still active.
-        s32 input_length = strlen(state->text_input);
+        s32 input_length = strlen(state->text_input.text);
         if (input_length > 0) {
             if (strlen(buffer) + input_length < buffer_size - 1) {
-                strcpy(buffer + strlen(buffer), state->text_input);
+                strcpy(buffer + strlen(buffer), state->text_input.text);
                 res_bar_color = state->ui.theme.text;
-                res_written = input_length;
             } else {
                 strcpy(buffer + buffer_size - 4, "...");
-                res_written = -1;
             }
+
             goto leave_draw;
         }
 
-        if (INPUT_TEXT_BACKSPACE) {
+
+
+        if (is_pressed_keycode(SDLK_BACKSPACE)) {
             buffer[strlen(buffer) - 1] = '\0';
             res_bar_color = state->ui.theme.text;
+            
+            ti_reset(&state->text_input.backspace_timer);
+
             goto leave_draw;
+
+        } else if (is_hold_keycode(SDLK_BACKSPACE)) {
+            ti_update(&state->text_input.backspace_timer, state->t->delta_time_milliseconds);
+
+            if (ti_is_complete(&state->text_input.backspace_timer)) {
+
+                ti_update(&state->text_input.key_repeat_timer, state->t->delta_time_milliseconds);
+
+                if (ti_is_complete(&state->text_input.key_repeat_timer)) {
+                    buffer[strlen(buffer) - 1] = '\0';
+                    res_bar_color = state->ui.theme.text;
+                    ti_reset(&state->text_input.key_repeat_timer);
+
+                    goto leave_draw;
+                }
+            }
+        } else if (is_pressed_keycode(SDLK_RETURN)) {
+            res_flushed = true;
+        } else if (is_pressed_keycode(SDLK_ESCAPE)) {
+            goto stop_text_input;
         }
+
 
     }
 
+    
 
-
-    if (ui_is_hover(size)) {
+    if (ui_is_hover(size) || state->ui.activate_next) {
         // If just pressed.
-        if (state->mouse_input.left_pressed) {
+        if (state->mouse_input.left_pressed || state->ui.activate_next) {
             state->ui.active_line_id = id;
             state->ui.active_prefix_id = prefix_id;
+
             SDL_StartTextInput();
-            state->keybinds.text_input = true;
+            state->text_input.enabled = true;
         }
 
         res_color = state->ui.theme.btn_bg_hover;
@@ -548,9 +600,11 @@ leave_draw:
     ui_draw_rect(state->ui.cursor, size, res_color); // Input field.
     ui_draw_rect(vec2f_make(state->ui.cursor.x + t_size.x, state->ui.cursor.y), vec2f_make(10, size.y), res_bar_color); // Input bar.
     ui_draw_text(buffer, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text);
-    return res_written;
-}
 
+    ui_end_element();
+
+    return res_flushed;
+}
 
 
 
@@ -573,8 +627,32 @@ void ui_text(const char *text) {
 
 
 
+/**
+ * Console.
+ */
 
+#define CONSOLE_INPUT_BUFFER_SIZE 64
+#define CONSOLE_OUTPUT_BUFFER_SIZE 512
 
+typedef struct dev_console {
+    bool enabled;
+    char input[CONSOLE_INPUT_BUFFER_SIZE];
+    char output[CONSOLE_OUTPUT_BUFFER_SIZE];
+    
+} Dev_Console;
+
+// void cprintf()
+// 
+// void cprintf(char *format, ...) {
+//     va_list args;
+//     va_start(args, format);
+//     s32 bytes_written = vsnprintf(pop_up_buffer + pop_up_buffer_start, sizeof(pop_up_buffer) - pop_up_buffer_start, format, args);
+//     va_end(args);
+//     pop_up_lerp_t = 0.0f;
+// 
+//     if (bytes_written > 0)
+//         pop_up_buffer_start += bytes_written;
+// }
 
 
 
@@ -1458,12 +1536,12 @@ void spawn_player(Vec2f position, Vec4f color) {
 
 void update_player(Player *p) {
     float x_vel = 0.0f;
-    if (INPUT_PLAYER_MOVE_RIGHT) {
+    if (BIND_HOLD(KEYBIND_PLAYER_MOVE_RIGHT)) {
         x_vel = 1.0f;
 
         transform_set_flip_x(&p->sword.handle, 1.0f);
         transform_set_flip_x(&p->sword.origin, 1.0f);
-    } else if (INPUT_PLAYER_MOVE_LEFT) {
+    } else if (BIND_HOLD(KEYBIND_PLAYER_MOVE_LEFT)) {
         x_vel = -1.0f;
 
         transform_set_flip_x(&p->sword.handle, -1.0f);
@@ -1473,7 +1551,7 @@ void update_player(Player *p) {
 
     p->p_box.body.velocity.x = lerp(p->p_box.body.velocity.x, x_vel * p->speed, 0.5f);
 
-    if (INPUT_PLAYER_JUMP && p->p_box.grounded) {
+    if (BIND_PRESSED(KEYBIND_PLAYER_JUMP) && p->p_box.grounded) {
         phys_apply_force(&p->p_box.body, vec2f_make(0.0f, 140.0f));
     }
 
@@ -1492,7 +1570,7 @@ void update_player(Player *p) {
     ti_update(&p->sword.animator, state->t->delta_time);
 
 
-    if (INPUT_PLAYER_ATTACK) {
+    if (BIND_PRESSED(KEYBIND_PLAYER_ATTACK)) {
         float temp = p->sword.angle_a;
         p->sword.angle_a = p->sword.angle_b;
         p->sword.angle_b = temp;
@@ -1567,7 +1645,7 @@ void game_update() {
 
     
     // Time slow down input.
-    if (INPUT_TIME_TOGGLE) {
+    if (BIND_PRESSED(KEYBIND_TIME_TOGGLE)) {
         state->t->time_slow_factor++;
         state->t->delta_time_multi = 1.0f / (state->t->time_slow_factor % 5);
         
@@ -1588,21 +1666,21 @@ void game_update() {
 
 
     // Switching game state to menu.
-    if (INPUT_MENU_TOGGLE) {
+    if (BIND_PRESSED(KEYBIND_MENU_ENTER)) {
         state->gs = MENU;
     }
 
 }
 
 
-void game_ui_function() {
-}
-
 float slider_val = 0.0f;
 s32 slider_int = 0;
 
-#define INPUT_FIELD_SIZE 120
-char input_buffer_field[INPUT_FIELD_SIZE] = "";
+
+
+
+
+
 
 
 void game_draw() {
@@ -1713,7 +1791,7 @@ void game_draw() {
 
 
 
-
+    // Test UI drawing
     draw_begin(&state->ui_drawer);
 
 
@@ -1759,7 +1837,7 @@ void game_draw() {
 
 
 
-
+    // Test infor display
     u32 info_buffer_size = 256;
     s32 written = 0;
     char info_buffer[info_buffer_size];
@@ -1768,21 +1846,23 @@ void game_draw() {
     written += snprintf(info_buffer + written, info_buffer_size - written, "Phys Box Count: %u\n", array_list_length(&state->phys_boxes));
     written += snprintf(info_buffer + written, info_buffer_size - written, "Slider value: %2.2f\n", slider_val);
     written += snprintf(info_buffer + written, info_buffer_size - written, "Slider int value: %2d\n", slider_int);
-    written += snprintf(info_buffer + written, info_buffer_size - written, "Input field length: %2d\n", strlen(input_buffer_field));
     
+
+
+
+
+
     state->ui.x_axis = UI_ALIGN_DEFAULT;
     state->ui.y_axis = UI_ALIGN_OPPOSITE;
 
     UI_BEGIN();
-
-    UI_INPUT_FIELD(vec2f_make(state->window_width, 40), input_buffer_field, INPUT_FIELD_SIZE);
+    
     ui_text(info_buffer);
 
 
 
 
     draw_end();
-
 }
 
 
@@ -1794,7 +1874,7 @@ void game_draw() {
 
 void menu_update() {
     // Switching game state back to play.
-    if (is_pressed_keycode(SDLK_m)) {
+    if (BIND_PRESSED(KEYBIND_MENU_EXIT)) {
         state->gs = PLAY;
     }
 }
@@ -1884,13 +1964,9 @@ void plug_init(Plug_State *s) {
     state = s;
 
     // Setting inputs.
-    #ifdef DEV
-    state->keybinds.dev = true;
-    #else
-    state->keybinds.dev = false;
-    #endif
-    state->keybinds.game = true;
-    state->keybinds.menu = false;
+    state->text_input.enabled = false;
+    state->text_input.backspace_timer = ti_make(500);
+    state->text_input.key_repeat_timer = ti_make(50);
 
     // Setting random seed.
     srand((u32)time(NULL));
@@ -2009,14 +2085,10 @@ void plug_update(Plug_State *s) {
     // Switch to handle different game states.
     switch (state->gs) {
         case PLAY:
-            state->keybinds.game = true;
-            state->keybinds.menu = false;
             game_update();
             game_draw();
             break;
         case MENU:
-            state->keybinds.game = false;
-            state->keybinds.menu = true;
             menu_update();
             menu_draw();
             break;
