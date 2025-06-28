@@ -2,6 +2,9 @@
 #define PLUG_H_
 
 #include "core/core.h"
+#include "core/graphics.h"
+#include "core/mathf.h"
+#include "core/input.h"
 
 #define calculate_obb_inertia(mass, width, height)                                          ((1.0f / 12.0f) * mass * (height * height + width * width))
 

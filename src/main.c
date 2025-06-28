@@ -1,7 +1,9 @@
-#include "SDL2/SDL_events.h"
-#include "SDL2/SDL_mouse.h"
 #include "core/core.h"
+#include "core/graphics.h"
 #include "game/plug.h"
+#include "core/input.h"
+#include <SDL2/SDL_events.h>
+#include <SDL2/SDL_mouse.h>
 #include <SDL2/SDL_video.h>
 
 #ifdef DEV
@@ -104,7 +106,8 @@ int main(int argc, char *argv[]) {
         state.mouse_input.right_pressed = false;
         state.mouse_input.right_unpressed = false;
         state.text_input.text[0] = '\0';
-
+        
+        // @Todo: Move event polling into a separate c file (module).
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
                 case SDL_QUIT:
@@ -149,7 +152,7 @@ int main(int argc, char *argv[]) {
         plug_update(&state);
 
         #ifdef DEV
-        if (is_pressed_keycode(SDLK_r) && !state.text_input.enabled) {
+        if (pressed(SDLK_r) && !state.text_input.enabled) {
             if(!reload_libplug()) {
                 fprintf(stderr, "%s Failed to hot reload plug.dll.\n", debug_error_str);
             }

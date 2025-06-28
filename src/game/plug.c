@@ -1,6 +1,13 @@
 #include "game/plug.h"
-#include "SDL2/SDL_keycode.h"
 #include "core/core.h"
+#include "core/type.h"
+#include "core/graphics.h"
+#include "core/structs.h"
+#include "core/file.h"
+#include "core/mathf.h"
+#include "core/input.h"
+
+#include <SDL2/SDL_keycode.h>
 #include <SDL2/SDL_keyboard.h>
 #include <float.h>
 #include <limits.h>
@@ -99,9 +106,9 @@ static const s32 KEYBIND_TIME_TOGGLE       = SDLK_t;
 static const s32 KEYBIND_CONSOLE_TOGGLE    = SDLK_BACKQUOTE;
 static const s32 KEYBIND_CONSOLE_ENTER     = SDLK_RETURN;
 
-#define BIND_PRESSED(keybind)   (!state->text_input.enabled && is_pressed_keycode(keybind))
-#define BIND_HOLD(keybind)      (!state->text_input.enabled && is_hold_keycode(keybind))
-#define BIND_UNPRESSED(keybind) (!state->text_input.enabled && is_unpressed_keycode(keybind))
+#define BIND_PRESSED(keybind)   (!state->text_input.enabled && pressed(keybind))
+#define BIND_HOLD(keybind)      (!state->text_input.enabled && hold(keybind))
+#define BIND_UNPRESSED(keybind) (!state->text_input.enabled && unpressed(keybind))
 
 
 
@@ -546,7 +553,7 @@ stop_text_input:
 
 
 
-        if (is_pressed_keycode(SDLK_BACKSPACE)) {
+        if (pressed(SDLK_BACKSPACE)) {
             buffer[strlen(buffer) - 1] = '\0';
             res_bar_color = state->ui.theme.text;
             
@@ -554,7 +561,7 @@ stop_text_input:
 
             goto leave_draw;
 
-        } else if (is_hold_keycode(SDLK_BACKSPACE)) {
+        } else if (hold(SDLK_BACKSPACE)) {
             ti_update(&state->text_input.backspace_timer, state->t->delta_time_milliseconds);
 
             if (ti_is_complete(&state->text_input.backspace_timer)) {
@@ -569,9 +576,9 @@ stop_text_input:
                     goto leave_draw;
                 }
             }
-        } else if (is_pressed_keycode(SDLK_RETURN)) {
+        } else if (pressed(SDLK_RETURN)) {
             res_flushed = true;
-        } else if (is_pressed_keycode(SDLK_ESCAPE)) {
+        } else if (pressed(SDLK_ESCAPE)) {
             goto stop_text_input;
         }
 
