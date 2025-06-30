@@ -78,6 +78,8 @@ typedef enum ui_alignment : s8 {
     UI_ALIGN_OPPOSITE = 1,
 } UI_Alignment;
 
+
+
 typedef struct ui_state {
     // Cursor
     Vec2f cursor;
@@ -148,30 +150,72 @@ typedef struct box {
 } Box;
 
 
-typedef struct text_input_info {
-    bool enabled;
-    char text[SDL_TEXTINPUTEVENT_TEXT_SIZE];
-    T_Interpolator backspace_timer;
-    T_Interpolator key_repeat_timer;
-} Text_Input_Info;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+typedef struct mouse_input {
+    Vec2f position;
+    bool left_hold;
+    bool left_pressed;
+    bool left_unpressed;
+    bool right_hold;
+    bool right_pressed;
+    bool right_unpressed;
+} Mouse_Input;
+
+typedef struct text_input {
+    char *buffer;
+    s64 capacity;
+    s64 length;
+    s64 write_index;
+} Text_Input;
+
+typedef struct events_info {
+    bool should_quit;
+    Mouse_Input mouse_input;
+    Text_Input text_input;
+} Events_Info;
+
+
+
+typedef struct window_info {
+    SDL_Window *ptr;
+    u32 width;
+    u32 height;
+} Window_Info;
 
 
 /**
  * Definition of plug_state.
- * @Important: All global variables should be saved and organized in the struct.
+ *
+ * @Todo: Divide global state on smalle sub states and pack them together so code pieces can choose what part of global state is specifically used at the moment rather than throwing all in one group and everytime time accessing all variables at the same time.
  */
 typedef struct plug_state {
-    SDL_Window *window;
-    u32 window_width;
-    u32 window_height;
-    SDL_Event event;
+    Window_Info window;
+    Events_Info events;
     Time_Data *t;
-    bool quit;
-    Mouse_Input mouse_input;
-    Text_Input_Info text_input;
+
+
+    UI_State ui;
+
 
     /**
-     * Globals, @Important: Must be loaded or/and unloaded when hot reloading plug.
+     * Game Globals, @Important: Must be loaded or/and unloaded when hot reloading plug.
      */
     Vec4f clear_color;
     Camera main_camera;
@@ -196,7 +240,7 @@ typedef struct plug_state {
      */
     Player player;
     Game_State gs;
-    UI_State ui;
+
 
 } Plug_State;
 

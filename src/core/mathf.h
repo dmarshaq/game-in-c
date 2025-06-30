@@ -322,4 +322,22 @@ typedef struct circle {
     float radius;
 } Circle;
 
+
+
+
+// s64
+
+
+static inline s64 maxi(s64 x, s64 y) {
+    return (x > y) ? x : y;
+}
+
+static inline s64 mini(s64 x, s64 y) {
+    return (x < y) ? x : y;
+}
+static inline s64 clampi(s64 a, s64 min, s64 max) {
+    return maxi(min, mini(a, max));
+}
+
+
 #endif

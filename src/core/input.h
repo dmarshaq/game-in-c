@@ -7,20 +7,6 @@
 #include <stdbool.h>
 
 /**
- * Input
- */
-
-typedef struct mouse_input {
-    Vec2f position;
-    bool left_hold;
-    bool left_pressed;
-    bool left_unpressed;
-    bool right_hold;
-    bool right_pressed;
-    bool right_unpressed;
-} Mouse_Input;
-
-/**
  * Inits keyboard state.
  * Internally allocates buffer for number of the keys to hold keyboard state.
  */

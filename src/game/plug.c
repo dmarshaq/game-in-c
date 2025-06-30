@@ -7,6 +7,10 @@
 #include "core/mathf.h"
 #include "core/input.h"
 
+#include "event.h"
+#include "game/event.h"
+#include "game/draw.h"
+
 #include <SDL2/SDL_keycode.h>
 #include <SDL2/SDL_keyboard.h>
 #include <float.h>
@@ -21,67 +25,16 @@
 
 
 
-
-
-
-
-
-
-/**
- * Helper functions interface.
- */
-
-// Drawing basics.
-void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle, Vertex_Buffer *buffer);
-void draw_grid(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer);
-void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale, Vertex_Buffer *buffer);
-Vec2f text_size(const char *text, Font_Baked *font);
-void draw_line(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer);
-void draw_dot(Vec2f position, Vec4f color, Vertex_Buffer *buffer);
-
-// Drawing frames.
-void draw_quad_outline(Vec2f p0, Vec2f p1, Vec4f color, float offset_angle, Vertex_Buffer *buffer);
-void draw_circle_outline(Vec2f position, float radius, u32 detail, Vec4f color, Vertex_Buffer *buffer);
-
-// Drawing function.
-void draw_function(float x0, float x1, Function y, u32 detail, Vec4f color, Vertex_Buffer *buffer);
-void draw_polar(float t0, float t1, Function r, u32 detail, Vec4f color, Vertex_Buffer *buffer);
-void draw_parametric(float t0, float t1, Function x, Function y, u32 detail, Vec4f color, Vertex_Buffer *buffer);
-
-// Drawing area under the curve.
-void draw_area_function(float x0, float x1, Function y, u32 rect_count, Vec4f color, Vertex_Buffer *buffer);
-void draw_area_polar(float t0, float t1, Function r, u32 rect_count, Vec4f color, Vertex_Buffer *buffer);
-void draw_area_parametric(float t0, float t1, Function x, Function y, u32 rect_count, Vec4f color, Vertex_Buffer *buffer);
-
-// Viewport manipulation.
-void draw_viewport(u32 x, u32 y, u32 width, u32 height, Vec4f color, Camera *camera, Vertex_Buffer *buffer);
-void viewport_reset();
-
-// 2D screen point translation to 2D world.
-Vec2f camera_screen_to_world(Vec2f point, Camera *camera);
-
-
-
-
-
-
-
-
-
-
-
-
 /**
  * Constants.
  */
 static const Vec2f GRAVITY_ACCELERATION = (Vec2f){ 0.0f, -9.81f };
-static const u8 MAX_BOXES =32;
+static const u8 MAX_BOXES = 32;
 static const u8 MAX_IMPULSES = 16;
 static const u8 MAX_PHYS_BOXES = 16;
 static const u8 PHYS_ITERATIONS = 16;
 static const float PHYS_ITERATION_STEP_TIME = (1.0f / PHYS_ITERATIONS);
 static const float MAX_PLAYER_SPEED = 6.0f;
-static const float DOT_SCALE = 0.005f;
 
 
 
@@ -106,10 +59,12 @@ static const s32 KEYBIND_TIME_TOGGLE       = SDLK_t;
 static const s32 KEYBIND_CONSOLE_TOGGLE    = SDLK_BACKQUOTE;
 static const s32 KEYBIND_CONSOLE_ENTER     = SDLK_RETURN;
 
-#define BIND_PRESSED(keybind)   (!state->text_input.enabled && pressed(keybind))
-#define BIND_HOLD(keybind)      (!state->text_input.enabled && hold(keybind))
-#define BIND_UNPRESSED(keybind) (!state->text_input.enabled && unpressed(keybind))
-
+// #define BIND_PRESSED(keybind)   (!state->events.text_input.enabled && pressed(keybind))
+// #define BIND_HOLD(keybind)      (!state->events.text_input.enabled && hold(keybind))
+// #define BIND_UNPRESSED(keybind) (!state->events.text_input.enabled && unpressed(keybind))
+#define BIND_PRESSED(keybind)   (pressed(keybind))
+#define BIND_HOLD(keybind)      (hold(keybind))
+#define BIND_UNPRESSED(keybind) (unpressed(keybind))
 
 
 
@@ -153,7 +108,7 @@ void ui_pop_frame() {
 void ui_init() {
     state->ui.cursor = vec2f_make(0, 0);
     state->ui.frame_stack = array_list_make(UI_Frame, 8, &std_allocator); // Maybe replace with the custom defined arena allocator later. @Leak.
-    ui_push_frame(0, 0, state->window_width, state->window_height);
+    ui_push_frame(0, 0, state->window.width, state->window.height);
 
     state->ui.x_axis = UI_ALIGN_OPPOSITE;
     state->ui.y_axis = UI_ALIGN_OPPOSITE;
@@ -279,7 +234,7 @@ void ui_draw_rect(Vec2f position, Vec2f size, Vec4f color) {
 
 
 bool ui_is_hover(Vec2f size) {
-    return value_inside_domain(state->ui.cursor.x, state->ui.cursor.x + size.x, state->mouse_input.position.x) && value_inside_domain(state->ui.cursor.y, state->ui.cursor.y + size.y, state->mouse_input.position.y);
+    return value_inside_domain(state->ui.cursor.x, state->ui.cursor.x + size.x, state->events.mouse_input.position.x) && value_inside_domain(state->ui.cursor.y, state->ui.cursor.y + size.y, state->events.mouse_input.position.y);
 }
 
 void ui_draw_text(const char *text, Vec2f position, Vec4f color) {
@@ -362,7 +317,7 @@ bool ui_button(Vec2f size, const char *text, s32 id) {
 
     if (ui_is_hover(size) || state->ui.activate_next) {
         if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
-            if (state->mouse_input.left_unpressed) {
+            if (state->events.mouse_input.left_unpressed) {
                 state->ui.active_line_id = -1;
                 state->ui.active_prefix_id = -1;
 
@@ -375,7 +330,7 @@ bool ui_button(Vec2f size, const char *text, s32 id) {
             goto leave_draw;
         }
 
-        if (state->mouse_input.left_pressed || state->ui.activate_next) {
+        if (state->events.mouse_input.left_pressed || state->ui.activate_next) {
             state->ui.active_line_id = id;
             state->ui.active_prefix_id = prefix_id;
         }
@@ -416,9 +371,9 @@ bool ui_slider_int(Vec2f size, s32 *output, s32 min, s32 max, s32 id) {
     bool  res_ret   = false;
     
     if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
-        if (state->mouse_input.left_hold) {
+        if (state->events.mouse_input.left_hold) {
             // If was pressed, and holding.
-            float a = state->mouse_input.position.x * scale - (state->ui.cursor.x * scale - min);
+            float a = state->events.mouse_input.position.x * scale - (state->ui.cursor.x * scale - min);
             *output = (s32)clamp(a, min, max);
 
             res_color = state->ui.theme.btn_bg_press;
@@ -435,7 +390,7 @@ bool ui_slider_int(Vec2f size, s32 *output, s32 min, s32 max, s32 id) {
     
     if (ui_is_hover(size)) {
         // If just pressed.
-        if (state->mouse_input.left_pressed) {
+        if (state->events.mouse_input.left_pressed) {
             state->ui.active_line_id = id;
             state->ui.active_prefix_id = prefix_id;
         }
@@ -469,9 +424,9 @@ bool ui_slider_float(Vec2f size, float *output, float min, float max, s32 id) {
     bool  res_ret   = false;
     
     if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
-        if (state->mouse_input.left_hold) {
+        if (state->events.mouse_input.left_hold) {
             // If was pressed, and holding.
-            float a = state->mouse_input.position.x * scale - (state->ui.cursor.x * scale - min);
+            float a = state->events.mouse_input.position.x * scale - (state->ui.cursor.x * scale - min);
             *output = clamp(a, min, max);
 
             res_color = state->ui.theme.btn_bg_press;
@@ -488,7 +443,7 @@ bool ui_slider_float(Vec2f size, float *output, float min, float max, s32 id) {
     
     if (ui_is_hover(size)) {
         // If just pressed.
-        if (state->mouse_input.left_pressed) {
+        if (state->events.mouse_input.left_pressed) {
             state->ui.active_line_id = id;
             state->ui.active_prefix_id = prefix_id;
         }
@@ -514,103 +469,103 @@ leave_draw:
 #define UI_INPUT_FIELD(size, buffer, buffer_size) ui_input_field(size, buffer, buffer_size, __LINE__)
 
 bool ui_input_field(Vec2f size, char *buffer, s32 buffer_size, s32 id) {
-    ui_cursor_advance(size);
-    ui_set_element_size(size);
+    // ui_cursor_advance(size);
+    // ui_set_element_size(size);
 
-    s32 prefix_id = state->ui.set_prefix_id;
+    // s32 prefix_id = state->ui.set_prefix_id;
 
-    Vec4f res_color = state->ui.theme.btn_bg;
-    Vec4f res_bar_color = state->ui.theme.btn_bg_hover;
-    bool  res_flushed = false;
-    
-    if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
-        if (state->mouse_input.left_pressed) {
-stop_text_input:
-            // If was pressed but was pressed again outside (deselected)
-            state->ui.active_line_id = -1;
-            state->ui.active_prefix_id = -1;
+    // Vec4f res_color = state->ui.theme.btn_bg;
+    // Vec4f res_bar_color = state->ui.theme.btn_bg_hover;
+    // bool  res_flushed = false;
+    // 
+    // if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
+    //     if (state->mouse_input.left_pressed) {
+    // _text_input:
+    //         // If was pressed but was pressed again outside (deselected)
+    //         state->ui.active_line_id = -1;
+    //         state->ui.active_prefix_id = -1;
 
-            SDL_StopTextInput();
-            state->text_input.enabled = false;
+    //         SDL_StopTextInput();
+    //         state->text_input.enabled = false;
 
-            goto leave_draw;
-        }
-        
-        res_color = state->ui.theme.btn_bg_press;
+    //         goto leave_draw;
+    //     }
+    //     
+    //     res_color = state->ui.theme.btn_bg_press;
 
-        // If is still active.
-        s32 input_length = strlen(state->text_input.text);
-        if (input_length > 0) {
-            if (strlen(buffer) + input_length < buffer_size - 1) {
-                strcpy(buffer + strlen(buffer), state->text_input.text);
-                res_bar_color = state->ui.theme.text;
-            } else {
-                strcpy(buffer + buffer_size - 4, "...");
-            }
+    //     // If is still active.
+    //     s32 input_length = strlen(state->text_input.text);
+    //     if (input_length > 0) {
+    //         if (strlen(buffer) + input_length < buffer_size - 1) {
+    //             strcpy(buffer + strlen(buffer), state->text_input.text);
+    //             res_bar_color = state->ui.theme.text;
+    //         } else {
+    //             strcpy(buffer + buffer_size - 4, "...");
+    //         }
 
-            goto leave_draw;
-        }
-
-
-
-        if (pressed(SDLK_BACKSPACE)) {
-            buffer[strlen(buffer) - 1] = '\0';
-            res_bar_color = state->ui.theme.text;
-            
-            ti_reset(&state->text_input.backspace_timer);
-
-            goto leave_draw;
-
-        } else if (hold(SDLK_BACKSPACE)) {
-            ti_update(&state->text_input.backspace_timer, state->t->delta_time_milliseconds);
-
-            if (ti_is_complete(&state->text_input.backspace_timer)) {
-
-                ti_update(&state->text_input.key_repeat_timer, state->t->delta_time_milliseconds);
-
-                if (ti_is_complete(&state->text_input.key_repeat_timer)) {
-                    buffer[strlen(buffer) - 1] = '\0';
-                    res_bar_color = state->ui.theme.text;
-                    ti_reset(&state->text_input.key_repeat_timer);
-
-                    goto leave_draw;
-                }
-            }
-        } else if (pressed(SDLK_RETURN)) {
-            res_flushed = true;
-        } else if (pressed(SDLK_ESCAPE)) {
-            goto stop_text_input;
-        }
-
-
-    }
-
-    
-
-    if (ui_is_hover(size) || state->ui.activate_next) {
-        // If just pressed.
-        if (state->mouse_input.left_pressed || state->ui.activate_next) {
-            state->ui.active_line_id = id;
-            state->ui.active_prefix_id = prefix_id;
-
-            SDL_StartTextInput();
-            state->text_input.enabled = true;
-        }
-
-        res_color = state->ui.theme.btn_bg_hover;
-    }
+    //         goto leave_draw;
+    //     }
 
 
 
-leave_draw:
-    Vec2f t_size = text_size(buffer, state->ui.font);
-    ui_draw_rect(state->ui.cursor, size, res_color); // Input field.
-    ui_draw_rect(vec2f_make(state->ui.cursor.x + t_size.x, state->ui.cursor.y), vec2f_make(10, size.y), res_bar_color); // Input bar.
-    ui_draw_text(buffer, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text);
+    //     if (pressed(SDLK_BACKSPACE)) {
+    //         buffer[strlen(buffer) - 1] = '\0';
+    //         res_bar_color = state->ui.theme.text;
+    //         
+    //         ti_reset(&state->text_input.backspace_timer);
 
-    ui_end_element();
+    //         goto leave_draw;
 
-    return res_flushed;
+    //     } else if (hold(SDLK_BACKSPACE)) {
+    //         ti_update(&state->text_input.backspace_timer, state->t->delta_time_milliseconds);
+
+    //         if (ti_is_complete(&state->text_input.backspace_timer)) {
+
+    //             ti_update(&state->text_input.key_repeat_timer, state->t->delta_time_milliseconds);
+
+    //             if (ti_is_complete(&state->text_input.key_repeat_timer)) {
+    //                 buffer[strlen(buffer) - 1] = '\0';
+    //                 res_bar_color = state->ui.theme.text;
+    //                 ti_reset(&state->text_input.key_repeat_timer);
+
+    //                 goto leave_draw;
+    //             }
+    //         }
+    //     } else if (pressed(SDLK_RETURN)) {
+    //         res_flushed = true;
+    //     } else if (pressed(SDLK_ESCAPE)) {
+    //         goto stop_text_input;
+    //     }
+
+
+    // }
+
+    // 
+
+    // if (ui_is_hover(size) || state->ui.activate_next) {
+    //     // If just pressed.
+    //     if (state->mouse_input.left_pressed || state->ui.activate_next) {
+    //         state->ui.active_line_id = id;
+    //         state->ui.active_prefix_id = prefix_id;
+
+    //         SDL_StartTextInput();
+    //         state->text_input.enabled = true;
+    //     }
+
+    //     res_color = state->ui.theme.btn_bg_hover;
+    // }
+
+
+
+    // e_draw:
+    // Vec2f t_size = text_size(buffer, state->ui.font);
+    // ui_draw_rect(state->ui.cursor, size, res_color); // Input field.
+    // ui_draw_rect(vec2f_make(state->ui.cursor.x + t_size.x, state->ui.cursor.y), vec2f_make(10, size.y), res_bar_color); // Input bar.
+    // ui_draw_text(buffer, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text);
+
+    // ui_end_element();
+
+    // return res_flushed;
 }
 
 
@@ -1643,8 +1598,8 @@ void game_update() {
 
 
     // Spawning box.
-    if (state->mouse_input.right_pressed) {
-        Vec2f pos = camera_screen_to_world(state->mouse_input.position, &state->main_camera);
+    if (state->events.mouse_input.right_pressed) {
+        Vec2f pos = camera_screen_to_world(state->events.mouse_input.position, &state->main_camera, state->window.width, state->window.height);
         spawn_box(pos, vec4f_make(randf(), randf(), randf(), 0.4f));
     } 
 
@@ -1711,7 +1666,7 @@ void game_draw() {
     // Load camera's projection into all shaders to correctly draw elements according to camera view.
     Matrix4f projection;
 
-    projection = camera_calculate_projection(&state->main_camera, (float)state->window_width, (float)state->window_height);
+    projection = camera_calculate_projection(&state->main_camera, (float)state->window.width, (float)state->window.height);
 
     shader_update_projection(quad_shader, &projection);
     shader_update_projection(grid_shader, &projection);
@@ -1719,7 +1674,7 @@ void game_draw() {
 
 
     // Reset viewport.
-    viewport_reset();
+    viewport_reset(state->window.width, state->window.height);
 
     // Clear the screen with clear_color.
     glClearColor(state->clear_color.x, state->clear_color.y, state->clear_color.z, state->clear_color.w);
@@ -1793,7 +1748,7 @@ void game_draw() {
 
     Shader *ui_quad_shader = hash_table_get(&state->shader_table, "ui_quad", 7);
 
-    projection = screen_calculate_projection(state->window_width, state->window_height);
+    projection = screen_calculate_projection(state->window.width, state->window.height);
     shader_update_projection(ui_quad_shader, &projection);
 
 
@@ -1891,7 +1846,7 @@ bool toggle;
 
 void menu_draw() {
     // Reset viewport.
-    viewport_reset();
+    viewport_reset(state->window.width, state->window.height);
 
     // Clear screen.
     glClearColor(0.3f, 0.1f, 0.4f, 1.0f);
@@ -1904,7 +1859,7 @@ void menu_draw() {
     Shader *ui_quad_shader = hash_table_get(&state->shader_table, "ui_quad", 7);
     Shader *line_shader = hash_table_get(&state->shader_table, "line", 4);
 
-    Matrix4f projection = screen_calculate_projection(state->window_width, state->window_height);
+    Matrix4f projection = screen_calculate_projection(state->window.width, state->window.height);
     shader_update_projection(ui_quad_shader, &projection);
     shader_update_projection(line_shader, &projection);
 
@@ -1917,7 +1872,7 @@ void menu_draw() {
 
     UI_BEGIN();
     
-    UI_FRAME(state->window_width, 50,
+    UI_FRAME(state->window.width, 50,
         if (UI_BUTTON(vec2f_make(100, 50), "Go Back")) {
             state->gs = PLAY;
         }
@@ -1970,10 +1925,8 @@ void menu_draw() {
 void plug_init(Plug_State *s) {
     state = s;
 
-    // Setting inputs.
-    state->text_input.enabled = false;
-    state->text_input.backspace_timer = ti_make(500);
-    state->text_input.key_repeat_timer = ti_make(50);
+    // Initing events.
+    init_events_handler(&state->events);
 
     // Setting random seed.
     srand((u32)time(NULL));
@@ -2079,6 +2032,11 @@ static s32 load_counter = 5;
  * Drawing part is only responsible for putting pixels accrodingly with calculated data in "Updating" part.
  */
 void plug_update(Plug_State *s) {
+    state = s;
+    
+    // Handling events
+    handle_events(&state->events, &state->window, state->t);
+
 
     // A simple and easy way to prevent delta_time jumps when loading.
     if (load_counter == 0) {
@@ -2110,7 +2068,7 @@ void plug_update(Plug_State *s) {
 
 
     // Swap buffers to display the rendered image.
-    SDL_GL_SwapWindow(state->window);
+    SDL_GL_SwapWindow(state->window.ptr);
 }
 
 void plug_unload(Plug_State *s) {
@@ -2137,415 +2095,6 @@ void plug_unload(Plug_State *s) {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/**
- * Helper functions defenitions.
- */
-void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle, Vertex_Buffer *buffer) {
-    float texture_slot = -1.0f; // @Important: -1.0f slot signifies shader to use color, not texture.
-    float mask_slot = -1.0f;
-
-    if (texture != NULL)
-        texture_slot = add_texture_to_slots(texture);              
-
-    if (mask != NULL)
-        mask_slot = add_texture_to_slots(mask);              
-    
-    Vec2f k = vec2f_make(cosf(offset_angle), sinf(offset_angle));
-    k = vec2f_multi_constant(k, vec2f_dot(k, vec2f_difference(p1, p0)));
-    
-    Vec2f p2 = vec2f_sum(p0, k);
-    Vec2f p3 = vec2f_difference(p1, k);
-    
-    float quad_data[44] = {
-        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, uv0.x, uv0.y, texture_slot, mask_slot,
-        p2.x, p2.y, 0.0f, color.x, color.y, color.z, color.w, uv1.x, uv0.y, texture_slot, mask_slot,
-        p3.x, p3.y, 0.0f, color.x, color.y, color.z, color.w, uv0.x, uv1.y, texture_slot, mask_slot,
-        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, uv1.x, uv1.y, texture_slot, mask_slot,
-    };
-    
-    if (buffer == NULL)
-        draw_quad_data(quad_data, 1);
-    else
-        vertex_buffer_append_data(buffer, quad_data, VERTICIES_PER_QUAD * 11);
-}
-
-void draw_grid(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer) {
-    Vec2f p2 = vec2f_make(p1.x, p0.y);
-    Vec2f p3 = vec2f_make(p0.x, p1.y);
-    
-    float quad_data[36] = {
-        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, p0.x, p0.y,
-        p2.x, p2.y, 0.0f, color.x, color.y, color.z, color.w, p2.x, p2.y,
-        p3.x, p3.y, 0.0f, color.x, color.y, color.z, color.w, p3.x, p3.y,
-        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, p1.x, p1.y,
-    };
-    
-    if (buffer == NULL)
-        draw_quad_data(quad_data, 1);
-    else
-        vertex_buffer_append_data(buffer, quad_data, VERTICIES_PER_QUAD * 9);
-}
-
-void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *font, u32 unit_scale, Vertex_Buffer *buffer) {
-    u64 text_length = strlen(text);
-
-    // Scale and adjust current_point.
-    current_point = vec2f_multi_constant(current_point, (float)unit_scale);
-    float origin_x = current_point.x;
-    current_point.y += (float)font->baseline;
-
-    // Text rendering variables.
-    s32 font_char_index;
-    u16 width, height;
-    stbtt_bakedchar *c;
-
-    for (u64 i = 0; i < text_length; i++) {
-        // @Incomplete: Handle special characters / symbols.
-        if (text[i] == '\n') {
-            current_point.x = origin_x;
-            current_point.y -= (float)font->line_height;
-            continue;
-        }
-
-        // Character drawing.
-        font_char_index = (s32)text[i] - font->first_char_code;
-        if (font_char_index < font->chars_count) {
-            c = &font->chars[font_char_index];
-            width  = font->chars[font_char_index].x1 - font->chars[font_char_index].x0;
-            height = font->chars[font_char_index].y1 - font->chars[font_char_index].y0;
-
-            draw_quad(vec2f_divide_constant(vec2f_make(current_point.x + c->xoff, current_point.y - c->yoff - height), (float)unit_scale), vec2f_divide_constant(vec2f_make(current_point.x + c->xoff + width, current_point.y - c->yoff), (float)unit_scale), color, NULL, vec2f_make(c->x0 / (float)font->bitmap.width, c->y1 / (float)font->bitmap.height), vec2f_make(c->x1 / (float)font->bitmap.width, c->y0 / (float)font->bitmap.height), &font->bitmap, 0.0f, buffer);
-
-            current_point.x += font->chars[font_char_index].xadvance;
-        }
-    }
-}
-
-Vec2f text_size(const char *text, Font_Baked *font) {
-    u64 text_length = strlen(text);
-
-    // Result.
-    Vec2f result = VEC2F_ORIGIN;
-
-    // Scale and adjust current_point.
-    Vec2f current_point = VEC2F_ORIGIN;
-    float origin_x = current_point.x;
-    current_point.y += (float)font->baseline;
-
-    // Text rendering variables.
-    s32 font_char_index;
-
-    for (u64 i = 0; i < text_length; i++) {
-        // Handle special characters / symbols.
-        if (text[i] == '\n') {
-            result.y += (float)font->line_height;
-            if (result.x < current_point.x)
-                result.x = current_point.x;
-
-            current_point.x = origin_x;
-            current_point.y -= (float)font->line_height;
-            continue;
-        }
-
-        // Character iterating.
-        font_char_index = (s32)text[i] - font->first_char_code;
-        if (font_char_index < font->chars_count) {
-
-            current_point.x += font->chars[font_char_index].xadvance;
-        }
-    }
-    
-    // Since last line dimensions is not handled in the loop, it can be done here.
-    result.y += (float)font->line_height;
-    if (result.x < current_point.x)
-        result.x = current_point.x;
-
-    return result;
-}
-
-
-
-void draw_line(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer) {
-    float line_data[14] = {
-        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w,
-        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w,
-    };
-
-    if (buffer == NULL)
-        draw_line_data(line_data, 1);
-    else
-        vertex_buffer_append_data(buffer, line_data, VERTICIES_PER_LINE * 7);
-}
-
-
-void draw_dot(Vec2f position, Vec4f color, Vertex_Buffer *buffer) {
-    draw_quad(vec2f_make(position.x - (float)state->main_camera.unit_scale * DOT_SCALE, position.y), vec2f_make(position.x + (float)state->main_camera.unit_scale * DOT_SCALE, position.y), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, PI/4, buffer);
-}
-
-void draw_quad_outline(Vec2f p0, Vec2f p1, Vec4f color, float offset_angle, Vertex_Buffer *buffer) {
-    
-    Vec2f k = vec2f_make(cosf(offset_angle), sinf(offset_angle));
-    k = vec2f_multi_constant(k, vec2f_dot(k, vec2f_difference(p1, p0)));
-    
-    Vec2f p2 = vec2f_sum(p0, k);
-    Vec2f p3 = vec2f_difference(p1, k);
-    
-    float line_data[56] = {
-        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w,
-        p2.x, p2.y, 0.0f, color.x, color.y, color.z, color.w,
-        p2.x, p2.y, 0.0f, color.x, color.y, color.z, color.w,
-        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w,
-        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w,
-        p3.x, p3.y, 0.0f, color.x, color.y, color.z, color.w,
-        p3.x, p3.y, 0.0f, color.x, color.y, color.z, color.w,
-        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w,
-    };
-
-    if (buffer == NULL)
-        draw_line_data(line_data, 4);
-    else
-        vertex_buffer_append_data(buffer, line_data, 4 * VERTICIES_PER_LINE * 7);
-}
-
-void draw_circle_outline(Vec2f position, float radius, u32 detail, Vec4f color, Vertex_Buffer *buffer) {
-
-    float line_data[detail * 14];
-
-    float step = 2*PI / (float)detail;
-    for (u32 i = 0; i < detail; i++) {
-        line_data[0  + i * 14] = radius * cosf(step * (float)i) + position.x;
-        line_data[1  + i * 14] = radius * sinf(step * (float)i) + position.y;
-        line_data[2  + i * 14] = 0.0f;
-        line_data[3  + i * 14] = color.x;
-        line_data[4  + i * 14] = color.y;
-        line_data[5  + i * 14] = color.z;
-        line_data[6  + i * 14] = color.w;
-                     
-        line_data[7  + i * 14] = radius * cosf(step * (float)(i + 1)) + position.x;
-        line_data[8  + i * 14] = radius * sinf(step * (float)(i + 1)) + position.y;
-        line_data[9  + i * 14] = 0.0f;
-        line_data[10 + i * 14] = color.x;
-        line_data[11 + i * 14] = color.y;
-        line_data[12 + i * 14] = color.z;
-        line_data[13 + i * 14] = color.w;
-    }
-    
-   
-    if (buffer == NULL)
-        draw_line_data(line_data, detail);
-    else
-        vertex_buffer_append_data(buffer, line_data, detail * VERTICIES_PER_LINE * 7);
-}
-
-void draw_function(float x0, float x1, Function y, u32 detail, Vec4f color, Vertex_Buffer *buffer) {
-    float line_data[detail * 14];
-
-    float step = (x1 - x0) / (float)detail;
-    for (u32 i = 0; i < detail; i++) {
-        line_data[0  + i * 14] = x0 + step * (float)i;
-        line_data[1  + i * 14] = y(x0 + step * (float)i);
-        line_data[2  + i * 14] = 0.0f;
-        line_data[3  + i * 14] = color.x;
-        line_data[4  + i * 14] = color.y;
-        line_data[5  + i * 14] = color.z;
-        line_data[6  + i * 14] = color.w;
-                     
-        line_data[7  + i * 14] = x0 + step * (float)(i + 1);
-        line_data[8  + i * 14] = y(x0 + step * (float)(i + 1));
-        line_data[9  + i * 14] = 0.0f;
-        line_data[10 + i * 14] = color.x;
-        line_data[11 + i * 14] = color.y;
-        line_data[12 + i * 14] = color.z;
-        line_data[13 + i * 14] = color.w;
-    }
-    
-   
-    if (buffer == NULL)
-        draw_line_data(line_data, detail);
-    else
-        vertex_buffer_append_data(buffer, line_data, detail * VERTICIES_PER_LINE * 7);
-}
-
-void draw_polar(float t0, float t1, Function r, u32 detail, Vec4f color, Vertex_Buffer *buffer) {
-    float line_data[detail * 14];
-
-    float step = (t1 - t0) / (float)detail;
-    float radius;
-    for (u32 i = 0; i < detail; i++) {
-        radius = r(t0 + step * (float)i);
-        line_data[0  + i * 14] = radius * cosf(t0 + step * (float)i);
-        line_data[1  + i * 14] = radius * sinf(t0 + step * (float)i);
-        line_data[2  + i * 14] = 0.0f;
-        line_data[3  + i * 14] = color.x;
-        line_data[4  + i * 14] = color.y;
-        line_data[5  + i * 14] = color.z;
-        line_data[6  + i * 14] = color.w;
-                     
-        radius = r(t0 + step * (float)(i + 1));
-        line_data[7  + i * 14] = radius * cosf(t0 + step * (float)(i + 1));
-        line_data[8  + i * 14] = radius * sinf(t0 + step * (float)(i + 1));
-        line_data[9  + i * 14] = 0.0f;
-        line_data[10 + i * 14] = color.x;
-        line_data[11 + i * 14] = color.y;
-        line_data[12 + i * 14] = color.z;
-        line_data[13 + i * 14] = color.w;
-    }
-    
-   
-    if (buffer == NULL)
-        draw_line_data(line_data, detail);
-    else
-        vertex_buffer_append_data(buffer, line_data, detail * VERTICIES_PER_LINE * 7);
-}
-
-void draw_parametric(float t0, float t1, Function x, Function y, u32 detail, Vec4f color, Vertex_Buffer *buffer) {
-    float line_data[detail * 14];
-
-    float step = (t1 - t0) / (float)detail;
-    for (u32 i = 0; i < detail; i++) {
-        line_data[0  + i * 14] = x(t0 + step * (float)i);
-        line_data[1  + i * 14] = y(t0 + step * (float)i);
-        line_data[2  + i * 14] = 0.0f;
-        line_data[3  + i * 14] = color.x;
-        line_data[4  + i * 14] = color.y;
-        line_data[5  + i * 14] = color.z;
-        line_data[6  + i * 14] = color.w;
-
-        line_data[7  + i * 14] = x(t0 + step * (float)(i + 1));
-        line_data[8  + i * 14] = y(t0 + step * (float)(i + 1));
-        line_data[9  + i * 14] = 0.0f;
-        line_data[10 + i * 14] = color.x;
-        line_data[11 + i * 14] = color.y;
-        line_data[12 + i * 14] = color.z;
-        line_data[13 + i * 14] = color.w;
-    }
-    
-   
-    if (buffer == NULL)
-        draw_line_data(line_data, detail);
-    else
-        vertex_buffer_append_data(buffer, line_data, detail * VERTICIES_PER_LINE * 7);
-}
-
-void draw_area_function(float x0, float x1, Function y, u32 rect_count, Vec4f color, Vertex_Buffer *buffer) {
-    float step = (x1 - x0) / (float)rect_count;
-    for (u32 i = 0; i < rect_count; i++) {
-        draw_quad(vec2f_make(x0 + step * i, 0.0f), vec2f_make(x0 + step * (i + 1), y(x0 + step * (i + 1))), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f, buffer);
-    }
-}
-
-void draw_area_polar(float t0, float t1, Function r, u32 rect_count, Vec4f color, Vertex_Buffer *buffer) {
-    float quad_data[rect_count * VERTICIES_PER_QUAD * 11];
-
-    float step = (t1 - t0) / (float)rect_count;
-    float radius;
-    for (u32 i = 0; i < rect_count; i++) {
-        quad_data[0  + i * VERTICIES_PER_QUAD * 11] = 0.0f;
-        quad_data[1  + i * VERTICIES_PER_QUAD * 11] = 0.0f;
-        quad_data[2  + i * VERTICIES_PER_QUAD * 11] = 0.0f;
-        quad_data[3  + i * VERTICIES_PER_QUAD * 11] = color.x;
-        quad_data[4  + i * VERTICIES_PER_QUAD * 11] = color.y;
-        quad_data[5  + i * VERTICIES_PER_QUAD * 11] = color.z;
-        quad_data[6  + i * VERTICIES_PER_QUAD * 11] = color.w;
-        quad_data[7  + i * VERTICIES_PER_QUAD * 11] = 0.0f;
-        quad_data[8  + i * VERTICIES_PER_QUAD * 11] = 0.0f;
-        quad_data[9  + i * VERTICIES_PER_QUAD * 11] = -1.0f;
-        quad_data[10 + i * VERTICIES_PER_QUAD * 11] = -1.0f;
-                     
-        quad_data[11 + i * VERTICIES_PER_QUAD * 11] = 0.0f;
-        quad_data[12 + i * VERTICIES_PER_QUAD * 11] = 0.0f;
-        quad_data[13 + i * VERTICIES_PER_QUAD * 11] = 0.0f;
-        quad_data[14 + i * VERTICIES_PER_QUAD * 11] = color.x;
-        quad_data[15 + i * VERTICIES_PER_QUAD * 11] = color.y;
-        quad_data[16 + i * VERTICIES_PER_QUAD * 11] = color.z;
-        quad_data[17 + i * VERTICIES_PER_QUAD * 11] = color.w;
-        quad_data[18 + i * VERTICIES_PER_QUAD * 11] = 1.0f;
-        quad_data[19 + i * VERTICIES_PER_QUAD * 11] = 0.0f;
-        quad_data[20 + i * VERTICIES_PER_QUAD * 11] = -1.0f;
-        quad_data[21 + i * VERTICIES_PER_QUAD * 11] = -1.0f;
-                     
-        radius = r(t0 + step * (float)i);
-        quad_data[22 + i * VERTICIES_PER_QUAD * 11] = radius * cosf(t0 + step * (float)i);
-        quad_data[23 + i * VERTICIES_PER_QUAD * 11] = radius * sinf(t0 + step * (float)i);
-        quad_data[24 + i * VERTICIES_PER_QUAD * 11] = 0.0f;
-        quad_data[25 + i * VERTICIES_PER_QUAD * 11] = color.x;
-        quad_data[26 + i * VERTICIES_PER_QUAD * 11] = color.y;
-        quad_data[27 + i * VERTICIES_PER_QUAD * 11] = color.z;
-        quad_data[28 + i * VERTICIES_PER_QUAD * 11] = color.w;
-        quad_data[29 + i * VERTICIES_PER_QUAD * 11] = 0.0f;
-        quad_data[30 + i * VERTICIES_PER_QUAD * 11] = 1.0f;
-        quad_data[31 + i * VERTICIES_PER_QUAD * 11] = -1.0f;
-        quad_data[32 + i * VERTICIES_PER_QUAD * 11] = -1.0f;
-                     
-        radius = r(t0 + step * (float)(i + 1));
-        quad_data[33 + i * VERTICIES_PER_QUAD * 11] = radius * cosf(t0 + step * (float)(i + 1));
-        quad_data[34 + i * VERTICIES_PER_QUAD * 11] = radius * sinf(t0 + step * (float)(i + 1));
-        quad_data[35 + i * VERTICIES_PER_QUAD * 11] = 0.0f;
-        quad_data[36 + i * VERTICIES_PER_QUAD * 11] = color.x;
-        quad_data[37 + i * VERTICIES_PER_QUAD * 11] = color.y;
-        quad_data[38 + i * VERTICIES_PER_QUAD * 11] = color.z;
-        quad_data[39 + i * VERTICIES_PER_QUAD * 11] = color.w;
-        quad_data[40 + i * VERTICIES_PER_QUAD * 11] = 1.0f;
-        quad_data[41 + i * VERTICIES_PER_QUAD * 11] = 1.0f;
-        quad_data[42 + i * VERTICIES_PER_QUAD * 11] = -1.0f;
-        quad_data[43 + i * VERTICIES_PER_QUAD * 11] = -1.0f;
-    }
-    
-    if (buffer == NULL)
-        draw_quad_data(quad_data, rect_count);
-    else
-        vertex_buffer_append_data(buffer, quad_data, rect_count * VERTICIES_PER_QUAD * 11);
-
-}
-
-void draw_area_parametric(float t0, float t1, Function x, Function y, u32 rect_count, Vec4f color, Vertex_Buffer *buffer) {
-    float step = (t1 - t0) / (float)rect_count;
-    for (u32 i = 0; i < rect_count; i++) {
-        draw_quad(vec2f_make(x(t0 + step * i), 0.0f), vec2f_make(x(t0 + step * (i + 1)), y(t0 + step * (i + 1))), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f, buffer);
-    }
-}
-
-
-void draw_viewport(u32 x, u32 y, u32 width, u32 height, Vec4f color, Camera *camera, Vertex_Buffer *buffer) {
-    glViewport(x, y, width, height);
-    
-    Vec2f p1 = vec2f_make((float)width / 2 / (float)camera->unit_scale, (float)height / 2 / (float)camera->unit_scale);
-    Vec2f p0 = vec2f_negate(p1);
-    
-    draw_quad(p0, p1, color, NULL, p0, p1, NULL, 0.0f, buffer);
-
-}
-
-void viewport_reset() {
-    glViewport(0, 0, state->window_width, state->window_height);
-}
-
-Vec2f camera_screen_to_world(Vec2f point, Camera *camera) {
-    return vec2f_make(camera->center.x + (point.x - (float)state->window_width / 2) / (float)camera->unit_scale, camera->center.y + (point.y - (float)state->window_height / 2) / (float)state->main_camera.unit_scale);
-}
 
 
 

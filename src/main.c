@@ -1,7 +1,8 @@
 #include "core/core.h"
 #include "core/graphics.h"
-#include "game/plug.h"
 #include "core/input.h"
+#include "game/plug.h"
+
 #include <SDL2/SDL_events.h>
 #include <SDL2/SDL_mouse.h>
 #include <SDL2/SDL_video.h>
@@ -59,20 +60,13 @@ int main(int argc, char *argv[]) {
     t.time_slow_factor = 1;
 
     state.t = &t;
-    state.quit = false;
-    state.window_width = WINDOW_WIDTH;
-    state.window_height = WINDOW_HEIGHT;
-    state.window = window;
 
-    state.mouse_input = (Mouse_Input) {
-        .position = VEC2F_ORIGIN,
-        .left_hold = false,
-        .left_pressed = false,
-        .left_unpressed = false,
-        .right_hold = false,
-        .right_pressed = false,
-        .right_unpressed = false,
+    state.window = (Window_Info) {
+        .ptr = window,
+        .width = WINDOW_WIDTH,
+        .height = WINDOW_HEIGHT,
     };
+
 
     #ifdef DEV
     reload_libplug();
@@ -82,11 +76,9 @@ int main(int argc, char *argv[]) {
     #endif
 
 
-    SDL_Event event;
-
     t.last_update_time = 0; 
     t.update_step_time = 10; // Milliseconds per one update time
-    while (!state.quit) {
+    while (true) {
         // Time management.
         t.current_time = SDL_GetTicks();
         t.accumilated_time += t.current_time - t.last_update_time;
@@ -100,59 +92,11 @@ int main(int argc, char *argv[]) {
         t.delta_time = (float)(t.delta_time_milliseconds) / 1000.0f;
         t.accumilated_time = t.accumilated_time % t.update_step_time;
 
-        // Clear inputs.
-        state.mouse_input.left_pressed = false;
-        state.mouse_input.left_unpressed = false;
-        state.mouse_input.right_pressed = false;
-        state.mouse_input.right_unpressed = false;
-        state.text_input.text[0] = '\0';
-        
-        // @Todo: Move event polling into a separate c file (module).
-        while (SDL_PollEvent(&event)) {
-            switch (event.type) {
-                case SDL_QUIT:
-                    state.quit = true;
-                    break;
-                case SDL_MOUSEMOTION:
-                    s32 mx, my;
-                    SDL_GetMouseState(&mx, &my);
-                    
-                    state.mouse_input.position.x = (float)mx;
-                    state.mouse_input.position.y = (float)(state.window_height - my);
-                    break;
-                case SDL_MOUSEBUTTONDOWN:
-                    if (event.button.button == SDL_BUTTON_LEFT) {
-                        state.mouse_input.left_pressed = true;
-                        state.mouse_input.left_hold = true;
-                    }
-                    else if (event.button.button == SDL_BUTTON_RIGHT) {
-                        state.mouse_input.right_pressed = true;
-                        state.mouse_input.right_hold = true;
-                    }
-                    break;
-                case SDL_MOUSEBUTTONUP:
-                    if (event.button.button == SDL_BUTTON_LEFT) {
-                        state.mouse_input.left_unpressed = true;
-                        state.mouse_input.left_hold = false;
-                    }
-                    else if (event.button.button == SDL_BUTTON_RIGHT) {
-                        state.mouse_input.right_unpressed = true;
-                        state.mouse_input.right_hold = false;
-                    }
-                    break;
-                case SDL_TEXTINPUT:
-                    strcpy(state.text_input.text, event.text.text);
-                    break;
-                default:
-                    break;
-            }
-        }
-        state.event = event;
         
         plug_update(&state);
 
         #ifdef DEV
-        if (pressed(SDLK_r) && !state.text_input.enabled) {
+        if (pressed(SDLK_r)) {
             if(!reload_libplug()) {
                 fprintf(stderr, "%s Failed to hot reload plug.dll.\n", debug_error_str);
             }
@@ -160,6 +104,10 @@ int main(int argc, char *argv[]) {
         #endif
 
         keyboard_state_old_update();
+
+        if (state.events.should_quit) {
+            break;
+        }
     }
 
     #ifndef DEV
