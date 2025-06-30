@@ -10,7 +10,7 @@
 void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle, Vertex_Buffer *buffer);
 void draw_grid(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer);
 void draw_text(const char *text, Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale, Vertex_Buffer *buffer);
-Vec2f text_size(const char *text, Font_Baked *font);
+Vec2f text_size(const char *text, s64 length, Font_Baked *font);
 void draw_line(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer);
 void draw_dot(Vec2f position, Vec4f color, Camera *camera, Vertex_Buffer *buffer);
 

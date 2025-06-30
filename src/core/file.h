@@ -10,17 +10,17 @@
  */
 
 /**
- * Reads contents of the file into the buffer that is preemptivly allocated using malloc.
+ * Reads contents of the file into the buffer that is preemptivly allocated using allooator.
  * Return pointer to the buffer and sets buffer size in bytes into the file_size.
  * @Important: Buffer should be freed manually when not used anymore.
  */
 void *read_file_into_buffer(char *file_name, u64 *file_size, Allocator *allocator);
 
 /**
- * Reads contents of the file into the String_8 structure that is preemptivly allocated using malloc.
- * Return String_8 structure with pointer to dynamically allocated memory and size of it.
- * @Important: String_8 should be freed manually when not used anymore.
+ * Reads contents of the file into the String structure that is preemptivly allocated using allocator.
+ * Return String structure with pointer to dynamically allocated memory and size of it.
+ * @Important: String should be freed manually when not used anymore.
  */
-String_8 read_file_into_str8(char *file_name, Allocator *allocator);
+String read_file_into_str(char *file_name, Allocator *allocator);
 
 #endif

@@ -1,4 +1,5 @@
 #include "core/graphics.h"
+#include "core.h"
 #include "core/core.h"
 #include "core/type.h"
 #include "core/str.h"
@@ -88,9 +89,9 @@ int init_sdl_audio() {
 
 
 // Shader loading key words.
-String_8 shader_version_tag = str8_make("#version");
-String_8 vertex_shader_defines = str8_make("#define VERTEX\n");
-String_8 fragment_shader_defines = str8_make("#define FRAGMENT\n");
+String shader_version_tag      = CSTR("#version");
+String vertex_shader_defines   = CSTR("#define VERTEX\n");
+String fragment_shader_defines = CSTR("#define FRAGMENT\n");
 
 
 s32 shader_strings_lengths[3];
@@ -273,17 +274,19 @@ Shader shader_load(char *shader_path) {
      */
 
     // Getting full shader file.
-    String_8 shader_source = read_file_into_str8(shader_path, &std_allocator);
+    String shader_source = read_file_into_str(shader_path, &std_allocator);
     
     // Splitting on two substrings, "shader_version" and "shader_code".
-    u32 start_of_version_tag = str8_index_of(&shader_source, &shader_version_tag, 0, shader_source.length);
-    u32 end_of_version_tag = str8_index_of_char(&shader_source, '\n', start_of_version_tag, shader_source.length);
-    String_8 shader_version = str8_substring(&shader_source, start_of_version_tag, end_of_version_tag + 1);
-    String_8 shader_code = str8_substring(&shader_source, end_of_version_tag + 1, shader_source.length);
+    s64 start_of_version_tag = str_find(shader_source, shader_version_tag);
+    s64 end_of_version_tag   = str_find_char_left(
+            str_substring(shader_source, start_of_version_tag, shader_source.length), '\n');
+
+    String shader_version    = str_substring(shader_source, start_of_version_tag, end_of_version_tag + 1);
+    String shader_code       = str_substring(shader_source, end_of_version_tag + 1, shader_source.length);
     
     // Passing all parts in the respective shader sources, where defines inserted between version and code parts.
-    const char *vertex_shader_source[3] = { (char *)shader_version.ptr, (char *)vertex_shader_defines.ptr, (char *)shader_code.ptr };
-    const char *fragment_shader_source[3] = { (char *)shader_version.ptr, (char *)fragment_shader_defines.ptr, (char *)shader_code.ptr };
+    const char *vertex_shader_source[3] = { shader_version.data, vertex_shader_defines.data, shader_code.data };
+    const char *fragment_shader_source[3] = { shader_version.data, fragment_shader_defines.data, shader_code.data };
     
     /**
      * Specifying lengths, because we don't pass null terminated strings.
@@ -325,7 +328,8 @@ Shader shader_load(char *shader_path) {
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
     
-    str8_free(&shader_source, &std_allocator);
+
+    allocator_free(&std_allocator, shader_source.data);
     
 
     // Cache all attributes in shader based on shader location as index.

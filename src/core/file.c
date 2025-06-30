@@ -41,7 +41,7 @@ void* read_file_into_buffer(char *file_name, u64 *file_size, Allocator *allocato
     return buffer;
 }
 
-String_8 read_file_into_str8(char *file_name, Allocator *allocator) {
+String read_file_into_str(char *file_name, Allocator *allocator) {
     FILE *file = fopen(file_name, "rb");
     if (file == NULL) {
         printf_err("Couldn't open the file \"%s\".\n", file_name);
@@ -51,19 +51,19 @@ String_8 read_file_into_str8(char *file_name, Allocator *allocator) {
     size_t file_size = ftell(file);
     rewind(file);
 
-    String_8 str = str8_make_allocate((u32)file_size, allocator);
+    String str = STR((s64)file_size, allocator_alloc(allocator, file_size));
 
-    if (str.ptr == NULL) {
+    if (str.data == NULL) {
         printf_err("Memory allocation for string buffer failed while reading the file \"%s\".\n", file_name);
         (void)fclose(file);
         str.length = 0;
     }
 
-    if (fread(str.ptr, 1, file_size, file) != file_size) {
+    if (fread(str.data, 1, file_size, file) != file_size) {
         printf_err("Failure reading the file \"%s\".\n", file_name);
         (void)fclose(file);
-        free(str.ptr);
-        str.ptr = NULL;
+        free(str.data);
+        str.data = NULL;
         str.length = 0;
     }
 

@@ -13,6 +13,4 @@ void init_events_handler(Events_Info *events);
 
 void handle_events(Events_Info *events, Window_Info *window, Time_Data *t);
 
-void set_text_input(char *buffer, s64 capacity);
-
 #endif

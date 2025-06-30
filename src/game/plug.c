@@ -7,7 +7,6 @@
 #include "core/mathf.h"
 #include "core/input.h"
 
-#include "event.h"
 #include "game/event.h"
 #include "game/draw.h"
 
@@ -62,9 +61,9 @@ static const s32 KEYBIND_CONSOLE_ENTER     = SDLK_RETURN;
 // #define BIND_PRESSED(keybind)   (!state->events.text_input.enabled && pressed(keybind))
 // #define BIND_HOLD(keybind)      (!state->events.text_input.enabled && hold(keybind))
 // #define BIND_UNPRESSED(keybind) (!state->events.text_input.enabled && unpressed(keybind))
-#define BIND_PRESSED(keybind)   (pressed(keybind))
-#define BIND_HOLD(keybind)      (hold(keybind))
-#define BIND_UNPRESSED(keybind) (unpressed(keybind))
+#define BIND_PRESSED(keybind)   (!SDL_IsTextInputActive() && pressed(keybind))
+#define BIND_HOLD(keybind)      (!SDL_IsTextInputActive() && hold(keybind))
+#define BIND_UNPRESSED(keybind) (!SDL_IsTextInputActive() && unpressed(keybind))
 
 
 
@@ -294,7 +293,7 @@ void ui_draw_text_centered(const char *text, Vec2f position, Vec2f size, Vec4f c
     if (text == NULL)
         return;
 
-    Vec2f t_size = text_size(text, state->ui.font);
+    Vec2f t_size = text_size(text, strlen(text), state->ui.font);
 
     // Following ui_draw_text centered calculations are for the system where y axis points up, and x axis to the right.
     ui_draw_text(text, vec2f_make(position.x + (size.x - t_size.x) * 0.5f, position.y + (size.y + t_size.y) * 0.5f), color);
@@ -469,110 +468,90 @@ leave_draw:
 #define UI_INPUT_FIELD(size, buffer, buffer_size) ui_input_field(size, buffer, buffer_size, __LINE__)
 
 bool ui_input_field(Vec2f size, char *buffer, s32 buffer_size, s32 id) {
-    // ui_cursor_advance(size);
-    // ui_set_element_size(size);
+    Mouse_Input *mouse_i = &state->events.mouse_input;
+    Text_Input *text_i = &state->events.text_input;
 
-    // s32 prefix_id = state->ui.set_prefix_id;
+    ui_cursor_advance(size);
+    ui_set_element_size(size);
 
-    // Vec4f res_color = state->ui.theme.btn_bg;
-    // Vec4f res_bar_color = state->ui.theme.btn_bg_hover;
-    // bool  res_flushed = false;
-    // 
-    // if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
-    //     if (state->mouse_input.left_pressed) {
-    // _text_input:
-    //         // If was pressed but was pressed again outside (deselected)
-    //         state->ui.active_line_id = -1;
-    //         state->ui.active_prefix_id = -1;
+    s32 prefix_id = state->ui.set_prefix_id;
 
-    //         SDL_StopTextInput();
-    //         state->text_input.enabled = false;
+    Vec4f res_color = state->ui.theme.btn_bg;
+    Vec4f res_bar_color = state->ui.theme.btn_bg_hover;
+    bool  res_flushed = false;
 
-    //         goto leave_draw;
-    //     }
-    //     
-    //     res_color = state->ui.theme.btn_bg_press;
+    if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
+        if (mouse_i->left_pressed || pressed(SDLK_ESCAPE)) {
+            // If was pressed but was pressed again outside (deselected)
+            state->ui.active_line_id = -1;
+            state->ui.active_prefix_id = -1;
 
-    //     // If is still active.
-    //     s32 input_length = strlen(state->text_input.text);
-    //     if (input_length > 0) {
-    //         if (strlen(buffer) + input_length < buffer_size - 1) {
-    //             strcpy(buffer + strlen(buffer), state->text_input.text);
-    //             res_bar_color = state->ui.theme.text;
-    //         } else {
-    //             strcpy(buffer + buffer_size - 4, "...");
-    //         }
+            SDL_StopTextInput();
 
-    //         goto leave_draw;
-    //     }
+            text_i->buffer = NULL;
+            text_i->capacity = 0;
+            text_i->length = 0;
+            text_i->write_index = 0;
 
 
+            goto leave_draw;
+        }
 
-    //     if (pressed(SDLK_BACKSPACE)) {
-    //         buffer[strlen(buffer) - 1] = '\0';
-    //         res_bar_color = state->ui.theme.text;
-    //         
-    //         ti_reset(&state->text_input.backspace_timer);
+        res_color = state->ui.theme.btn_bg_press;
 
-    //         goto leave_draw;
-
-    //     } else if (hold(SDLK_BACKSPACE)) {
-    //         ti_update(&state->text_input.backspace_timer, state->t->delta_time_milliseconds);
-
-    //         if (ti_is_complete(&state->text_input.backspace_timer)) {
-
-    //             ti_update(&state->text_input.key_repeat_timer, state->t->delta_time_milliseconds);
-
-    //             if (ti_is_complete(&state->text_input.key_repeat_timer)) {
-    //                 buffer[strlen(buffer) - 1] = '\0';
-    //                 res_bar_color = state->ui.theme.text;
-    //                 ti_reset(&state->text_input.key_repeat_timer);
-
-    //                 goto leave_draw;
-    //             }
-    //         }
-    //     } else if (pressed(SDLK_RETURN)) {
-    //         res_flushed = true;
-    //     } else if (pressed(SDLK_ESCAPE)) {
-    //         goto stop_text_input;
-    //     }
+        if (pressed(SDLK_RETURN)) {
+            res_flushed = true;
+            goto leave_draw;
+        } 
 
 
-    // }
+        // If is still active.
+        
 
-    // 
 
-    // if (ui_is_hover(size) || state->ui.activate_next) {
-    //     // If just pressed.
-    //     if (state->mouse_input.left_pressed || state->ui.activate_next) {
-    //         state->ui.active_line_id = id;
-    //         state->ui.active_prefix_id = prefix_id;
-
-    //         SDL_StartTextInput();
-    //         state->text_input.enabled = true;
-    //     }
-
-    //     res_color = state->ui.theme.btn_bg_hover;
-    // }
+    }
 
 
 
-    // e_draw:
-    // Vec2f t_size = text_size(buffer, state->ui.font);
-    // ui_draw_rect(state->ui.cursor, size, res_color); // Input field.
-    // ui_draw_rect(vec2f_make(state->ui.cursor.x + t_size.x, state->ui.cursor.y), vec2f_make(10, size.y), res_bar_color); // Input bar.
-    // ui_draw_text(buffer, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text);
+    if (ui_is_hover(size) || state->ui.activate_next) {
+        // If just pressed.
+        if (mouse_i->left_pressed || state->ui.activate_next) {
+            state->ui.active_line_id = id;
+            state->ui.active_prefix_id = prefix_id;
+            
+            SDL_StartTextInput();
 
-    // ui_end_element();
+            // Setting text input for appending.
+            text_i->buffer = buffer;
+            text_i->capacity = buffer_size;
+            text_i->length = strlen(buffer);
+            text_i->write_index = text_i->length;
+            
+        }
 
-    // return res_flushed;
+        res_color = state->ui.theme.btn_bg_hover;
+
+        goto leave_draw;
+    }
+
+
+
+leave_draw:
+     Vec2f t_size = text_size(buffer, text_i->length, state->ui.font);
+     ui_draw_rect(state->ui.cursor, size, res_color); // Input field.
+     ui_draw_rect(vec2f_make(state->ui.cursor.x + text_size(buffer, text_i->write_index, state->ui.font).x, state->ui.cursor.y), vec2f_make(10, size.y), res_bar_color); // Input bar.
+     ui_draw_text(buffer, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text);
+
+     ui_end_element();
+
+     return res_flushed;
 }
 
 
 
 
 void ui_text(const char *text) {
-    Vec2f t_size = text_size(text, state->ui.font);
+    Vec2f t_size = text_size(text, strlen(text), state->ui.font);
     ui_cursor_advance(t_size);
     ui_set_element_size(t_size);
     ui_draw_text(text, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + t_size.y), state->ui.theme.text);
@@ -1637,7 +1616,7 @@ void game_update() {
 
 float slider_val = 0.0f;
 s32 slider_int = 0;
-
+char text_input_buffer[100] = "";
 
 
 
@@ -1819,8 +1798,14 @@ void game_draw() {
 
     UI_BEGIN();
     
+    if (UI_INPUT_FIELD(vec2f_make(500, 40), text_input_buffer, 100)) {
+        printf("%s\n", text_input_buffer);
+        text_input_buffer[0] = '\0';
+        state->events.text_input.write_index = 0;
+        state->events.text_input.length = 0;
+    }
     ui_text(info_buffer);
-
+    
 
 
 
@@ -1829,12 +1814,15 @@ void game_draw() {
 
 
 
+String line     = STR_BUFFER("This is just a line.");
 
 
 
 
 
 void menu_update() {
+    printf("%.*s\n", UNPACK(line));
+
     // Switching game state back to play.
     if (BIND_PRESSED(KEYBIND_MENU_EXIT)) {
         state->gs = PLAY;

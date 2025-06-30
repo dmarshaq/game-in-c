@@ -8,68 +8,67 @@
 #include "core/core.h"
 #include "core/type.h"
 #include <string.h>
+#include <stdbool.h>
+
+
+typedef struct string {
+    s64 length;
+    char *data;
+} String;
+
+#define STR(length, data)   ((String) { length, data } )
+#define CSTR(cstring)       STR(strlen(cstring), cstring)
+
+#define STR_BUFFER(literal) STR(sizeof(literal) - 1, (char[]){literal})
+
+#define UNPACK(str)         str.length, str.data
+
+
 
 /**
- * The idea behind String_8 is to make working with dynamically allocated strings easier.
- * They are NOT null terminated, but are designed to be compatible with regural C strings, if used correctly.
- */
-typedef struct string_8 {
-    u8  *ptr;
-    u32 length;
-} String_8;
-
-
-#define str8_make(cstring)                                 ((String_8) { .ptr = (u8 *)cstring, .length = (u32)strlen(cstring) } )
-#define str8_make_ptr(ptr, length)                         ((String_8) { .ptr = (u8 *)ptr, .length = (u32)length } )
-
-/**
- * @Todo: Write description.
- */
-String_8 str8_make_allocate(u32 length, Allocator *allocator);
-
-/**
- * Frees previously allocated memory through "str8_make_allocate()".
- * @Important: Only use on strings that were allocated.
- */
-void str8_free(String_8 *str, Allocator *allocator);
-
-void str8_memcopy_from_buffer(String_8 *str, void *buffer, u32 length);
-
-void str8_memcopy_into_buffer(String_8 *str, void *buffer, u32 start, u32 end);
-
-/**
- * Returns String_8 that points to the memory of original "str" at index "start" with length up untill index "end".
- * Note: Character at index "end" is not included in the returned String_8, domain for resulting substring is always [ start, end ).
+ * Returns String that points to the memory of original "str" at index "start" with length up until index "end".
+ * Note: Character at index "end" is not included in the returned String, domain for resulting substring is always [ start, end ).
  * @Important: DOESN'T COPY MEMORY. If "str" memory is freed later, returned string will not point to valid adress anymore.
  */
-#define str8_substring(ptr_str8, start, end)                    ((String_8) { .ptr = (u8 *)((ptr_str8)->ptr) + (start), .length = (u32)((end) - (start)) } )
-
-bool str8_equals(String_8 *str1, String_8 *str2);
-
-bool str8_equals_string(String_8 *str, char *string);
+String str_substring(String str, s64 start, s64 end);
 
 /**
- * Linearly searches for the first occurnse of "search_str" in "str", by comparing them through "str8_equals_str8()" function.
- * Returns the index of first character of the occurns, otherwise, returns UINT_MAX.
- * "start" refers to the index where searching begins, character at this index IS included in the search comparising.
- * "end" refers to the index where searching stops, character at this index is NOT included in the search comparising.
+ * Compares "str1" and "str2", checks for lengths equality first and then compares symbol by symbol.
+ * Returns true if strings are identical.
  */
-u32 str8_index_of(String_8 *str, String_8 *search_str, u32 start, u32 end);
+bool str_equals(String str1, String str2);
 
 /**
- * Linearly searches for the first occurnse of "search_string" in "str", by comparing them through "str8_equals_string()" function.
- * Returns the index of first character of the occurns, otherwise, returns UINT_MAX.
- * "start" refers to the index where searching begins, character at this index IS included in the search comparising.
- * "end" refers to the index where searching stops, character at this index is NOT included in the search comparising.
+ * Linearly searches for the first occurnse of "search" in "str" from the LEFT, by comparing them through "str_equals()" function.
+ * Returns the index of first character of the occurns, otherwise, returns -1.
  */
-u32 str8_index_of_string(String_8 *str, char *search_string, u32 start, u32 end);
+s64 str_find(String str, String search);
 
 /**
- * Linearly searches for the first occurnse of char "character" in "str", by comparing each char in "str".
- * Returns the index of first character of the occurns, otherwise, returns UINT_MAX.
- * "start" refers to the index where searching begins, character at this index IS included in the search comparising.
- * "end" refers to the index where searching stops, character at this index is NOT included in the search comparising.
+ * Linearly searches for the first occurnse of char "symbol" in "str" from the LEFT, by comparing each char in "str".
+ * Returns the index of first character of the occurns, otherwise, returns -1.
  */
-u32 str8_index_of_char(String_8 *str, char character, u32 start, u32 end);
+s64 str_find_char_left(String str, char symbol);
+
+/**
+ * Linearly searches for the first occurnse of char "symbol" in "str" from the RIGHT, by comparing each char in "str".
+ * Returns the index of first character of the occurns, otherwise, returns -1.
+ */
+s64 str_find_char_right(String str, char symbol);
+
+/**
+ * Copies contents of the src string into dest string.
+ * Doesn't resize destination string.
+ * @Important: dest.length >= src.length must be true!
+ */
+void str_copy(String src, String dest);
+
+/**
+ * Copies contents of the src string into buffer.
+ * @Important: buffer should have enough space to hold src data!
+ */
+void str_copy_buffer(String src, void *buffer);
+
+
 
 #endif

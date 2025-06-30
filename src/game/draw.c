@@ -88,9 +88,7 @@ void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *f
     }
 }
 
-Vec2f text_size(const char *text, Font_Baked *font) {
-    u64 text_length = strlen(text);
-
+Vec2f text_size(const char *text, s64 length, Font_Baked *font) {
     // Result.
     Vec2f result = VEC2F_ORIGIN;
 
@@ -102,7 +100,7 @@ Vec2f text_size(const char *text, Font_Baked *font) {
     // Text rendering variables.
     s32 font_char_index;
 
-    for (u64 i = 0; i < text_length; i++) {
+    for (u64 i = 0; i < length; i++) {
         // Handle special characters / symbols.
         if (text[i] == '\n') {
             result.y += (float)font->line_height;

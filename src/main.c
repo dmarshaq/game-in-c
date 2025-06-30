@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
         plug_update(&state);
 
         #ifdef DEV
-        if (pressed(SDLK_r)) {
+        if (!SDL_IsTextInputActive() && pressed(SDLK_r)) {
             if(!reload_libplug()) {
                 fprintf(stderr, "%s Failed to hot reload plug.dll.\n", debug_error_str);
             }

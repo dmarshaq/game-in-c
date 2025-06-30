@@ -143,7 +143,7 @@ typedef enum hash_table_slot_state : u8 {
 
 typedef struct hash_table_slot {
     Hash_Table_Slot_State state;
-    String_8 key;
+    String key;
 } Hash_Table_Slot;
 
 /**
@@ -190,12 +190,12 @@ void hash_table_print_slot(void *item, u32 item_size, Hash_Table_Slot *slot) {
     }
 
     // Print the state and key_size as hex.
-    (void)printf(" | State: 0x%02x | Key Size: 0x%08x | Key Ptr: 0x%16p -> ", slot->state, slot->key.length, slot->key.ptr);
+    (void)printf(" | State: 0x%02x | Key Size: 0x%08x | Key Ptr: 0x%16p -> ", slot->state, slot->key.length, slot->key.data);
 
     if (slot->state == SLOT_OCCUPIED) {
         
         // Print key itself
-        (void)printf("%.*s", slot->key.length, slot->key.ptr);
+        (void)printf("%.*s", slot->key.length, slot->key.data);
     }
     (void)printf("\n");
 }
@@ -209,7 +209,7 @@ bool hash_table_readress(void **table, u32 index) {
     Hash_Table_Header *header = hash_table_header(table);
     Hash_Table_Slot *target_slot = hash_table_get_slot(table, index);
 
-    u32 new_index = hash_table_hash_index_of(table, target_slot->key.ptr, target_slot->key.length);
+    u32 new_index = hash_table_hash_index_of(table, target_slot->key.data, target_slot->key.length);
     target_slot->state = SLOT_EMPTY;
 
     Hash_Table_Slot *slot = NULL;
@@ -220,7 +220,7 @@ bool hash_table_readress(void **table, u32 index) {
             slot->state = SLOT_OCCUPIED;
 
             slot->key.length = target_slot->key.length;
-            slot->key.ptr = target_slot->key.ptr;
+            slot->key.data = target_slot->key.data;
 
             memmove(*table + ((new_index + i) % header->capacity) * header->item_size, *table + index * header->item_size, header->item_size);
 
@@ -234,7 +234,7 @@ bool hash_table_readress(void **table, u32 index) {
                 slot->state = SLOT_OCCUPIED;
 
                 slot->key.length = target_slot->key.length;
-                slot->key.ptr = target_slot->key.ptr;
+                slot->key.data = target_slot->key.data;
 
                 memmove(*table + ((new_index + i) % header->capacity) * header->item_size, *table + index * header->item_size, header->item_size);
 
@@ -395,13 +395,13 @@ u32 _hash_table_push_key(void **table, void *key, u32 key_size) {
              * So it is neccessary to call this macro like function in a separate line, otherwise undefined behaviour will occure.
              */
             u32 key_index = array_list_append_multiple(&(header->keys), key, key_size);
-            slot->key.ptr = header->keys + key_index;
+            slot->key.data = header->keys + key_index;
 
             header->count++;
            
             return (index + i) % header->capacity;
         }
-        else if (slot->key.length == key_size && !memcmp(slot->key.ptr, key, key_size)) {
+        else if (slot->key.length == key_size && !memcmp(slot->key.data, key, key_size)) {
             // Key already exists, return index of that slot.
             return (index + i) % header->capacity;
         }
@@ -422,7 +422,7 @@ void *_hash_table_get(void **table, void *key, u32 key_size) {
         if (slot->state == SLOT_EMPTY) {
             return NULL;
         }
-        else if (slot->key.length == key_size && !memcmp(slot->key.ptr, key, key_size)) {
+        else if (slot->key.length == key_size && !memcmp(slot->key.data, key, key_size)) {
             // Right key is found, return.
             return *table + ((index + i) % header->capacity) * header->item_size;
         }
@@ -441,7 +441,7 @@ void _hash_table_remove(void **table, void *key, u32 key_size) {
         if (slot->state == SLOT_EMPTY) {
             return;
         }
-        else if (slot->key.length == key_size && !memcmp(slot->key.ptr, key, key_size)) {
+        else if (slot->key.length == key_size && !memcmp(slot->key.data, key, key_size)) {
             // Right key is found.
             // @Incomplete: Doesn't delete key.
             header->count--;
