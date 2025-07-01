@@ -1,4 +1,6 @@
 #include "game/plug.h"
+#include "console.h"
+#include "game/console.h"
 #include "core/core.h"
 #include "core/type.h"
 #include "core/graphics.h"
@@ -1606,6 +1608,8 @@ void game_update() {
     phys_update();
 
 
+
+
     // Switching game state to menu.
     if (BIND_PRESSED(KEYBIND_MENU_ENTER)) {
         state->gs = MENU;
@@ -1634,12 +1638,12 @@ void game_draw() {
 
 
     // Get neccessary to draw resource: (Shaders, Fonts, Textures, etc.).
-    Shader *quad_shader = hash_table_get(&state->shader_table, "quad", 4);
-    Shader *grid_shader = hash_table_get(&state->shader_table, "grid", 4);
-    Shader *line_shader = hash_table_get(&state->shader_table, "line", 4);
+    Shader *quad_shader = hash_table_get(&state->shader_table, "quad");
+    Shader *grid_shader = hash_table_get(&state->shader_table, "grid");
+    Shader *line_shader = hash_table_get(&state->shader_table, "line");
 
-    Font_Baked *font_medium = hash_table_get(&state->font_table, "medium", 6);
-    Font_Baked *font_small  = hash_table_get(&state->font_table, "small", 5);
+    Font_Baked *font_medium = hash_table_get(&state->font_table, "medium");
+    Font_Baked *font_small  = hash_table_get(&state->font_table, "small");
 
 
     // Load camera's projection into all shaders to correctly draw elements according to camera view.
@@ -1725,7 +1729,7 @@ void game_draw() {
     // Get neccessary to draw resource: (Shaders, Fonts, Textures, etc.).
     state->ui.font = font_medium;
 
-    Shader *ui_quad_shader = hash_table_get(&state->shader_table, "ui_quad", 7);
+    Shader *ui_quad_shader = hash_table_get(&state->shader_table, "ui_quad");
 
     projection = screen_calculate_projection(state->window.width, state->window.height);
     shader_update_projection(ui_quad_shader, &projection);
@@ -1798,12 +1802,12 @@ void game_draw() {
 
     UI_BEGIN();
     
-    if (UI_INPUT_FIELD(vec2f_make(500, 40), text_input_buffer, 100)) {
-        printf("%s\n", text_input_buffer);
-        text_input_buffer[0] = '\0';
-        state->events.text_input.write_index = 0;
-        state->events.text_input.length = 0;
-    }
+    // if (UI_INPUT_FIELD(vec2f_make(500, 40), text_input_buffer, 100)) {
+    //     printf("%s\n", text_input_buffer);
+    //     text_input_buffer[0] = '\0';
+    //     state->events.text_input.write_index = 0;
+    //     state->events.text_input.length = 0;
+    // }
     ui_text(info_buffer);
     
 
@@ -1841,11 +1845,11 @@ void menu_draw() {
     glClear(GL_COLOR_BUFFER_BIT);
 
     // Get neccessary to draw resource: (Shaders, Fonts, Textures, etc.).
-    Font_Baked *font_medium = hash_table_get(&state->font_table, "medium", 6);
+    Font_Baked *font_medium = hash_table_get(&state->font_table, "medium");
     state->ui.font = font_medium;
 
-    Shader *ui_quad_shader = hash_table_get(&state->shader_table, "ui_quad", 7);
-    Shader *line_shader = hash_table_get(&state->shader_table, "line", 4);
+    Shader *ui_quad_shader = hash_table_get(&state->shader_table, "ui_quad");
+    Shader *line_shader = hash_table_get(&state->shader_table, "line");
 
     Matrix4f projection = screen_calculate_projection(state->window.width, state->window.height);
     shader_update_projection(ui_quad_shader, &projection);
@@ -1971,25 +1975,25 @@ void plug_load(Plug_State *s) {
     // Shader loading.
     Shader grid_shader = shader_load("res/shader/grid.glsl");
     shader_init_uniforms(&grid_shader);
-    hash_table_put(&state->shader_table, grid_shader, "grid", 4);
+    hash_table_put(&state->shader_table, grid_shader, "grid");
 
     Shader quad_shader = shader_load("res/shader/quad.glsl");
     shader_init_uniforms(&quad_shader);
-    hash_table_put(&state->shader_table, quad_shader, "quad", 4);
+    hash_table_put(&state->shader_table, quad_shader, "quad");
 
     Shader ui_quad_shader = shader_load("res/shader/ui_quad.glsl");
     shader_init_uniforms(&ui_quad_shader);
-    hash_table_put(&state->shader_table, ui_quad_shader, "ui_quad", 7);
+    hash_table_put(&state->shader_table, ui_quad_shader, "ui_quad");
 
     Shader line_shader = shader_load("res/shader/line.glsl");
     shader_init_uniforms(&line_shader);
-    hash_table_put(&state->shader_table, line_shader, "line", 4);
+    hash_table_put(&state->shader_table, line_shader, "line");
 
     // Drawers init.
-    drawer_init(&state->quad_drawer, hash_table_get(&state->shader_table, "quad", 4));
-    drawer_init(&state->grid_drawer, hash_table_get(&state->shader_table, "grid", 4));
-    drawer_init(&state->ui_drawer, hash_table_get(&state->shader_table, "ui_quad", 7));
-    line_drawer_init(&state->line_drawer, hash_table_get(&state->shader_table, "line", 4));
+    drawer_init(&state->quad_drawer, hash_table_get(&state->shader_table, "quad"));
+    drawer_init(&state->grid_drawer, hash_table_get(&state->shader_table, "grid"));
+    drawer_init(&state->ui_drawer, hash_table_get(&state->shader_table, "ui_quad"));
+    line_drawer_init(&state->line_drawer, hash_table_get(&state->shader_table, "line"));
 
 
 
@@ -1999,12 +2003,17 @@ void plug_load(Plug_State *s) {
 
 
     Font_Baked font_baked_medium = font_bake(font_data, 20.0f);
-    hash_table_put(&state->font_table, font_baked_medium, "medium", 6);
+    hash_table_put(&state->font_table, font_baked_medium, "medium");
 
     Font_Baked font_baked_small = font_bake(font_data, 16.0f);
-    hash_table_put(&state->font_table, font_baked_small, "small", 5);
+    hash_table_put(&state->font_table, font_baked_small, "small");
 
     free(font_data);
+
+
+    // Init console.
+    init_console(state);
+
 
     // Player loading.
     state->player.speed = 5.0f;
@@ -2034,6 +2043,9 @@ void plug_update(Plug_State *s) {
         load_counter--;
     }
 
+    // Console update.
+    console_update(&state->window, &state->events, state->t);
+
 
     // Switch to handle different game states.
     switch (state->gs) {
@@ -2048,6 +2060,9 @@ void plug_update(Plug_State *s) {
         default:
             printf_err("Couldn't handle current game state value.\n");
     }
+
+    // Console drawing.
+    console_draw(&state->window);
    
 
 
@@ -2062,18 +2077,18 @@ void plug_update(Plug_State *s) {
 void plug_unload(Plug_State *s) {
     state->t->delta_time_multi = 0.0f;
 
-    shader_unload(hash_table_get(&state->shader_table, "quad", 4));
-    shader_unload(hash_table_get(&state->shader_table, "grid", 4));
-    shader_unload(hash_table_get(&state->shader_table, "ui_quad", 7));
-    shader_unload(hash_table_get(&state->shader_table, "line", 4));
+    shader_unload(hash_table_get(&state->shader_table, "quad"));
+    shader_unload(hash_table_get(&state->shader_table, "grid"));
+    shader_unload(hash_table_get(&state->shader_table, "ui_quad"));
+    shader_unload(hash_table_get(&state->shader_table, "line"));
     
     drawer_free(&state->quad_drawer);
     drawer_free(&state->grid_drawer);
     drawer_free(&state->ui_drawer);
     line_drawer_free(&state->line_drawer);
     
-    font_free(hash_table_get(&state->font_table, "medium", 6));
-    font_free(hash_table_get(&state->font_table, "small", 5));
+    font_free(hash_table_get(&state->font_table, "medium"));
+    font_free(hash_table_get(&state->font_table, "small"));
 }
 
 

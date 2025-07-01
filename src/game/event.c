@@ -223,6 +223,8 @@ void handle_text_input(Events_Info *events) {
 
 
 void handle_events(Events_Info *events, Window_Info *window, Time_Data *t) {
+
+    printf("Unknown Error debug 1.\n");
     // Clear inputs.
     events->mouse_input.left_pressed = false;
     events->mouse_input.left_unpressed = false;
@@ -270,6 +272,8 @@ void handle_events(Events_Info *events, Window_Info *window, Time_Data *t) {
         }
     }
 
+
+    printf("Unknown Error debug 2.\n");
     if (SDL_IsTextInputActive()) {
         handle_text_modification(events, t);
     }
