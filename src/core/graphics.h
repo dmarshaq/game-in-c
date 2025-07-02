@@ -33,10 +33,17 @@ bool check_gl_error();
  */
 int init_sdl_gl();
 
+
+typedef struct window_info {
+    SDL_Window *ptr;
+    s32 width;
+    s32 height;
+} Window_Info;
+
 /**
  * Wrapper around GL window creation through SDL, with OpenGL context and GLEW initialization.
  */
-SDL_Window* create_gl_window(const char *title, s32 x, s32 y, s32 width, s32 height);
+Window_Info create_gl_window(const char *title, s32 x, s32 y, s32 width, s32 height);
 
 /**
  * Wrapper around SDL Mix, Audio initialization.
@@ -307,6 +314,7 @@ typedef struct font_baked {
     s32             first_char_code;            // ASCII value of the first character baked.
     s32             baseline;
     s32             line_height;
+    s32             line_gap;
     Texture         bitmap;
 } Font_Baked;
 

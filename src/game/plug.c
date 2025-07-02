@@ -724,14 +724,14 @@ void phys_add_impulse(Vec2f force, u32 milliseconds, Body_2D *body) {
 
 void phys_apply_impulses() {
     for (u32 i = 0; i < array_list_length(&state->impulses); i++) {
-        u32 force_time_multi = state->t->delta_time_milliseconds;
+        u32 force_time_multi = state->t.delta_time_milliseconds;
 
-        if (state->impulses[i].milliseconds < state->t->delta_time_milliseconds) {
+        if (state->impulses[i].milliseconds < state->t.delta_time_milliseconds) {
             force_time_multi = state->impulses[i].milliseconds;
             state->impulses[i].milliseconds = 0;
         }
         else {
-            state->impulses[i].milliseconds -= state->t->delta_time_milliseconds;
+            state->impulses[i].milliseconds -= state->t.delta_time_milliseconds;
         }
 
         state->impulses[i].target->velocity = vec2f_sum(state->impulses[i].target->velocity, vec2f_multi_constant(vec2f_divide_constant(state->impulses[i].delta_force, state->impulses[i].target->mass), (float)force_time_multi));
@@ -1228,16 +1228,16 @@ void phys_update() {
 
             // Applying gravity.
             if (box1->gravitable) {
-                box1->body.velocity = vec2f_sum(box1->body.velocity, vec2f_multi_constant(GRAVITY_ACCELERATION, state->t->delta_time * PHYS_ITERATION_STEP_TIME ));
+                box1->body.velocity = vec2f_sum(box1->body.velocity, vec2f_multi_constant(GRAVITY_ACCELERATION, state->t.delta_time * PHYS_ITERATION_STEP_TIME ));
             }
 
             // Applying velocities.
-            box1->bound_box.center = vec2f_sum(box1->bound_box.center, vec2f_multi_constant(box1->body.velocity, state->t->delta_time * PHYS_ITERATION_STEP_TIME));
-            box1->bound_box.rot += box1->body.angular_velocity * state->t->delta_time * PHYS_ITERATION_STEP_TIME;
+            box1->bound_box.center = vec2f_sum(box1->bound_box.center, vec2f_multi_constant(box1->body.velocity, state->t.delta_time * PHYS_ITERATION_STEP_TIME));
+            box1->bound_box.rot += box1->body.angular_velocity * state->t.delta_time * PHYS_ITERATION_STEP_TIME;
             box1->body.mass_center = box1->bound_box.center;
 
             // Debug drawing.
-            draw_line(box1->bound_box.center, vec2f_sum(box1->bound_box.center, vec2f_multi_constant(box1->body.velocity, state->t->delta_time * PHYS_ITERATION_STEP_TIME)), VEC4F_RED, &state->debug_vert_buffer);
+            draw_line(box1->bound_box.center, vec2f_sum(box1->bound_box.center, vec2f_multi_constant(box1->body.velocity, state->t.delta_time * PHYS_ITERATION_STEP_TIME)), VEC4F_RED, &state->debug_vert_buffer);
 
             // Debug drawing.
             draw_quad_outline(obb_p0(&box1->bound_box), obb_p1(&box1->bound_box), VEC4F_RED, box1->bound_box.rot, &state->debug_vert_buffer);
@@ -1500,7 +1500,7 @@ void update_player(Player *p) {
 
 
     // Applying calculated velocities. For both AABB and Rigid Body 2D.
-    p->p_box.bound_box.center = vec2f_sum(p->p_box.bound_box.center, vec2f_multi_constant(p->p_box.body.velocity, state->t->delta_time));
+    p->p_box.bound_box.center = vec2f_sum(p->p_box.bound_box.center, vec2f_multi_constant(p->p_box.body.velocity, state->t.delta_time));
     p->p_box.body.mass_center = p->p_box.bound_box.center;
 
     // Updating sword.
@@ -1510,7 +1510,7 @@ void update_player(Player *p) {
     transform_set_translation_2d(&p->sword.origin, p->p_box.bound_box.center);
     transform_set_translation_2d(&p->sword.handle, matrix4f_mul_vec2f(p->sword.origin, VEC2F_RIGHT));
 
-    ti_update(&p->sword.animator, state->t->delta_time);
+    ti_update(&p->sword.animator, state->t.delta_time);
 
 
     if (BIND_PRESSED(KEYBIND_PLAYER_ATTACK)) {
@@ -1589,10 +1589,10 @@ void game_update() {
     
     // Time slow down input.
     if (BIND_PRESSED(KEYBIND_TIME_TOGGLE)) {
-        state->t->time_slow_factor++;
-        state->t->delta_time_multi = 1.0f / (state->t->time_slow_factor % 5);
+        state->t.time_slow_factor++;
+        state->t.delta_time_multi = 1.0f / (state->t.time_slow_factor % 5);
         
-        printf("Delta Time Multiplier: %f\n", state->t->delta_time_multi);
+        printf("Delta Time Multiplier: %f\n", state->t.delta_time_multi);
     }
 
     // Player logic.
@@ -1787,7 +1787,7 @@ void game_draw() {
     s32 written = 0;
     char info_buffer[info_buffer_size];
 
-    written += snprintf(info_buffer + written, info_buffer_size - written, "FPS: %3.2f\n", 1 / state->t->delta_time);
+    written += snprintf(info_buffer + written, info_buffer_size - written, "FPS: %3.2f\n", 1 / state->t.delta_time);
     written += snprintf(info_buffer + written, info_buffer_size - written, "Phys Box Count: %u\n", array_list_length(&state->phys_boxes));
     written += snprintf(info_buffer + written, info_buffer_size - written, "Slider value: %2.2f\n", slider_val);
     written += snprintf(info_buffer + written, info_buffer_size - written, "Slider int value: %2d\n", slider_int);
@@ -1818,14 +1818,11 @@ void game_draw() {
 
 
 
-String line     = STR_BUFFER("This is just a line.");
-
 
 
 
 
 void menu_update() {
-    printf("%.*s\n", UNPACK(line));
 
     // Switching game state back to play.
     if (BIND_PRESSED(KEYBIND_MENU_EXIT)) {
@@ -2032,19 +2029,17 @@ void plug_update(Plug_State *s) {
     state = s;
     
     // Handling events
-    handle_events(&state->events, &state->window, state->t);
+    handle_events(&state->events, &state->window, &state->t);
 
 
     // A simple and easy way to prevent delta_time jumps when loading.
     if (load_counter == 0) {
-        state->t->delta_time_multi = 1.0f / (state->t->time_slow_factor % 5);
+        state->t.delta_time_multi = 1.0f / (state->t.time_slow_factor % 5);
     }
     if (load_counter > -1) {
         load_counter--;
     }
 
-    // Console update.
-    console_update(&state->window, &state->events, state->t);
 
 
     // Switch to handle different game states.
@@ -2061,6 +2056,8 @@ void plug_update(Plug_State *s) {
             printf_err("Couldn't handle current game state value.\n");
     }
 
+    // Console update.
+    console_update(&state->window, &state->events, &state->t);
     // Console drawing.
     console_draw(&state->window);
    
@@ -2075,7 +2072,7 @@ void plug_update(Plug_State *s) {
 }
 
 void plug_unload(Plug_State *s) {
-    state->t->delta_time_multi = 0.0f;
+    state->t.delta_time_multi = 0.0f;
 
     shader_unload(hash_table_get(&state->shader_table, "quad"));
     shader_unload(hash_table_get(&state->shader_table, "grid"));

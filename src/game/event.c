@@ -1,10 +1,8 @@
 #include "game/event.h"
 #include "core/type.h"
 #include "core/input.h"
+#include "core/graphics.h"
 #include "core/mathf.h"
-
-#include "game/plug.h"
-#include "plug.h"
 
 #include <SDL2/SDL_events.h>
 #include <SDL2/SDL_keyboard.h>
@@ -15,8 +13,8 @@
 #include <string.h>
 
 
-static T_Interpolator key_timer = ti_make(500);
-static T_Interpolator key_repeat_timer = ti_make(50);
+static T_Interpolator key_timer = ti_make(450);
+static T_Interpolator key_repeat_timer = ti_make(30);
 static SDL_Event event;
 
 void init_events_handler(Events_Info *events) {
@@ -37,6 +35,7 @@ void init_events_handler(Events_Info *events) {
         .capacity = 0,
         .length = 0,
         .write_index = 0,
+        .write_moved = false,
     };
     
     // Make sure text input is disabled on start / init.
@@ -45,7 +44,7 @@ void init_events_handler(Events_Info *events) {
     }
 }
 
-void handle_text_modification(Events_Info *events, Time_Data *t) {
+void handle_text_modification(Events_Info *events, Time_Info *t) {
     Text_Input *info = &events->text_input;
 
     if (info->buffer == NULL || info->capacity <= 0) {
@@ -69,6 +68,7 @@ void handle_text_modification(Events_Info *events, Time_Data *t) {
 
 
             info->write_index--;
+            info->write_moved = true;
             info->length--;
 
             // To satisfy C NULL termination string.
@@ -76,7 +76,6 @@ void handle_text_modification(Events_Info *events, Time_Data *t) {
 
 
             ti_reset(&key_timer);
-
 
             return;
         }
@@ -101,6 +100,7 @@ void handle_text_modification(Events_Info *events, Time_Data *t) {
                     }
 
                     info->write_index--;
+                    info->write_moved = true;
                     info->length--;
 
                     // To satisfy C NULL termination string.
@@ -108,6 +108,7 @@ void handle_text_modification(Events_Info *events, Time_Data *t) {
 
 
                     ti_reset(&key_repeat_timer);
+
                 }
             }
 
@@ -119,6 +120,7 @@ void handle_text_modification(Events_Info *events, Time_Data *t) {
     if (pressed(SDLK_LEFT)) {
 
         info->write_index--;
+        info->write_moved = true;
 
         ti_reset(&key_timer);
 
@@ -135,6 +137,7 @@ void handle_text_modification(Events_Info *events, Time_Data *t) {
             if (ti_is_complete(&key_repeat_timer)) {
                 
                 info->write_index--;
+                info->write_moved = true;
 
                 ti_reset(&key_repeat_timer);
             }
@@ -148,6 +151,7 @@ void handle_text_modification(Events_Info *events, Time_Data *t) {
     if (pressed(SDLK_RIGHT)) {
 
         info->write_index++;
+        info->write_moved = true;
 
         ti_reset(&key_timer);
 
@@ -164,6 +168,7 @@ void handle_text_modification(Events_Info *events, Time_Data *t) {
             if (ti_is_complete(&key_repeat_timer)) {
                 
                 info->write_index++;
+                info->write_moved = true;
 
                 ti_reset(&key_repeat_timer);
             }
@@ -173,9 +178,12 @@ void handle_text_modification(Events_Info *events, Time_Data *t) {
     }
 
 
+
 leave_clamp:
     // Make sure write index is clamped before returning, because arrow keys don't explicitly check bounds when moving write index.
     info->write_index = clampi(info->write_index, 0, info->length);
+
+
     return;
 }
 
@@ -197,7 +205,7 @@ void handle_text_input(Events_Info *events) {
             return;
         }
 
-
+        
         // Shifting string if there is insertion.
         if (info->write_index < info->length) {
 
@@ -213,6 +221,7 @@ void handle_text_input(Events_Info *events) {
 
         // Advancing.
         info->write_index += input_length;
+        info->write_moved = true;
         info->length += input_length;
 
         
@@ -222,14 +231,16 @@ void handle_text_input(Events_Info *events) {
 }
 
 
-void handle_events(Events_Info *events, Window_Info *window, Time_Data *t) {
+void handle_events(Events_Info *events, Window_Info *window, Time_Info *t) {
 
-    printf("Unknown Error debug 1.\n");
+    // printf("Unknown Error debug 1.\n");
     // Clear inputs.
     events->mouse_input.left_pressed = false;
     events->mouse_input.left_unpressed = false;
     events->mouse_input.right_pressed = false;
     events->mouse_input.right_unpressed = false;
+
+    events->text_input.write_moved = false;
 
     // Poll events.
     while (SDL_PollEvent(&event)) {
@@ -273,7 +284,7 @@ void handle_events(Events_Info *events, Window_Info *window, Time_Data *t) {
     }
 
 
-    printf("Unknown Error debug 2.\n");
+    // printf("Unknown Error debug 2.\n");
     if (SDL_IsTextInputActive()) {
         handle_text_modification(events, t);
     }

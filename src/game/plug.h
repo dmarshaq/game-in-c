@@ -6,6 +6,8 @@
 #include "core/mathf.h"
 #include "core/input.h"
 
+#include "game/event.h"
+
 #define calculate_obb_inertia(mass, width, height)                                          ((1.0f / 12.0f) * mass * (height * height + width * width))
 
 typedef struct body_2d {
@@ -31,9 +33,6 @@ typedef struct impulse {
     Body_2D *target;
 } Impulse;
 
-
-
-
 /**
  * Some of these flags in theory can be moved to rigid body 2d to abstact shape from body when resolving collisions.
  */
@@ -52,10 +51,13 @@ typedef struct phys_box {
 
 
 
-typedef enum game_state {
-    PLAY,
-    MENU,
-} Game_State;
+
+
+
+
+
+
+
 
 
 typedef struct ui_theme {
@@ -107,6 +109,13 @@ typedef struct ui_state {
 
 
 
+
+
+
+
+
+
+
 /**
  * Game entities.
  * 
@@ -149,6 +158,10 @@ typedef struct box {
     bool destroyed;
 } Box;
 
+typedef enum game_state {
+    PLAY,
+    MENU,
+} Game_State;
 
 
 
@@ -167,37 +180,6 @@ typedef struct box {
 
 
 
-
-typedef struct mouse_input {
-    Vec2f position;
-    bool left_hold;
-    bool left_pressed;
-    bool left_unpressed;
-    bool right_hold;
-    bool right_pressed;
-    bool right_unpressed;
-} Mouse_Input;
-
-typedef struct text_input {
-    char *buffer;
-    s64 capacity;
-    s64 length;
-    s64 write_index;
-} Text_Input;
-
-typedef struct events_info {
-    bool should_quit;
-    Mouse_Input mouse_input;
-    Text_Input text_input;
-} Events_Info;
-
-
-
-typedef struct window_info {
-    SDL_Window *ptr;
-    u32 width;
-    u32 height;
-} Window_Info;
 
 
 /**
@@ -208,7 +190,7 @@ typedef struct window_info {
 typedef struct plug_state {
     Window_Info window;
     Events_Info events;
-    Time_Data *t;
+    Time_Info t;
 
 
     UI_State ui;

@@ -13,7 +13,7 @@
 
 void init_console(Plug_State *state);
 
-void console_update(Window_Info *window, Events_Info *events, Time_Data *t);
+void console_update(Window_Info *window, Events_Info *events, Time_Info *t);
 
 void console_draw(Window_Info *window);
 

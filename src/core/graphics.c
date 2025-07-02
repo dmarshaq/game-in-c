@@ -8,6 +8,7 @@
 #include "core/mathf.h"
 
 #include "SDL2/SDL_video.h"
+#include "graphics.h"
 #include <GL/glew.h>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -47,33 +48,33 @@ int init_sdl_gl() {
     return 0;
 }
 
-SDL_Window* create_gl_window(const char *title, int x, int y, int width, int height) {
+Window_Info create_gl_window(const char *title, int x, int y, int width, int height) {
     // Create window.
     SDL_Window *window = SDL_CreateWindow(title, x, y, width, height, SDL_WINDOW_OPENGL);
     if (window == NULL) {
         printf_err("Window could not be created! SDL_Error: %s\n", SDL_GetError());
-        return NULL;
+        return (Window_Info) { NULL, 0, 0 };
     }
 
     // Create OpenGL context.
     SDL_GLContext glContext = SDL_GL_CreateContext(window);
     if (glContext == NULL) {
         printf_err("OpenGL context could not be created! SDL_Error: %s\n", SDL_GetError());
-        return window;
+        return (Window_Info) { window, width, height };
     }
 
     if (SDL_GL_MakeCurrent(window, glContext) < 0) {
         printf_err("OpenGL current could not be created! SDL_Error: %s\n", SDL_GetError());
-        return window;
+        return (Window_Info) { window, width, height };
     }
 
     // Initialize GLEW.
     if (glewInit() != GLEW_OK) {
         printf_err("GLEW initialization failed!\n");
-        return window;
+        return (Window_Info) { window, width, height };
     }
 
-    return window;
+    return (Window_Info) { window, width, height };
 }
 
 int init_sdl_audio() {
@@ -716,6 +717,7 @@ Font_Baked font_bake(u8 *font_data, float font_size) {
     float scale = stbtt_ScaleForPixelHeight(&info, font_size);
     result.line_height = (s32)((float)(ascent - descent + line_gap) * scale);
     result.baseline = (s32)((float)ascent * -scale);
+    result.line_gap = (s32)((float)line_gap * scale);
 
     // Create a bitmap.
     result.bitmap.width    = 512;

@@ -5,27 +5,41 @@
 #include "core/structs.h"
 #include "core/str.h"
 #include "core/mathf.h"
+#include "core/file.h"
 #include <SDL2/SDL_keyboard.h>
 #include <SDL2/SDL_keycode.h>
 
 
 static Quad_Drawer *drawer;
 
-static Font_Baked *font_input;
-static Font_Baked *font_output;
+static Font_Baked font_input;
+static Font_Baked font_output;
 
 static Matrix4f projection;
 
-static const float HEIGHT = 600;
-static const float INPUT_HEIGHT = 20;
-static const float CONSOLE_SPEED = 1000;
+static const float SPEED = 100;
+static const float OPEN_PERCENT = 0.4f;
+static const float FULL_OPEN_PERCENT = 0.8f;
+static const float TEXT_PAD = 10;
+
 
 static String history[32];
 static s64 history_length;
-static char input[100] = "Input text here!";
+static float history_font_top_pad;
+static float history_block_width;
+
+static char input[100] = "";
+static float input_height;
+static float input_font_top_pad;
+static float input_block_width;
+
 static s64 input_cursor_index;
+static T_Interpolator input_cursor_blink_timer;
+static bool input_cursor_visible;
+static float input_cursor_activity;
 
 static float c_y0;
+static float c_y0_target;
 
 
 typedef enum console_openness {
@@ -37,23 +51,8 @@ typedef enum console_openness {
 static Console_Openness console_state;
 
 
-void init_console(Plug_State *state) {
-    // Get resources.
-    drawer = &state->quad_drawer;
-    font_input = hash_table_get(&state->font_table, "medium");
-    font_output = hash_table_get(&state->font_table, "small");
-
-
-
-    c_y0 = state->window.height;
-    console_state = FULLY_OPEN;
-
-    // Testing.
-    // history[0] = CSTR("Hello world!\n");
-    // history[1] = CSTR("This is just a test!\n");
-    // history[2] = CSTR("Of console history\n");
-
-    history_length = 0;
+float console_max_height(Window_Info *window){
+    return window->height * FULL_OPEN_PERCENT; 
 }
 
 void console_start_input_if_not(Text_Input *text_i) {
@@ -65,7 +64,7 @@ void console_start_input_if_not(Text_Input *text_i) {
         text_i->capacity = 100;
         text_i->length = strlen(input);
         text_i->write_index = text_i->length;
-        printf("Unknown SWITCH.\n");
+        // printf("SWITCH.\n");
     }
 }
 
@@ -78,8 +77,47 @@ void console_stop_input(Text_Input *text_i) {
     text_i->write_index = 0;
 }
 
-void console_update(Window_Info *window, Events_Info *events, Time_Data *t) {
 
+void init_console(Plug_State *state) {
+    // Get resources.
+    drawer = &state->quad_drawer;
+
+    // Load needed font.
+    u8* font_data = read_file_into_buffer("res/font/Consolas-Regular.ttf", NULL, &std_allocator);
+    font_input = font_bake(font_data, 18.0f);
+    font_output = font_bake(font_data, 16.0f);
+    free(font_data);
+
+    // @Important: For metrics we assume that fonts are monospaced!
+    // Set input metrics.
+    input_font_top_pad = font_input.line_height * 0.4f;
+    input_height = font_input.line_height + input_font_top_pad;
+    input_block_width = font_input.chars[(s32)' ' - font_input.first_char_code].xadvance;
+
+    // Set history height.
+    history_font_top_pad = font_output.line_height * 0.2f;
+    history_block_width = font_output.chars[(s32)' ' - font_input.first_char_code].xadvance;
+
+    // Cursor.
+    input_cursor_blink_timer = ti_make(800);
+    input_cursor_visible = true;
+    input_cursor_activity = 0.0f;
+
+    // Console positions and state.
+    c_y0 = state->window.height;
+    console_state = OPEN;
+    console_start_input_if_not(&state->events.text_input);
+
+    // @Temporary: Testing history.
+    history[0] = CSTR("Hello world!\n");
+    history[1] = CSTR("This is just a test!");
+    history[2] = CSTR("Of console history");
+
+    history_length = 3;
+}
+
+void console_update(Window_Info *window, Events_Info *events, Time_Info *t) {
+    // Checking for input to change console's state.
     if (pressed(SDLK_F11)) {
         if (hold(SDLK_LSHIFT)) {
             if (console_state == FULLY_OPEN) {
@@ -102,33 +140,47 @@ void console_update(Window_Info *window, Events_Info *events, Time_Data *t) {
         }
     }
 
-    printf("Unknown Error debug.\n");
+    // Lerping console if it's y0 doesn't match it's state (target y0).
     switch(console_state) {
         case CLOSED:
-            if (c_y0 < window->height)
-                c_y0 = c_y0 + CONSOLE_SPEED * t->delta_time;
+            c_y0_target = window->height;
             break;
         case OPEN:
-            if (c_y0 > window->height - HEIGHT * 0.4f)
-                c_y0 = c_y0 - CONSOLE_SPEED * t->delta_time;
-            else if (c_y0 < window->height - HEIGHT * 0.4f)
-                c_y0 = c_y0 + CONSOLE_SPEED * t->delta_time;
+            c_y0_target = window->height * (1.0f - OPEN_PERCENT);
             break;
         case FULLY_OPEN:
-            if (c_y0 > window->height - HEIGHT)
-                c_y0 = c_y0 - CONSOLE_SPEED * t->delta_time;
+            c_y0_target = window->height * (1.0f - FULL_OPEN_PERCENT);
             break;
         default:
             printf_err("Unknown console state.\n");
             break;
     }
 
-    c_y0 = clamp(c_y0, window->height - HEIGHT, window->height);
+    c_y0 = lerp(c_y0, c_y0_target, 0.01f * t->delta_time_milliseconds);
 
-    // Updating cursor index.
+    // Updating cursor index. @Refactor: Make it depends on console states.
     if (SDL_IsTextInputActive()) {
         input_cursor_index = events->text_input.write_index;
     }
+
+    ti_update(&input_cursor_blink_timer, t->delta_time_milliseconds);
+    
+    if (events->text_input.write_moved) {
+        ti_reset(&input_cursor_blink_timer);
+        input_cursor_visible = true;
+        input_cursor_activity += 0.03f;
+    } else {
+        input_cursor_activity -= 0.15f * t->delta_time;
+    }
+    input_cursor_activity = clamp(input_cursor_activity, 0.0f, 0.25f);
+
+
+    if (ti_is_complete(&input_cursor_blink_timer)) {
+        ti_reset(&input_cursor_blink_timer);
+        input_cursor_visible = !input_cursor_visible;
+    }
+
+
 }
 
 void console_draw(Window_Info *window) {
@@ -139,27 +191,30 @@ void console_draw(Window_Info *window) {
     draw_begin(drawer);
 
     // Output.
-    draw_quad(vec2f_make(0, c_y0 + INPUT_HEIGHT), vec2f_make(window->width, c_y0 + HEIGHT), vec4f_make(0.10f, 0.12f, 0.24f, 0.98f), NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
+    draw_quad(vec2f_make(0, c_y0 + input_height), vec2f_make(window->width, c_y0 + console_max_height(window)), vec4f_make(0.10f, 0.12f, 0.24f, 0.98f), NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
 
     // Input.
-    draw_quad(vec2f_make(0, c_y0), vec2f_make(window->width, c_y0 + INPUT_HEIGHT), vec4f_make(0.18f, 0.18f, 0.35f, 0.98f), NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
+    draw_quad(vec2f_make(0, c_y0), vec2f_make(window->width, c_y0 + input_height), vec4f_make(0.18f, 0.18f, 0.35f, 0.98f), NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
     
-    float pad = 10;
-    float line_height = 20;
-    float cursor_pos_x = text_size(input, input_cursor_index, font_input).x;
-    Vec2f cursor = vec2f_make(10, 16);
-
     // Draw text of the history.
+    Vec2f history_draw_origin = vec2f_make(TEXT_PAD, c_y0 + input_height);
     for (s64 i = 1; i <= history_length; i++) {
-        // draw_text(history[history_length - i].data, vec2f_make(pad, c_y0 + INPUT_HEIGHT + line_height * i), VEC4F_WHITE, font_output, 1, NULL);
+        history_draw_origin.y += font_output.line_height;
+        draw_text(history[history_length - i].data, history_draw_origin, VEC4F_WHITE, &font_output, 1, NULL);
+        history_draw_origin.y += history_font_top_pad;
+    }
+    
+    
+    // Draw input cursor.
+    
+    if (input_cursor_visible) {
+        Vec4f color = vec4f_lerp(vec4f_make(0.58f, 0.58f, 0.85f, 0.90f), VEC4F_YELLOW, input_cursor_activity);
+        draw_quad(vec2f_make(TEXT_PAD + input_cursor_index * input_block_width, c_y0 + font_input.line_gap), vec2f_make(TEXT_PAD + (input_cursor_index + 1) * input_block_width, c_y0 + input_height - input_font_top_pad * 0.5f), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
     }
 
-    // Draw input text.
-    draw_text(input, vec2f_make(pad + 2, c_y0 + line_height - 2), VEC4F_BLACK, font_input, 1, NULL);
-    draw_text(input, vec2f_make(pad, c_y0 + line_height), VEC4F_WHITE, font_input, 1, NULL);
 
-    // Draw input cursor.
-    draw_quad(vec2f_make(pad + cursor_pos_x, c_y0 + line_height - cursor.y), vec2f_make(pad + cursor_pos_x + cursor.x, c_y0 + line_height), vec4f_make(0.58f, 0.58f, 0.85f, 0.96f), NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
+    // Draw input text.
+    draw_text(input, vec2f_make(TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_CYAN, &font_input, 1, NULL);
 
     draw_end();
 }

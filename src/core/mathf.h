@@ -172,6 +172,11 @@ static inline Vec4f vec4f_make(float x, float y, float z, float w) {
 
 #define vec4f_print(v1)                     printf(#v1 " = ( % 2.2f , % 2.2f , % 2.2f , % 2.2f )\n", v1.x, v1.y, v1.z, v1.w)
 
+
+static inline Vec4f vec4f_lerp(Vec4f v1, Vec4f v2, float t) {
+    return vec4f_make(lerp(v1.x, v2.x, t), lerp(v1.y, v2.y, t), lerp(v1.z, v2.z, t), lerp(v1.w, v2.w, t));
+}
+
 // Matrix4f
 
 typedef struct matrix4f {

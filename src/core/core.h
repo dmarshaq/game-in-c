@@ -86,7 +86,7 @@ void  allocator_free(Allocator *allocator, void *ptr);
 /**
  * Time.
  */
-typedef struct time_data {
+typedef struct time_info {
     u32 current_time;
     u32 delta_time_milliseconds;
     float delta_time;
@@ -97,7 +97,7 @@ typedef struct time_data {
     u32 last_update_time;
     u32 accumilated_time;
     u32 update_step_time;
-} Time_Data;
+} Time_Info;
 
 
 typedef struct time_interpolator {
