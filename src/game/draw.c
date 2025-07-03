@@ -53,9 +53,7 @@ void draw_grid(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer) {
         vertex_buffer_append_data(buffer, quad_data, VERTICIES_PER_QUAD * 9);
 }
 
-void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *font, u32 unit_scale, Vertex_Buffer *buffer) {
-    u64 text_length = strlen(text);
-
+void draw_text(String text, Vec2f current_point, Vec4f color, Font_Baked *font, u32 unit_scale, Vertex_Buffer *buffer) {
     // Scale and adjust current_point.
     current_point = vec2f_multi_constant(current_point, (float)unit_scale);
     float origin_x = current_point.x;
@@ -66,16 +64,16 @@ void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *f
     u16 width, height;
     stbtt_bakedchar *c;
 
-    for (u64 i = 0; i < text_length; i++) {
+    for (s64 i = 0; i < text.length; i++) {
         // @Incomplete: Handle special characters / symbols.
-        if (text[i] == '\n') {
+        if (text.data[i] == '\n') {
             current_point.x = origin_x;
             current_point.y -= (float)font->line_height;
             continue;
         }
 
         // Character drawing.
-        font_char_index = (s32)text[i] - font->first_char_code;
+        font_char_index = (s32)text.data[i] - font->first_char_code;
         if (font_char_index < font->chars_count) {
             c = &font->chars[font_char_index];
             width  = font->chars[font_char_index].x1 - font->chars[font_char_index].x0;
@@ -88,7 +86,7 @@ void draw_text(const char *text, Vec2f current_point, Vec4f color, Font_Baked *f
     }
 }
 
-Vec2f text_size(const char *text, s64 length, Font_Baked *font) {
+Vec2f text_size(String text, Font_Baked *font) {
     // Result.
     Vec2f result = VEC2F_ORIGIN;
 
@@ -100,9 +98,9 @@ Vec2f text_size(const char *text, s64 length, Font_Baked *font) {
     // Text rendering variables.
     s32 font_char_index;
 
-    for (u64 i = 0; i < length; i++) {
+    for (s64 i = 0; i < text.length; i++) {
         // Handle special characters / symbols.
-        if (text[i] == '\n') {
+        if (text.data[i] == '\n') {
             result.y += (float)font->line_height;
             if (result.x < current_point.x)
                 result.x = current_point.x;
@@ -113,7 +111,7 @@ Vec2f text_size(const char *text, s64 length, Font_Baked *font) {
         }
 
         // Character iterating.
-        font_char_index = (s32)text[i] - font->first_char_code;
+        font_char_index = (s32)text.data[i] - font->first_char_code;
         if (font_char_index < font->chars_count) {
 
             current_point.x += font->chars[font_char_index].xadvance;

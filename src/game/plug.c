@@ -295,7 +295,7 @@ void ui_draw_text_centered(const char *text, Vec2f position, Vec2f size, Vec4f c
     if (text == NULL)
         return;
 
-    Vec2f t_size = text_size(text, strlen(text), state->ui.font);
+    Vec2f t_size = text_size(CSTR(text), state->ui.font);
 
     // Following ui_draw_text centered calculations are for the system where y axis points up, and x axis to the right.
     ui_draw_text(text, vec2f_make(position.x + (size.x - t_size.x) * 0.5f, position.y + (size.y + t_size.y) * 0.5f), color);
@@ -539,9 +539,10 @@ bool ui_input_field(Vec2f size, char *buffer, s32 buffer_size, s32 id) {
 
 
 leave_draw:
-     Vec2f t_size = text_size(buffer, text_i->length, state->ui.font);
+     Vec2f t_size = text_size(CSTR(buffer), state->ui.font);
      ui_draw_rect(state->ui.cursor, size, res_color); // Input field.
-     ui_draw_rect(vec2f_make(state->ui.cursor.x + text_size(buffer, text_i->write_index, state->ui.font).x, state->ui.cursor.y), vec2f_make(10, size.y), res_bar_color); // Input bar.
+    // Please rework
+     // ui_draw_rect(vec2f_make(state->ui.cursor.x + text_size(CSTR(buffer), text_i->write_index, state->ui.font).x, state->ui.cursor.y), vec2f_make(10, size.y), res_bar_color); // Input bar.
      ui_draw_text(buffer, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text);
 
      ui_end_element();
@@ -553,7 +554,7 @@ leave_draw:
 
 
 void ui_text(const char *text) {
-    Vec2f t_size = text_size(text, strlen(text), state->ui.font);
+    Vec2f t_size = text_size(CSTR(text), state->ui.font);
     ui_cursor_advance(t_size);
     ui_set_element_size(t_size);
     ui_draw_text(text, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + t_size.y), state->ui.theme.text);
@@ -573,16 +574,6 @@ void ui_text(const char *text) {
 /**
  * Console.
  */
-
-#define CONSOLE_INPUT_BUFFER_SIZE 64
-#define CONSOLE_OUTPUT_BUFFER_SIZE 512
-
-typedef struct dev_console {
-    bool enabled;
-    char input[CONSOLE_INPUT_BUFFER_SIZE];
-    char output[CONSOLE_OUTPUT_BUFFER_SIZE];
-    
-} Dev_Console;
 
 // void cprintf()
 // 
@@ -1997,8 +1988,6 @@ void plug_load(Plug_State *s) {
     // Font loading.
     u8* font_data = read_file_into_buffer("res/font/font.ttf", NULL, &std_allocator);
 
-
-
     Font_Baked font_baked_medium = font_bake(font_data, 20.0f);
     hash_table_put(&state->font_table, font_baked_medium, "medium");
 
@@ -2006,7 +1995,7 @@ void plug_load(Plug_State *s) {
     hash_table_put(&state->font_table, font_baked_small, "small");
 
     free(font_data);
-
+    
 
     // Init console.
     init_console(state);
@@ -2073,6 +2062,8 @@ void plug_update(Plug_State *s) {
 
 void plug_unload(Plug_State *s) {
     state->t.delta_time_multi = 0.0f;
+
+    console_free();
 
     shader_unload(hash_table_get(&state->shader_table, "quad"));
     shader_unload(hash_table_get(&state->shader_table, "grid"));

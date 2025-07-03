@@ -21,9 +21,11 @@ static const float SPEED = 100;
 static const float OPEN_PERCENT = 0.4f;
 static const float FULL_OPEN_PERCENT = 0.8f;
 static const float TEXT_PAD = 10;
+static const s64 HISTORY_BUFFER_SIZE = 1024;
+static const s64 HISTORY_MAX_STRINGS = 64;
 
 
-static String history[32];
+static String history[64];
 static s64 history_length;
 static float history_font_top_pad;
 static float history_block_width;
@@ -40,6 +42,10 @@ static float input_cursor_activity;
 
 static float c_y0;
 static float c_y0_target;
+
+
+static Arena_Allocator history_allocator;
+
 
 
 typedef enum console_openness {
@@ -108,12 +114,10 @@ void init_console(Plug_State *state) {
     console_state = OPEN;
     console_start_input_if_not(&state->events.text_input);
 
-    // @Temporary: Testing history.
-    history[0] = CSTR("Hello world!\n");
-    history[1] = CSTR("This is just a test!");
-    history[2] = CSTR("Of console history");
 
-    history_length = 3;
+    // Initing allocator for history. @Temporary: Later should done using looped array.
+    history_allocator = arena_make(HISTORY_BUFFER_SIZE);
+    history_length = 0;
 }
 
 void console_update(Window_Info *window, Events_Info *events, Time_Info *t) {
@@ -160,9 +164,20 @@ void console_update(Window_Info *window, Events_Info *events, Time_Info *t) {
 
     // Updating cursor index. @Refactor: Make it depends on console states.
     if (SDL_IsTextInputActive()) {
+        if (pressed(SDLK_RETURN)) {
+            // Flush input if pressed here.
+            console_add(events->text_input.buffer, events->text_input.length);
+
+            // Clearing text input buffer.
+            events->text_input.buffer[0] = '\0';
+            events->text_input.length = 0;
+            events->text_input.write_index = 0;
+        }
+
         input_cursor_index = events->text_input.write_index;
     }
 
+    // Cursor styling.
     ti_update(&input_cursor_blink_timer, t->delta_time_milliseconds);
     
     if (events->text_input.write_moved) {
@@ -179,7 +194,6 @@ void console_update(Window_Info *window, Events_Info *events, Time_Info *t) {
         ti_reset(&input_cursor_blink_timer);
         input_cursor_visible = !input_cursor_visible;
     }
-
 
 }
 
@@ -200,7 +214,7 @@ void console_draw(Window_Info *window) {
     Vec2f history_draw_origin = vec2f_make(TEXT_PAD, c_y0 + input_height);
     for (s64 i = 1; i <= history_length; i++) {
         history_draw_origin.y += font_output.line_height;
-        draw_text(history[history_length - i].data, history_draw_origin, VEC4F_WHITE, &font_output, 1, NULL);
+        draw_text(history[history_length - i], history_draw_origin, VEC4F_WHITE, &font_output, 1, NULL);
         history_draw_origin.y += history_font_top_pad;
     }
     
@@ -214,9 +228,38 @@ void console_draw(Window_Info *window) {
 
 
     // Draw input text.
-    draw_text(input, vec2f_make(TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_CYAN, &font_input, 1, NULL);
+    draw_text(CSTR(input), vec2f_make(TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_CYAN, &font_input, 1, NULL);
 
     draw_end();
+}
+
+
+
+void console_free() {
+    arena_destroy(&history_allocator);
+}
+
+
+
+void console_add(char *buffer, s64 length) {
+    if (length <= 0) {
+        return;
+    }
+
+    if (history_length < HISTORY_MAX_STRINGS) {
+        char *ptr = allocator_alloc(&history_allocator, length);
+        if (ptr == NULL) {
+            printf_err("Console's buffer is out of memory, cannot add more strings.\n");
+            return;
+        }
+        
+        memcpy(ptr, buffer, length);
+
+        history[history_length] = STR(length, ptr);
+        history_length++;
+    } else {
+        printf_err("Max console string limit has been reached, cannot add more strings.\n");
+    }
 }
 
 

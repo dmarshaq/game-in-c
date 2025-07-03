@@ -17,6 +17,9 @@ void console_update(Window_Info *window, Events_Info *events, Time_Info *t);
 
 void console_draw(Window_Info *window);
 
+void console_free();
+
+void console_add(char *buffer, s64 length);
 
 
 
