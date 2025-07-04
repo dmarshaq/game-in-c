@@ -1,6 +1,7 @@
 #include "core/str.h"
 #include "core/core.h"
-#include "core/type.h"
+#include"core/type.h"
+#include <ctype.h>
 #include <string.h>
 #include <stdbool.h>
 
@@ -49,6 +50,48 @@ s64 str_find_char_right(String str, char symbol) {
 
     return -1;
 }
+
+s64 str_find_non_whitespace_left(String str) {
+    for (s64 i = 0; i < str.length; i++) {
+        if (!isspace(str.data[i])) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+s64 str_find_non_whitespace_right(String str) {
+    for (s64 i = str.length - 1; i > -1; i--) {
+        if (!isspace(str.data[i])) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+
+s64 str_find_whitespace_left(String str) {
+    for (s64 i = 0; i < str.length; i++) {
+        if (isspace(str.data[i])) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+s64 str_find_whitespace_right(String str) {
+    for (s64 i = str.length - 1; i > -1; i--) {
+        if (isspace(str.data[i])) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 
 void str_copy(String src, String dest) {
     (void)memcpy(src.data, dest.data, src.length);

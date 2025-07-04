@@ -56,6 +56,14 @@ s64 str_find_char_left(String str, char symbol);
  */
 s64 str_find_char_right(String str, char symbol);
 
+s64 str_find_non_whitespace_left(String str);
+
+s64 str_find_non_whitespace_right(String str);
+
+s64 str_find_whitespace_left(String str);
+
+s64 str_find_whitespace_right(String str);
+
 /**
  * Copies contents of the src string into dest string.
  * Doesn't resize destination string.
@@ -68,6 +76,8 @@ void str_copy(String src, String dest);
  * @Important: buffer should have enough space to hold src data!
  */
 void str_copy_buffer(String src, void *buffer);
+
+
 
 
 
