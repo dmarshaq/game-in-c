@@ -12,6 +12,7 @@ void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec
 void draw_grid(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer);
 void draw_text(String text, Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale, Vertex_Buffer *buffer);
 Vec2f text_size(String text, Font_Baked *font);
+float text_size_y(String text, Font_Baked *font);
 void draw_line(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer);
 void draw_dot(Vec2f position, Vec4f color, Camera *camera, Vertex_Buffer *buffer);
 

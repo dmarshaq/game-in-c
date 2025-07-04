@@ -109,7 +109,6 @@ void ui_pop_frame() {
 void ui_init() {
     state->ui.cursor = vec2f_make(0, 0);
     state->ui.frame_stack = array_list_make(UI_Frame, 8, &std_allocator); // Maybe replace with the custom defined arena allocator later. @Leak.
-    ui_push_frame(0, 0, state->window.width, state->window.height);
 
     state->ui.x_axis = UI_ALIGN_OPPOSITE;
     state->ui.y_axis = UI_ALIGN_OPPOSITE;
@@ -223,8 +222,11 @@ void ui_draw_rect(Vec2f position, Vec2f size, Vec4f color) {
     ui_cursor_advance(vec2f_make(width, height));\
     ui_set_element_size(vec2f_make(width, height))
 
-#define UI_BEGIN()\
-    ui_cursor_reset()\
+#define UI_WINDOW(code)\
+    ui_push_frame(0, 0, state->window.width, state->window.height);\
+    ui_cursor_reset();\
+    code\
+    ui_pop_frame()\
 
     
 
@@ -1733,41 +1735,42 @@ void game_draw() {
 
     state->ui.x_axis = UI_ALIGN_OPPOSITE;
     state->ui.y_axis = UI_ALIGN_DEFAULT;
-    UI_BEGIN();
-
-    UI_FRAME(220, 120, 
-        UI_FRAME(120, 120, 
-            if (UI_BUTTON(vec2f_make(120, 80), "Spawn box")) {
-                spawn_box(VEC2F_ORIGIN, vec4f_make(randf(), randf(), randf(), 0.4f));
-            }
-            if (UI_BUTTON(vec2f_make(120, 40), "Pop box")) {
-                for (s32 i = MAX_BOXES - 1; i > -1; i--) {
-                    if (!state->boxes[i].destroyed) {
-                        state->boxes[i].p_box.bound_box.dimensions.x = 0.0f;
-                        state->boxes[i].destroyed = true;
-                        break;
-                    }   
+    UI_WINDOW(
+        UI_FRAME(220, 120, 
+            UI_FRAME(120, 120, 
+                if (UI_BUTTON(vec2f_make(120, 80), "Spawn box")) {
+                    spawn_box(VEC2F_ORIGIN, vec4f_make(randf(), randf(), randf(), 0.4f));
                 }
-            }
-        );
-        
-        ui_sameline();
-
-        UI_FRAME(100, 120, 
-            for (s32 i = 0; i < 1; i++) {
-                ui_set_prefix(i);
-                if (UI_BUTTON(vec2f_make(100, 40), "Menu")) {
-                    state->gs = MENU;
+                if (UI_BUTTON(vec2f_make(120, 40), "Pop box")) {
+                    for (s32 i = MAX_BOXES - 1; i > -1; i--) {
+                        if (!state->boxes[i].destroyed) {
+                            state->boxes[i].p_box.bound_box.dimensions.x = 0.0f;
+                            state->boxes[i].destroyed = true;
+                            break;
+                        }   
+                    }
                 }
-            }
-            UI_SLIDER_FLOAT(vec2f_make(100, 40), &slider_val, -0.0f, 1.0f);
-            UI_SLIDER_INT(vec2f_make(100, 40), &slider_int, -1, 12942);
-        );
-        
+            );
+            
+            ui_sameline();
 
-        // UI_SLIDER_FLOAT(vec2f_make(220, 40), &slider_val, -2.0f, 2.0f);
-        // UI_SLIDER_FLOAT(vec2f_make(220, 40), &slider_val, -4.0f, 4.0f);
+            UI_FRAME(100, 120, 
+                for (s32 i = 0; i < 1; i++) {
+                    ui_set_prefix(i);
+                    if (UI_BUTTON(vec2f_make(100, 40), "Menu")) {
+                        state->gs = MENU;
+                    }
+                }
+                UI_SLIDER_FLOAT(vec2f_make(100, 40), &slider_val, -0.0f, 1.0f);
+                UI_SLIDER_INT(vec2f_make(100, 40), &slider_int, -1, 12942);
+            );
+            
+
+            // UI_SLIDER_FLOAT(vec2f_make(220, 40), &slider_val, -2.0f, 2.0f);
+            // UI_SLIDER_FLOAT(vec2f_make(220, 40), &slider_val, -4.0f, 4.0f);
+        );
     );
+
 
     
 
@@ -1791,16 +1794,15 @@ void game_draw() {
     state->ui.x_axis = UI_ALIGN_DEFAULT;
     state->ui.y_axis = UI_ALIGN_OPPOSITE;
 
-    UI_BEGIN();
-    
-    // if (UI_INPUT_FIELD(vec2f_make(500, 40), text_input_buffer, 100)) {
-    //     printf("%s\n", text_input_buffer);
-    //     text_input_buffer[0] = '\0';
-    //     state->events.text_input.write_index = 0;
-    //     state->events.text_input.length = 0;
-    // }
-    ui_text(info_buffer);
-    
+    UI_WINDOW(
+        // if (UI_INPUT_FIELD(vec2f_make(500, 40), text_input_buffer, 100)) {
+        //     printf("%s\n", text_input_buffer);
+        //     text_input_buffer[0] = '\0';
+        //     state->events.text_input.write_index = 0;
+        //     state->events.text_input.length = 0;
+        // }
+        ui_text(info_buffer);
+    );
 
 
 
@@ -1850,21 +1852,19 @@ void menu_draw() {
     state->ui.x_axis = UI_ALIGN_DEFAULT;
     state->ui.y_axis = UI_ALIGN_OPPOSITE;
 
-    UI_BEGIN();
-    
-    UI_FRAME(state->window.width, 50,
-        if (UI_BUTTON(vec2f_make(100, 50), "Go Back")) {
-            state->gs = PLAY;
-        }
+    UI_WINDOW(
+        UI_FRAME(state->window.width, 50,
+            if (UI_BUTTON(vec2f_make(100, 50), "Go Back")) {
+                state->gs = PLAY;
+            }
+        );
     );
-
 
     state->ui.y_axis = UI_ALIGN_DEFAULT;
 
-    UI_BEGIN();
-
-    ui_text("Menu");
-    
+    UI_WINDOW(
+        ui_text("Menu");
+    );
 
     draw_end();
     // // Pushing new origin.

@@ -1,4 +1,5 @@
 #include "game/console.h"
+#include "draw.h"
 #include "game/plug.h"
 #include "game/draw.h"
 #include "core/graphics.h"
@@ -8,6 +9,7 @@
 #include "core/file.h"
 #include <SDL2/SDL_keyboard.h>
 #include <SDL2/SDL_keycode.h>
+#include <stdio.h>
 
 
 static Quad_Drawer *drawer;
@@ -43,8 +45,11 @@ static float input_cursor_activity;
 static float c_y0;
 static float c_y0_target;
 
+static float c_x0;
+static float c_x1;
 
-static Arena_Allocator history_allocator;
+
+static Arena_Allocator history_arena;
 
 
 
@@ -67,10 +72,9 @@ void console_start_input_if_not(Text_Input *text_i) {
         SDL_StartTextInput();
 
         text_i->buffer = input;
-        text_i->capacity = 100;
+        text_i->capacity = 99; // @Important: The last symbol is reserved for the new line in the input.
         text_i->length = strlen(input);
         text_i->write_index = text_i->length;
-        // printf("SWITCH.\n");
     }
 }
 
@@ -116,11 +120,22 @@ void init_console(Plug_State *state) {
 
 
     // Initing allocator for history. @Temporary: Later should done using looped array.
-    history_allocator = arena_make(HISTORY_BUFFER_SIZE);
+    history_arena = arena_make(HISTORY_BUFFER_SIZE);
     history_length = 0;
+
+
+    // Test of multiline output.
+    String test = STR_BUFFER("This is just a test of a ...\nMultiline console output!\n    It should work fine\n");
+    console_add(test.data, test.length);
+
+    cprintf("Hello world!\n");
+    cprintf("Wait is this actually cool strings? %4d\n", 103);
 }
 
 void console_update(Window_Info *window, Events_Info *events, Time_Info *t) {
+    c_x0 = 0.1f * window->width;
+    c_x1 = 0.9f * window->width;
+
     // Checking for input to change console's state.
     if (pressed(SDLK_F11)) {
         if (hold(SDLK_LSHIFT)) {
@@ -165,8 +180,9 @@ void console_update(Window_Info *window, Events_Info *events, Time_Info *t) {
     // Updating cursor index. @Refactor: Make it depends on console states.
     if (SDL_IsTextInputActive()) {
         if (pressed(SDLK_RETURN)) {
-            // Flush input if pressed here.
-            console_add(events->text_input.buffer, events->text_input.length);
+            // Add a new line symbol and flush input if return key was pressed.
+            events->text_input.buffer[events->text_input.length] = '\n';
+            console_add(events->text_input.buffer, events->text_input.length + 1);
 
             // Clearing text input buffer.
             events->text_input.buffer[0] = '\0';
@@ -205,30 +221,31 @@ void console_draw(Window_Info *window) {
     draw_begin(drawer);
 
     // Output.
-    draw_quad(vec2f_make(0, c_y0 + input_height), vec2f_make(window->width, c_y0 + console_max_height(window)), vec4f_make(0.10f, 0.12f, 0.24f, 0.98f), NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
+    draw_quad(vec2f_make(c_x0, c_y0 + input_height), vec2f_make(c_x1, c_y0 + console_max_height(window)), vec4f_make(0.10f, 0.12f, 0.24f, 0.98f), NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
 
     // Input.
-    draw_quad(vec2f_make(0, c_y0), vec2f_make(window->width, c_y0 + input_height), vec4f_make(0.18f, 0.18f, 0.35f, 0.98f), NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
+    draw_quad(vec2f_make(c_x0, c_y0), vec2f_make(c_x1, c_y0 + input_height), vec4f_make(0.18f, 0.18f, 0.35f, 0.98f), NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
     
     // Draw text of the history.
-    Vec2f history_draw_origin = vec2f_make(TEXT_PAD, c_y0 + input_height);
+    Vec2f history_draw_origin = vec2f_make(c_x0 + TEXT_PAD, c_y0 + input_height);
+    String str;
     for (s64 i = 1; i <= history_length; i++) {
-        history_draw_origin.y += font_output.line_height;
-        draw_text(history[history_length - i], history_draw_origin, VEC4F_WHITE, &font_output, 1, NULL);
-        history_draw_origin.y += history_font_top_pad;
+        str = history[history_length - i];
+        history_draw_origin.y += text_size_y(str, &font_output); 
+        draw_text(str, history_draw_origin, VEC4F_WHITE, &font_output, 1, NULL);
+        // history_draw_origin.y += history_font_top_pad;
     }
     
     
     // Draw input cursor.
-    
     if (input_cursor_visible) {
         Vec4f color = vec4f_lerp(vec4f_make(0.58f, 0.58f, 0.85f, 0.90f), VEC4F_YELLOW, input_cursor_activity);
-        draw_quad(vec2f_make(TEXT_PAD + input_cursor_index * input_block_width, c_y0 + font_input.line_gap), vec2f_make(TEXT_PAD + (input_cursor_index + 1) * input_block_width, c_y0 + input_height - input_font_top_pad * 0.5f), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
+        draw_quad(vec2f_make(c_x0 + TEXT_PAD + input_cursor_index * input_block_width, c_y0 + font_input.line_gap), vec2f_make(c_x0 + TEXT_PAD + (input_cursor_index + 1) * input_block_width, c_y0 + input_height - input_font_top_pad * 0.5f), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
     }
 
 
     // Draw input text.
-    draw_text(CSTR(input), vec2f_make(TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_CYAN, &font_input, 1, NULL);
+    draw_text(CSTR(input), vec2f_make(c_x0 + TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_CYAN, &font_input, 1, NULL);
 
     draw_end();
 }
@@ -236,30 +253,56 @@ void console_draw(Window_Info *window) {
 
 
 void console_free() {
-    arena_destroy(&history_allocator);
+    arena_destroy(&history_arena);
 }
 
 
 
 void console_add(char *buffer, s64 length) {
-    if (length <= 0) {
-        return;
-    }
-
     if (history_length < HISTORY_MAX_STRINGS) {
-        char *ptr = allocator_alloc(&history_allocator, length);
+        char *ptr = allocator_alloc(&history_arena, length);
         if (ptr == NULL) {
             printf_err("Console's buffer is out of memory, cannot add more strings.\n");
             return;
         }
-        
+
         memcpy(ptr, buffer, length);
 
-        history[history_length] = STR(length, ptr);
-        history_length++;
+        // Following code will determine to either create a new String if previous was ended with '\n' or append to previous string if not. It is done to properly display messages if previous one wasn't ended with '\n'.
+        if (history_length > 0 && history[history_length - 1].data[history[history_length - 1].length - 1] != '\n') {
+            history[history_length - 1].length += length;
+        } else {
+            history[history_length] = STR(length, ptr);
+            history_length++;
+        }
+
     } else {
         printf_err("Max console string limit has been reached, cannot add more strings.\n");
     }
+}
+
+void cprintf(char *format, ...) {
+     va_list args;
+     va_start(args, format);
+
+     // Make a copy, because vsnprintf consumes args, so this will make consume only the copy.
+     va_list args_copy;
+     va_copy(args_copy, args);
+     s64 length = vsnprintf(NULL, 0, format, args_copy);
+     va_end(args_copy);
+
+     if (length < 0) {
+         printf_err("Failed to find formatted string length for console output.\n");
+         return;
+     }
+
+     // String formatted_str = STR(length + 1, (char[length]));
+     char buffer[length + 1];
+     vsnprintf(buffer, length + 1, format, args);
+
+     va_end(args);
+
+     console_add(buffer, length);
 }
 
 

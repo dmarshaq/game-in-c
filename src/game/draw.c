@@ -119,9 +119,33 @@ Vec2f text_size(String text, Font_Baked *font) {
     }
     
     // Since last line dimensions is not handled in the loop, it can be done here.
-    result.y += (float)font->line_height;
+    if (text.data[text.length - 1] != '\n') 
+        result.y += (float)font->line_height;
+
     if (result.x < current_point.x)
         result.x = current_point.x;
+
+    return result;
+}
+
+float text_size_y(String text, Font_Baked *font) {
+    // Result.
+    float result = 0;
+
+    // Text rendering variables.
+    s32 font_char_index;
+
+    for (s64 i = 0; i < text.length; i++) {
+        // Handle special characters / symbols.
+        if (text.data[i] == '\n') {
+            result += (float)font->line_height;
+            continue;
+        }
+    }
+    
+    // Since last line dimensions is not handled in the loop, it can be done here.
+    if (text.data[text.length - 1] != '\n') 
+        result += (float)font->line_height;
 
     return result;
 }

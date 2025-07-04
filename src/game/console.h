@@ -20,6 +20,7 @@ void console_draw(Window_Info *window);
 void console_free();
 
 void console_add(char *buffer, s64 length);
+void cprintf(char *format, ...);
 
 
 

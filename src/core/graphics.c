@@ -50,7 +50,7 @@ int init_sdl_gl() {
 
 Window_Info create_gl_window(const char *title, int x, int y, int width, int height) {
     // Create window.
-    SDL_Window *window = SDL_CreateWindow(title, x, y, width, height, SDL_WINDOW_OPENGL);
+    SDL_Window *window = SDL_CreateWindow(title, x, y, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     if (window == NULL) {
         printf_err("Window could not be created! SDL_Error: %s\n", SDL_GetError());
         return (Window_Info) { NULL, 0, 0 };

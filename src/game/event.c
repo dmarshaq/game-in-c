@@ -278,6 +278,11 @@ void handle_events(Events_Info *events, Window_Info *window, Time_Info *t) {
             case SDL_TEXTINPUT:
                 handle_text_input(events);
                 break;
+            case SDL_WINDOWEVENT:
+                if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+                    window->width = event.window.data1;
+                    window->height = event.window.data2;
+                } 
             default:
                 break;
         }
