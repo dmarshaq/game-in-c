@@ -235,6 +235,15 @@ void console_update(Window_Info *window, Events_Info *events, Time_Info *t) {
 
     // Updating cursor index. @Refactor: Make it depends on console states.
     if (SDL_IsTextInputActive()) {
+        if (hold(SDLK_TAB) && pressed (SDLK_UP)) {
+            console_log("Go up history.\n");
+        }
+
+        if (hold(SDLK_TAB) && pressed (SDLK_DOWN)) {
+            console_log("Go down history.\n");
+        }
+
+
         if (pressed(SDLK_RETURN)) {
             // Add a new line symbol and flush input if return key was pressed.
             console_command(STR(events->text_input.length, events->text_input.buffer));

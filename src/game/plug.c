@@ -1571,6 +1571,12 @@ void game_update() {
      */
 
 
+    // Test key repeat.
+    if (repeat(SDLK_z, state->t.delta_time_milliseconds)) {
+        printf("Key Z is repeated!\n");
+    }
+
+
     // Spawning box.
     if (state->events.mouse_input.right_pressed) {
         Vec2f pos = camera_screen_to_world(state->events.mouse_input.position, &state->main_camera, state->window.width, state->window.height);

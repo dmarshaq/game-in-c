@@ -1,4 +1,5 @@
 #include "core/input.h"
+#include "core/core.h"
 #include "core/type.h"
 #include "core/mathf.h"
 
@@ -9,6 +10,9 @@
 /**
  * Input.
  */
+
+static T_Interpolator key_timer = ti_make(450);
+static T_Interpolator key_repeat_timer = ti_make(30);
 
 static u8 *keyboard_state_old;
 static const u8 *keyboard_state_current;
@@ -38,6 +42,31 @@ bool pressed(SDL_KeyCode key) {
 
 bool unpressed(SDL_KeyCode key) {
     return *(keyboard_state_old + SDL_GetScancodeFromKey(key)) == 1 && *(keyboard_state_current + SDL_GetScancodeFromKey(key)) == 0;
+}
+
+bool repeat(SDL_KeyCode key, float dt_milliseconds) {
+    if (pressed(key)) {
+        ti_reset(&key_timer);
+        return true;
+    }
+
+    if (hold(key)) {
+        ti_update(&key_timer, dt_milliseconds);
+
+        if (ti_is_complete(&key_timer)) {
+
+            ti_update(&key_repeat_timer, dt_milliseconds);
+
+            if (ti_is_complete(&key_repeat_timer)) {
+
+                ti_reset(&key_repeat_timer);
+                return true;
+            }
+        }
+
+    }
+
+    return false;
 }
 
 

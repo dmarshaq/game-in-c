@@ -38,4 +38,10 @@ bool pressed(SDL_KeyCode key);
  */
 bool unpressed(SDL_KeyCode key);
 
+/**
+ * Retruns true if specfied key was just pressed and returns every repeat time interval if the key is still holding.
+ * Resets on specified key press.
+ */
+bool repeat(SDL_KeyCode key, float dt_milliseconds);
+
 #endif
