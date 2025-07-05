@@ -20,14 +20,14 @@ void console_draw(Window_Info *window);
 void console_free();
 
 /**
- * Adds contents of the buffer to the console.
+ * Prints message to the console.
  */
-void console_add(char *buffer, s64 length);
+void console_log(char *format, ...);
 
 /**
- * Prints formatted string to the console.
+ * Prints error message to the console.
  */
-void cprintf(char *format, ...);
+void console_error(char *format, ...);
 
 /**
  * Executes console command specified by the string.
