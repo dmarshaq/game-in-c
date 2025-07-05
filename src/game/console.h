@@ -19,8 +19,22 @@ void console_draw(Window_Info *window);
 
 void console_free();
 
+/**
+ * Adds contents of the buffer to the console.
+ */
 void console_add(char *buffer, s64 length);
+
+/**
+ * Prints formatted string to the console.
+ */
 void cprintf(char *format, ...);
+
+/**
+ * Executes console command specified by the string.
+ */
+void console_command(String str);
+
+void init_console_commands();
 
 
 

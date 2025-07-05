@@ -64,6 +64,20 @@ s64 str_find_whitespace_left(String str);
 
 s64 str_find_whitespace_right(String str);
 
+String str_eat_spaces(String str);
+
+String str_eat_until_space(String str);
+
+String str_get_until_space(String str);
+
+bool str_is_int(String str);
+
+bool str_is_float(String str);
+
+s64 str_parse_int(String str);
+
+float str_parse_float(String str);
+
 /**
  * Copies contents of the src string into dest string.
  * Doesn't resize destination string.

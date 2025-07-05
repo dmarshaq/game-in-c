@@ -240,7 +240,7 @@ bool ui_is_hover(Vec2f size) {
     return value_inside_domain(state->ui.cursor.x, state->ui.cursor.x + size.x, state->events.mouse_input.position.x) && value_inside_domain(state->ui.cursor.y, state->ui.cursor.y + size.y, state->events.mouse_input.position.y);
 }
 
-void ui_draw_text(const char *text, Vec2f position, Vec4f color) {
+void ui_draw_text(char *text, Vec2f position, Vec4f color) {
     u64 text_length = strlen(text);
 
     // Scale and adjust current_point.
@@ -293,7 +293,7 @@ void ui_draw_text(const char *text, Vec2f position, Vec4f color) {
     }
 }
 
-void ui_draw_text_centered(const char *text, Vec2f position, Vec2f size, Vec4f color) {
+void ui_draw_text_centered(char *text, Vec2f position, Vec2f size, Vec4f color) {
     if (text == NULL)
         return;
 
@@ -308,7 +308,7 @@ void ui_draw_text_centered(const char *text, Vec2f position, Vec2f size, Vec4f c
 
 #define UI_BUTTON(size, text) ui_button(size, text, __LINE__)
 
-bool ui_button(Vec2f size, const char *text, s32 id) {
+bool ui_button(Vec2f size, char *text, s32 id) {
     ui_cursor_advance(size);
     ui_set_element_size(size);
 
@@ -555,7 +555,7 @@ leave_draw:
 
 
 
-void ui_text(const char *text) {
+void ui_text(char *text) {
     Vec2f t_size = text_size(CSTR(text), state->ui.font);
     ui_cursor_advance(t_size);
     ui_set_element_size(t_size);
