@@ -18,11 +18,8 @@ typedef struct mouse_input {
 } Mouse_Input;
 
 typedef struct text_input {
-    char *buffer;
-    s64 capacity;
-    s64 length;
-    s64 write_index;
-    bool write_moved;
+    bool text_inputted;
+    char buffer[32];    // Size of SDL text input buffer.
 } Text_Input;
 
 typedef struct events_info {
@@ -34,5 +31,14 @@ typedef struct events_info {
 void init_events_handler(Events_Info *events);
 
 void handle_events(Events_Info *events, Window_Info *window, Time_Info *t);
+
+
+/**
+ * This function will insert input text (if any) to the buffer specified.
+ * Starting at write index it's going to shift everything until length to the right and insert the text.
+ * If inserted length is greater than buffer's capacity it will stop and return 0.
+ * It will return the amount of bytes inserted.
+ */
+s64 insert_input_text(char *buffer, s64 capacity, s64 length, s64 write_index, Text_Input *text_input);
 
 #endif

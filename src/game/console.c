@@ -23,7 +23,9 @@ static const float OPEN_PERCENT = 0.4f;
 static const float FULL_OPEN_PERCENT = 0.8f;
 static const float TEXT_PAD = 10;
 static const s64 HISTORY_BUFFER_SIZE = 10000;
-static const s64 HISTORY_MAX_STRINGS = 128;
+
+#define HISTORY_MAX_MESSAGES  128
+#define INPUT_BUFFER_SIZE     100
 
 typedef enum history_message_type : u8 {
     MESSAGE_USER        = 0,
@@ -42,19 +44,25 @@ typedef struct history_message {
     String str;
 } History_Message;
 
-static History_Message history[64];
+static History_Message history[HISTORY_MAX_MESSAGES];
 static s64 history_length;
 static float history_font_top_pad;
 static float history_block_width;
+static s64 history_peeked_message_index;
 
-static char input[100] = "";
+
+
+static char input[INPUT_BUFFER_SIZE] = "";
 static float input_height;
 static float input_font_top_pad;
 static float input_block_width;
 
+static s64 input_length;
 static s64 input_cursor_index;
+
 static T_Interpolator input_cursor_blink_timer;
 static bool input_cursor_visible;
+static bool input_cursor_moved;
 static float input_cursor_activity;
 
 static float c_y0;
@@ -126,23 +134,59 @@ float console_max_height(Window_Info *window){
 
 void console_start_input_if_not(Text_Input *text_i) {
     if (!SDL_IsTextInputActive()) {
-
         SDL_StartTextInput();
-
-        text_i->buffer = input;
-        text_i->capacity = 100;
-        text_i->length = strlen(input);
-        text_i->write_index = text_i->length;
     }
 }
 
 void console_stop_input(Text_Input *text_i) {
     SDL_StopTextInput();
+}
 
-    text_i->buffer = NULL;
-    text_i->capacity = 0;
-    text_i->length = 0;
-    text_i->write_index = 0;
+// Returns index of the user message before 'history_peeked_message_index' if its not -1.
+// If it there is no message returns 'history_peeked_message_index'. 
+void history_peek_up_user_message() {
+    s64 i = history_length - 1;
+    if (history_peeked_message_index > -1)
+        i = history_peeked_message_index - 1;
+
+    for (; i > -1; i--) {
+        if (history[i].type == MESSAGE_USER) {
+            input_cursor_index = history[i].str.length - 1;
+            history_peeked_message_index = i;
+            return;
+        }
+    }
+}
+
+// Returns index of the user message after 'history_peeked_message_index' if its not -1.
+// If it there is no message returns 'history_peeked_message_index'. 
+void history_peek_down_user_message() {
+    s64 i = 0;
+    if (history_peeked_message_index > -1)
+        i = history_peeked_message_index + 1;
+    else
+        return;
+
+    for (; i < history_length; i++) {
+        if (history[i].type == MESSAGE_USER) {
+            input_cursor_index = history[i].str.length - 1;
+            history_peeked_message_index = i;
+            return;
+        }
+    }
+    
+    input_cursor_index = input_length;
+    history_peeked_message_index = -1;
+}
+
+
+void history_return_peeked_message() {
+    if (history_peeked_message_index != -1) {
+        input_length = history[history_peeked_message_index].str.length - 1; // -1 because last char is '\n' so we skip it.
+        memcpy(input, history[history_peeked_message_index].str.data, input_length);
+
+        history_peeked_message_index = -1;
+    }
 }
 
 
@@ -171,9 +215,16 @@ void init_console(Plug_State *state) {
     history_font_top_pad = font_output.line_height * 0.2f;
     history_block_width = font_output.chars[(s32)' ' - font_input.first_char_code].xadvance;
 
+    // Important not styling, logic vars.
+    input_length = 0; 
+    input_cursor_index = 0;
+    history_peeked_message_index = -1;
+
+
     // Cursor.
     input_cursor_blink_timer = ti_make(800);
     input_cursor_visible = true;
+    input_cursor_moved = false;
     input_cursor_activity = 0.0f;
 
     // Console positions and state.
@@ -189,6 +240,9 @@ void init_console(Plug_State *state) {
 }
 
 void console_update(Window_Info *window, Events_Info *events, Time_Info *t) {
+    // Reset state.
+    input_cursor_moved = false;
+
     c_x0 = 0.1f * window->width;
     c_x1 = 0.9f * window->width;
 
@@ -232,35 +286,98 @@ void console_update(Window_Info *window, Events_Info *events, Time_Info *t) {
     }
 
     c_y0 = lerp(c_y0, c_y0_target, 0.01f * t->delta_time_milliseconds);
+    
 
-    // Updating cursor index. @Refactor: Make it depends on console states.
+    // Checking for input if active.
     if (SDL_IsTextInputActive()) {
-        if (hold(SDLK_TAB) && pressed (SDLK_UP)) {
-            console_log("Go up history.\n");
+
+        if (repeat(SDLK_UP, t->delta_time_milliseconds)) {
+            history_peek_up_user_message();
+        } 
+
+        if (repeat(SDLK_DOWN, t->delta_time_milliseconds)) {
+            history_peek_down_user_message();
         }
 
-        if (hold(SDLK_TAB) && pressed (SDLK_DOWN)) {
-            console_log("Go down history.\n");
+        if (repeat(SDLK_LEFT, t->delta_time_milliseconds)) {
+            // Stop history command walk when cursor moving.
+            history_return_peeked_message();
+            
+            if (input_cursor_index > 0)
+                input_cursor_index--;
+
+            input_cursor_moved = true;
         }
+
+        if (repeat(SDLK_RIGHT, t->delta_time_milliseconds)) {
+            // Stop history command walk when cursor moving.
+            history_return_peeked_message();
+            
+            if (input_cursor_index < input_length)
+                input_cursor_index++;
+
+            input_cursor_moved = true;
+        }
+
+
+        if (events->text_input.text_inputted) {
+            // Stop history command walk when text editing.
+            history_return_peeked_message();
+
+            s64 written = insert_input_text(input, INPUT_BUFFER_SIZE, input_length, input_cursor_index,&events->text_input);
+
+            input_length += written;
+            input_cursor_index += written;
+
+            input_cursor_moved = true;
+        }
+
+
+
+        if (repeat(SDLK_BACKSPACE, t->delta_time_milliseconds)) {
+            // Stop history command walk when text editing.
+            history_return_peeked_message();
+
+            if (input_cursor_index > 0) {
+                // Shifting string if deleted in the middle of the text.
+                if (input_cursor_index < input_length) {
+
+                    // Shift the string to the left by one.
+                    for (s64 i = input_cursor_index - 1; i < input_length; i++) {
+                        input[i] = input[i + 1];
+                    }
+                }
+
+                input_length--;
+                input_cursor_index--;
+            }
+
+            input_cursor_moved = true;
+        }
+
+
 
 
         if (pressed(SDLK_RETURN)) {
+            // Stop history command walk when text editing.
+            history_return_peeked_message();
+
             // Add a new line symbol and flush input if return key was pressed.
-            console_command(STR(events->text_input.length, events->text_input.buffer));
+            console_command(STR(input_length, input));
 
             // Clearing text input buffer.
-            events->text_input.buffer[0] = '\0';
-            events->text_input.length = 0;
-            events->text_input.write_index = 0;
+            input[0] = '\0';
+            input_length = 0;
+            input_cursor_index = 0;
         }
 
-        input_cursor_index = events->text_input.write_index;
+        //  input_cursor_index = events->text_input.write_index;
     }
 
     // Cursor styling.
     ti_update(&input_cursor_blink_timer, t->delta_time_milliseconds);
     
-    if (events->text_input.write_moved) {
+    if (input_cursor_moved) {
         ti_reset(&input_cursor_blink_timer);
         input_cursor_visible = true;
         input_cursor_activity += 0.03f;
@@ -309,7 +426,11 @@ void console_draw(Window_Info *window) {
 
 
     // Draw input text.
-    draw_text(CSTR(input), vec2f_make(c_x0 + TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_CYAN, &font_input, 1, NULL);
+    if (history_peeked_message_index != -1) {
+        draw_text(history[history_peeked_message_index].str, vec2f_make(c_x0 + TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_YELLOW, &font_input, 1, NULL);
+    } else {
+        draw_text(STR(input_length, input), vec2f_make(c_x0 + TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_CYAN, &font_input, 1, NULL);
+    }
 
     draw_end();
 }
@@ -323,7 +444,7 @@ void console_free() {
 
 
 void console_add(char *buffer, s64 length, History_Message_Type type) {
-    if (history_length < HISTORY_MAX_STRINGS) {
+    if (history_length < HISTORY_MAX_MESSAGES) {
         // Copy actual string data.
         char *ptr = allocator_alloc(&history_arena, length);
         if (ptr == NULL) {

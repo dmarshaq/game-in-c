@@ -31,11 +31,8 @@ void init_events_handler(Events_Info *events) {
     };
 
     events->text_input = (Text_Input) {
-        .buffer = NULL,
-        .capacity = 0,
-        .length = 0,
-        .write_index = 0,
-        .write_moved = false,
+        .text_inputted = false,
+        .buffer[0] = '\0',
     };
     
     // Make sure text input is disabled on start / init.
@@ -44,191 +41,191 @@ void init_events_handler(Events_Info *events) {
     }
 }
 
-void handle_text_modification(Events_Info *events, Time_Info *t) {
-    Text_Input *info = &events->text_input;
-
-    if (info->buffer == NULL || info->capacity <= 0) {
-        printf_err("Cannot handle text modification: output buffer is either NULL or its capacity is less then or equal to 0\n");
-        return;
-    }
-
-    // Character deletion.
-    if (info->write_index > 0) {
-
-        if (pressed(SDLK_BACKSPACE)) {
-
-            // Shifting string if there is insertion.
-            if (info->write_index < info->length) {
-
-                // Shift the string to the left by one.
-                for (s64 i = info->write_index - 1; i < info->length; i++) {
-                    info->buffer[i] = info->buffer[i + 1];
-                }
-            }
-
-
-            info->write_index--;
-            info->write_moved = true;
-            info->length--;
-
-            // To satisfy C NULL termination string.
-            info->buffer[info->length] = '\0';
-
-
-            ti_reset(&key_timer);
-
-            return;
-        }
-
-        if (hold(SDLK_BACKSPACE)) {
-            ti_update(&key_timer, t->delta_time_milliseconds);
-
-            if (ti_is_complete(&key_timer)) {
-
-                ti_update(&key_repeat_timer, t->delta_time_milliseconds);
-
-                if (ti_is_complete(&key_repeat_timer)) {
-
-
-                    // Shifting string if there is insertion.
-                    if (info->write_index < info->length) {
-
-                        // Shift the string to the left by one.
-                        for (s64 i = info->write_index - 1; i < info->length; i++) {
-                            info->buffer[i] = info->buffer[i + 1];
-                        }
-                    }
-
-                    info->write_index--;
-                    info->write_moved = true;
-                    info->length--;
-
-                    // To satisfy C NULL termination string.
-                    info->buffer[info->length] = '\0';
-
-
-                    ti_reset(&key_repeat_timer);
-
-                }
-            }
-
-            return;
-        }
-    }
-
-    // Arrow key left.
-    if (pressed(SDLK_LEFT)) {
-
-        info->write_index--;
-        info->write_moved = true;
-
-        ti_reset(&key_timer);
-
-        goto leave_clamp;
-    }
-
-    if (hold(SDLK_LEFT)) {
-        ti_update(&key_timer, t->delta_time_milliseconds);
-
-        if (ti_is_complete(&key_timer)) {
-
-            ti_update(&key_repeat_timer, t->delta_time_milliseconds);
-
-            if (ti_is_complete(&key_repeat_timer)) {
-                
-                info->write_index--;
-                info->write_moved = true;
-
-                ti_reset(&key_repeat_timer);
-            }
-        }
-
-        goto leave_clamp;
-    }
-
-
-    // Arrow key right.
-    if (pressed(SDLK_RIGHT)) {
-
-        info->write_index++;
-        info->write_moved = true;
-
-        ti_reset(&key_timer);
-
-        goto leave_clamp;
-    }
-
-    if (hold(SDLK_RIGHT)) {
-        ti_update(&key_timer, t->delta_time_milliseconds);
-
-        if (ti_is_complete(&key_timer)) {
-
-            ti_update(&key_repeat_timer, t->delta_time_milliseconds);
-
-            if (ti_is_complete(&key_repeat_timer)) {
-                
-                info->write_index++;
-                info->write_moved = true;
-
-                ti_reset(&key_repeat_timer);
-            }
-        }
-
-        goto leave_clamp;
-    }
-
-
-
-leave_clamp:
-    // Make sure write index is clamped before returning, because arrow keys don't explicitly check bounds when moving write index.
-    info->write_index = clampi(info->write_index, 0, info->length);
-
-
-    return;
-}
-
-void handle_text_input(Events_Info *events) { 
-    Text_Input *info = &events->text_input;
-
-    if (info->buffer == NULL || info->capacity <= 0) {
-        printf_err("Cannot handle text input: output buffer is either NULL or its capacity is less then or equal to 0\n");
-        return;
-    }
-
-    s64 input_length = strlen(event.text.text);
-
-
-    if (input_length > 0) {
-        // Check for buffer overflow.
-        // @Important: -1 is always there, because the last character in the buffer is always NULL termination, so that in case of buffer being fully filled it is still considered safe C NULL terminated string.
-        if (info->length + input_length > info->capacity - 1) {
-            return;
-        }
-
-        
-        // Shifting string if there is insertion.
-        if (info->write_index < info->length) {
-
-            // Shift the string to the right on the amount of inputted characters.
-            for (s64 i = info->length + input_length - 1; i > info->write_index + input_length - 1; i--) {
-                info->buffer[i] = info->buffer[i - input_length];
-            }
-        }
-
-        // Using memcpy cause strcpy also copies null terminator, but since null terminator is managed manually it is not needed to happen.
-        memcpy(info->buffer + info->write_index, event.text.text, input_length);
-
-
-        // Advancing.
-        info->write_index += input_length;
-        info->write_moved = true;
-        info->length += input_length;
-
-        
-        // To satisfy C NULL termination string.
-        info->buffer[info->length] = '\0';
-    }
-}
+// void handle_text_modification(Events_Info *events, Time_Info *t) {
+//     Text_Input *info = &events->text_input;
+// 
+//     if (info->buffer == NULL || info->capacity <= 0) {
+//         printf_err("Cannot handle text modification: output buffer is either NULL or its capacity is less then or equal to 0\n");
+//         return;
+//     }
+// 
+//     // Character deletion.
+//     if (info->write_index > 0) {
+// 
+//         if (pressed(SDLK_BACKSPACE)) {
+// 
+//             // Shifting string if there is insertion.
+//             if (info->write_index < info->length) {
+// 
+//                 // Shift the string to the left by one.
+//                 for (s64 i = info->write_index - 1; i < info->length; i++) {
+//                     info->buffer[i] = info->buffer[i + 1];
+//                 }
+//             }
+// 
+// 
+//             info->write_index--;
+//             info->write_moved = true;
+//             info->length--;
+// 
+//             // To satisfy C NULL termination string.
+//             info->buffer[info->length] = '\0';
+// 
+// 
+//             ti_reset(&key_timer);
+// 
+//             return;
+//         }
+// 
+//         if (hold(SDLK_BACKSPACE)) {
+//             ti_update(&key_timer, t->delta_time_milliseconds);
+// 
+//             if (ti_is_complete(&key_timer)) {
+// 
+//                 ti_update(&key_repeat_timer, t->delta_time_milliseconds);
+// 
+//                 if (ti_is_complete(&key_repeat_timer)) {
+// 
+// 
+//                     // Shifting string if there is insertion.
+//                     if (info->write_index < info->length) {
+// 
+//                         // Shift the string to the left by one.
+//                         for (s64 i = info->write_index - 1; i < info->length; i++) {
+//                             info->buffer[i] = info->buffer[i + 1];
+//                         }
+//                     }
+// 
+//                     info->write_index--;
+//                     info->write_moved = true;
+//                     info->length--;
+// 
+//                     // To satisfy C NULL termination string.
+//                     info->buffer[info->length] = '\0';
+// 
+// 
+//                     ti_reset(&key_repeat_timer);
+// 
+//                 }
+//             }
+// 
+//             return;
+//         }
+//     }
+// 
+//     // Arrow key left.
+//     if (pressed(SDLK_LEFT)) {
+// 
+//         info->write_index--;
+//         info->write_moved = true;
+// 
+//         ti_reset(&key_timer);
+// 
+//         goto leave_clamp;
+//     }
+// 
+//     if (hold(SDLK_LEFT)) {
+//         ti_update(&key_timer, t->delta_time_milliseconds);
+// 
+//         if (ti_is_complete(&key_timer)) {
+// 
+//             ti_update(&key_repeat_timer, t->delta_time_milliseconds);
+// 
+//             if (ti_is_complete(&key_repeat_timer)) {
+//                 
+//                 info->write_index--;
+//                 info->write_moved = true;
+// 
+//                 ti_reset(&key_repeat_timer);
+//             }
+//         }
+// 
+//         goto leave_clamp;
+//     }
+// 
+// 
+//     // Arrow key right.
+//     if (pressed(SDLK_RIGHT)) {
+// 
+//         info->write_index++;
+//         info->write_moved = true;
+// 
+//         ti_reset(&key_timer);
+// 
+//         goto leave_clamp;
+//     }
+// 
+//     if (hold(SDLK_RIGHT)) {
+//         ti_update(&key_timer, t->delta_time_milliseconds);
+// 
+//         if (ti_is_complete(&key_timer)) {
+// 
+//             ti_update(&key_repeat_timer, t->delta_time_milliseconds);
+// 
+//             if (ti_is_complete(&key_repeat_timer)) {
+//                 
+//                 info->write_index++;
+//                 info->write_moved = true;
+// 
+//                 ti_reset(&key_repeat_timer);
+//             }
+//         }
+// 
+//         goto leave_clamp;
+//     }
+// 
+// 
+// 
+// leave_clamp:
+//     // Make sure write index is clamped before returning, because arrow keys don't explicitly check bounds when moving write index.
+//     info->write_index = clampi(info->write_index, 0, info->length);
+// 
+// 
+//     return;
+// }
+// 
+// void handle_text_input(Events_Info *events) { 
+//     Text_Input *info = &events->text_input;
+// 
+//     if (info->buffer == NULL || info->capacity <= 0) {
+//         printf_err("Cannot handle text input: output buffer is either NULL or its capacity is less then or equal to 0\n");
+//         return;
+//     }
+// 
+//     s64 input_length = strlen(event.text.text);
+// 
+// 
+//     if (input_length > 0) {
+//         // Check for buffer overflow.
+//         // @Important: -1 is always there, because the last character in the buffer is always NULL termination, so that in case of buffer being fully filled it is still considered safe C NULL terminated string.
+//         if (info->length + input_length > info->capacity - 1) {
+//             return;
+//         }
+// 
+//         
+//         // Shifting string if there is insertion.
+//         if (info->write_index < info->length) {
+// 
+//             // Shift the string to the right on the amount of inputted characters.
+//             for (s64 i = info->length + input_length - 1; i > info->write_index + input_length - 1; i--) {
+//                 info->buffer[i] = info->buffer[i - input_length];
+//             }
+//         }
+// 
+//         // Using memcpy cause strcpy also copies null terminator, but since null terminator is managed manually it is not needed to happen.
+//         memcpy(info->buffer + info->write_index, event.text.text, input_length);
+// 
+// 
+//         // Advancing.
+//         info->write_index += input_length;
+//         info->write_moved = true;
+//         info->length += input_length;
+// 
+//         
+//         // To satisfy C NULL termination string.
+//         info->buffer[info->length] = '\0';
+//     }
+// }
 
 
 void handle_events(Events_Info *events, Window_Info *window, Time_Info *t) {
@@ -240,7 +237,8 @@ void handle_events(Events_Info *events, Window_Info *window, Time_Info *t) {
     events->mouse_input.right_pressed = false;
     events->mouse_input.right_unpressed = false;
 
-    events->text_input.write_moved = false;
+    events->text_input.text_inputted = false;
+    events->text_input.buffer[0] = '\0';
 
     // Poll events.
     while (SDL_PollEvent(&event)) {
@@ -276,7 +274,9 @@ void handle_events(Events_Info *events, Window_Info *window, Time_Info *t) {
                 }
                 break;
             case SDL_TEXTINPUT:
-                handle_text_input(events);
+                memcpy(events->text_input.buffer, event.text.text, strlen(event.text.text));
+                events->text_input.text_inputted = true;
+
                 break;
             case SDL_WINDOWEVENT:
                 if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
@@ -290,11 +290,40 @@ void handle_events(Events_Info *events, Window_Info *window, Time_Info *t) {
 
 
     // printf("Unknown Error debug 2.\n");
-    if (SDL_IsTextInputActive()) {
-        handle_text_modification(events, t);
-    }
+    // if (SDL_IsTextInputActive()) {
+    //     handle_text_modification(events, t);
+    // }
 }
 
+
+s64 insert_input_text(char *buffer, s64 capacity, s64 length, s64 write_index, Text_Input *input) {
+    if (capacity <= 0) {
+        printf_err("Cannot handle text input: output buffer capacity is less then or equal to 0\n");
+        return 0;
+    }
+
+    s64 input_length = strlen(input->buffer);
+
+    // Check for buffer overflow.
+    if (length + input_length > capacity) {
+        return 0;
+    }
+
+
+    // Shifting string if there is insertion.
+    if (write_index < length) {
+
+        // Shift the string to the right on the amount of inputted characters.
+        for (s64 i = length + input_length - 1; i > write_index + input_length - 1; i--) {
+            buffer[i] = buffer[i - input_length];
+        }
+    }
+
+    // Using memcpy cause strcpy also copies null terminator, but since null terminator is managed manually it is not needed to happen.
+    memcpy(buffer + write_index, input->buffer, input_length);
+
+    return input_length;
+}
 
 
 

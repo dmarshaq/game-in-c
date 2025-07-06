@@ -472,84 +472,85 @@ leave_draw:
 #define UI_INPUT_FIELD(size, buffer, buffer_size) ui_input_field(size, buffer, buffer_size, __LINE__)
 
 bool ui_input_field(Vec2f size, char *buffer, s32 buffer_size, s32 id) {
-    Mouse_Input *mouse_i = &state->events.mouse_input;
-    Text_Input *text_i = &state->events.text_input;
+    // Mouse_Input *mouse_i = &state->events.mouse_input;
+    // Text_Input *text_i = &state->events.text_input;
 
-    ui_cursor_advance(size);
-    ui_set_element_size(size);
+    // ui_cursor_advance(size);
+    // ui_set_element_size(size);
 
-    s32 prefix_id = state->ui.set_prefix_id;
+    // s32 prefix_id = state->ui.set_prefix_id;
 
-    Vec4f res_color = state->ui.theme.btn_bg;
-    Vec4f res_bar_color = state->ui.theme.btn_bg_hover;
-    bool  res_flushed = false;
+    // Vec4f res_color = state->ui.theme.btn_bg;
+    // Vec4f res_bar_color = state->ui.theme.btn_bg_hover;
+    // bool  res_flushed = false;
 
-    if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
-        if (mouse_i->left_pressed || pressed(SDLK_ESCAPE)) {
-            // If was pressed but was pressed again outside (deselected)
-            state->ui.active_line_id = -1;
-            state->ui.active_prefix_id = -1;
+    // if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
+    //     if (mouse_i->left_pressed || pressed(SDLK_ESCAPE)) {
+    //         // If was pressed but was pressed again outside (deselected)
+    //         state->ui.active_line_id = -1;
+    //         state->ui.active_prefix_id = -1;
 
-            SDL_StopTextInput();
+    //         SDL_StopTextInput();
 
-            text_i->buffer = NULL;
-            text_i->capacity = 0;
-            text_i->length = 0;
-            text_i->write_index = 0;
-
-
-            goto leave_draw;
-        }
-
-        res_color = state->ui.theme.btn_bg_press;
-
-        if (pressed(SDLK_RETURN)) {
-            res_flushed = true;
-            goto leave_draw;
-        } 
+    //         text_i->buffer = NULL;
+    //         text_i->capacity = 0;
+    //         text_i->length = 0;
+    //         text_i->write_index = 0;
 
 
-        // If is still active.
-        
+    //         goto leave_draw;
+    //     }
+
+    //     res_color = state->ui.theme.btn_bg_press;
+
+    //     if (pressed(SDLK_RETURN)) {
+    //         res_flushed = true;
+    //         goto leave_draw;
+    //     } 
 
 
-    }
+    //     // If is still active.
+    //     
 
 
-
-    if (ui_is_hover(size) || state->ui.activate_next) {
-        // If just pressed.
-        if (mouse_i->left_pressed || state->ui.activate_next) {
-            state->ui.active_line_id = id;
-            state->ui.active_prefix_id = prefix_id;
-            
-            SDL_StartTextInput();
-
-            // Setting text input for appending.
-            text_i->buffer = buffer;
-            text_i->capacity = buffer_size;
-            text_i->length = strlen(buffer);
-            text_i->write_index = text_i->length;
-            
-        }
-
-        res_color = state->ui.theme.btn_bg_hover;
-
-        goto leave_draw;
-    }
+    // }
 
 
 
-leave_draw:
-     Vec2f t_size = text_size(CSTR(buffer), state->ui.font);
-     ui_draw_rect(state->ui.cursor, size, res_color); // Input field.
-    // Please rework
-     // ui_draw_rect(vec2f_make(state->ui.cursor.x + text_size(CSTR(buffer), text_i->write_index, state->ui.font).x, state->ui.cursor.y), vec2f_make(10, size.y), res_bar_color); // Input bar.
-     ui_draw_text(buffer, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text);
+    // if (ui_is_hover(size) || state->ui.activate_next) {
+    //     // If just pressed.
+    //     if (mouse_i->left_pressed || state->ui.activate_next) {
+    //         state->ui.active_line_id = id;
+    //         state->ui.active_prefix_id = prefix_id;
+    //         
+    //         SDL_StartTextInput();
 
-     ui_end_element();
+    //         // Setting text input for appending.
+    //         text_i->buffer = buffer;
+    //         text_i->capacity = buffer_size;
+    //         text_i->length = strlen(buffer);
+    //         text_i->write_index = text_i->length;
+    //         
+    //     }
 
-     return res_flushed;
+    //     res_color = state->ui.theme.btn_bg_hover;
+
+    //     goto leave_draw;
+    // }
+
+
+
+//leav// e_draw:
+    //  Vec2f t_size = text_size(CSTR(buffer), state->ui.font);
+    //  ui_draw_rect(state->ui.cursor, size, res_color); // Input field.
+    // // Please rework
+    //  // ui_draw_rect(vec2f_make(state->ui.cursor.x + text_size(CSTR(buffer), text_i->write_index, state->ui.font).x, state->ui.cursor.y), vec2f_make(10, size.y), res_bar_color); // Input bar.
+    //  ui_draw_text(buffer, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text);
+
+    //  ui_end_element();
+
+    //  return res_flushed;
+    return false;
 }
 
 
@@ -1570,11 +1571,6 @@ void game_update() {
      * -----------------------------------
      */
 
-
-    // Test key repeat.
-    if (repeat(SDLK_z, state->t.delta_time_milliseconds)) {
-        printf("Key Z is repeated!\n");
-    }
 
 
     // Spawning box.
