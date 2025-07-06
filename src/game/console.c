@@ -421,7 +421,14 @@ void console_draw(Window_Info *window) {
     // Draw input cursor.
     if (input_cursor_visible) {
         Vec4f color = vec4f_lerp(vec4f_make(0.58f, 0.58f, 0.85f, 0.90f), VEC4F_YELLOW, input_cursor_activity);
-        draw_quad(vec2f_make(c_x0 + TEXT_PAD + input_cursor_index * input_block_width, c_y0 + font_input.line_gap), vec2f_make(c_x0 + TEXT_PAD + (input_cursor_index + 1) * input_block_width, c_y0 + input_height - input_font_top_pad * 0.5f), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
+        
+        // Choosing cursor width.
+        float width = input_block_width;
+        if (input_cursor_index < input_length) {
+            width = 2;
+        }
+
+        draw_quad(vec2f_make(c_x0 + TEXT_PAD + input_cursor_index * input_block_width, c_y0 + font_input.line_gap), vec2f_make(c_x0 + TEXT_PAD + input_cursor_index * input_block_width + width, c_y0 + input_height - input_font_top_pad * 0.5f), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
     }
 
 
@@ -580,6 +587,10 @@ void COMMAND_PREFIX(help)(Command_Argument *args, u32 args_length) {
     }
 }
 
+void COMMAND_PREFIX(quit)(Command_Argument *args, u32 args_length) {
+    quit();
+}
+
 void COMMAND_PREFIX(add)(Command_Argument *args, u32 args_length) {
     s64 result = add(args[0].int_value, args[1].int_value);
     console_log("%d + %d = %d\n", args[0].int_value, args[1].int_value, result);
@@ -611,6 +622,7 @@ void init_console_commands() {
                     
     // Register commands here.
     register_command("help", COMMAND_PREFIX(help), 0, 1, (Command_Argument[1]) { arg_str("") });
+    register_command("quit", COMMAND_PREFIX(quit), 0, 0, (Command_Argument[0]) {  });
     register_command("add", COMMAND_PREFIX(add), 1, 2, (Command_Argument[2]) { arg_int(0), arg_int(0) } );
     register_command("spawn_box", COMMAND_PREFIX(spawn_box), 0, 2, (Command_Argument[2]) { arg_float(0), arg_float(0) } );
 }

@@ -68,6 +68,14 @@ static const s32 KEYBIND_CONSOLE_ENTER     = SDLK_RETURN;
 #define BIND_UNPRESSED(keybind) (!SDL_IsTextInputActive() && unpressed(keybind))
 
 
+/**
+ * Global state functions.
+ */
+
+void quit() {
+    state->events.should_quit = true;
+}
+
 
 /**
  * User Interface.

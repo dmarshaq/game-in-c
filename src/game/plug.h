@@ -160,6 +160,7 @@ typedef struct box {
 
 // For console test function must be available for other files scopes.
 void spawn_box(Vec2f position, Vec4f color);
+void quit();
 
 typedef enum game_state {
     PLAY,
