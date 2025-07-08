@@ -11,6 +11,7 @@
 #include <SDL2/SDL_keycode.h>
 
 
+
 void init_console(Plug_State *state);
 
 void console_update(Window_Info *window, Events_Info *events, Time_Info *t);
@@ -30,9 +31,9 @@ void console_log(char *format, ...);
 void console_error(char *format, ...);
 
 /**
- * Executes console command specified by the string.
+ * This function parses console command given in a string form and immidiately executes it.
  */
-void console_command(String str);
+void console_exec_command(String str);
 
 void init_console_commands();
 

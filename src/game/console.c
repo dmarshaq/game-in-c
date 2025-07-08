@@ -190,6 +190,93 @@ void history_return_peeked_message() {
 }
 
 
+
+
+
+/**
+ * Console printing.
+ */
+void console_add(char *buffer, s64 length, History_Message_Type type) {
+    if (history_length < HISTORY_MAX_MESSAGES) {
+        // Copy actual string data.
+        char *ptr = allocator_alloc(&history_arena, length);
+        if (ptr == NULL) {
+            printf_err("Console's buffer is out of memory, cannot add more strings.\n");
+            return;
+        }
+
+        memcpy(ptr, buffer, length);
+
+        
+        // Following code will determine to either create a new String if previous was ended with '\n' or append to previous string if not. It is done to properly display messages if previous one wasn't ended with '\n'.
+        bool concat_with_last_message = false;
+        History_Message *last_message = NULL;
+        if (history_length > 0) {
+            last_message = history + (history_length - 1);
+            if (last_message->str.data[last_message->str.length - 1] != '\n')
+                concat_with_last_message = true;
+        }
+
+
+        if (concat_with_last_message) {
+            last_message->str.length += length;
+        } else {
+            history[history_length].str = STR(length, ptr);
+            history[history_length].type = type;
+            history_length++;
+        }
+
+    } else {
+        printf_err("Max console string limit has been reached, cannot add more strings.\n");
+    }
+}
+
+void cprintf_va(History_Message_Type type, char *format, va_list args) {
+    // Make a copy of args
+    va_list args_copy;
+    va_copy(args_copy, args);
+    s64 length = vsnprintf(NULL, 0, format, args_copy);
+    va_end(args_copy);
+
+    if (length < 0) {
+        printf_err("Failed to find formatted string length for console output.\n");
+        return;
+    }
+
+    char buffer[length + 1];
+    vsnprintf(buffer, length + 1, format, args);
+
+    console_add(buffer, length, type);
+}
+
+void cprintf(History_Message_Type type, char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    cprintf_va(type, format, args);
+    va_end(args);
+}
+
+void console_log(char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    cprintf_va(MESSAGE_LOG, format, args);
+    va_end(args);
+}
+
+
+void console_error(char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    cprintf_va(MESSAGE_ERROR, format, args);
+    va_end(args);
+}
+
+
+
+
+
+
+
 void init_console(Plug_State *state) {
     // Init commands.
     init_console_commands();
@@ -363,7 +450,8 @@ void console_update(Window_Info *window, Events_Info *events, Time_Info *t) {
             history_return_peeked_message();
 
             // Add a new line symbol and flush input if return key was pressed.
-            console_command(STR(input_length, input));
+            cprintf(MESSAGE_USER, "%.*s\n", input_length, input);
+            console_exec_command(STR(input_length, input));
 
             // Clearing text input buffer.
             input[0] = '\0';
@@ -450,91 +538,12 @@ void console_free() {
 
 
 
-void console_add(char *buffer, s64 length, History_Message_Type type) {
-    if (history_length < HISTORY_MAX_MESSAGES) {
-        // Copy actual string data.
-        char *ptr = allocator_alloc(&history_arena, length);
-        if (ptr == NULL) {
-            printf_err("Console's buffer is out of memory, cannot add more strings.\n");
-            return;
-        }
-
-        memcpy(ptr, buffer, length);
-
-        
-        // Following code will determine to either create a new String if previous was ended with '\n' or append to previous string if not. It is done to properly display messages if previous one wasn't ended with '\n'.
-        bool concat_with_last_message = false;
-        History_Message *last_message = NULL;
-        if (history_length > 0) {
-            last_message = history + (history_length - 1);
-            if (last_message->str.data[last_message->str.length - 1] != '\n')
-                concat_with_last_message = true;
-        }
-
-
-        if (concat_with_last_message) {
-            last_message->str.length += length;
-        } else {
-            history[history_length].str = STR(length, ptr);
-            history[history_length].type = type;
-            history_length++;
-        }
-
-    } else {
-        printf_err("Max console string limit has been reached, cannot add more strings.\n");
-    }
-}
-
-void cprintf_va(History_Message_Type type, char *format, va_list args) {
-    // Make a copy of args
-    va_list args_copy;
-    va_copy(args_copy, args);
-    s64 length = vsnprintf(NULL, 0, format, args_copy);
-    va_end(args_copy);
-
-    if (length < 0) {
-        printf_err("Failed to find formatted string length for console output.\n");
-        return;
-    }
-
-    char buffer[length + 1];
-    vsnprintf(buffer, length + 1, format, args);
-
-    console_add(buffer, length, type);
-}
-
-void cprintf(History_Message_Type type, char *format, ...) {
-    va_list args;
-    va_start(args, format);
-    cprintf_va(type, format, args);
-    va_end(args);
-}
-
-void console_log(char *format, ...) {
-    va_list args;
-    va_start(args, format);
-    cprintf_va(MESSAGE_LOG, format, args);
-    va_end(args);
-}
-
-
-void console_error(char *format, ...) {
-    va_list args;
-    va_start(args, format);
-    cprintf_va(MESSAGE_ERROR, format, args);
-    va_end(args);
-}
 
 
 
 
-// Example function that we want to register (doesn't have to be in this file).
-s64 add(s64 a, s64 b) {
-    return a + b;
-}
 
 
-#define COMMAND_PREFIX(name)    _command_##name
 
 void print_argument(Command_Argument *argument) {
     switch (argument->type) {
@@ -565,19 +574,46 @@ void print_command(Command *command) {
 
 
 
+
+
+
+
+/**
+ * 'min_args' <= 'max_args' must be true.
+ */
+void register_command(char *name, void (*ptr)(Command_Argument *, u32), u32 min_args, u32 max_args, Command_Argument *args) {
+    Command_Argument *args_cpy = allocator_alloc(&commands_arena, max_args * sizeof(Command_Argument));
+    memcpy(args_cpy, args, max_args * sizeof(Command_Argument));
+
+    array_list_append(&commands, ((Command){ CSTR(name), ptr, min_args, max_args, args_cpy }));
+}
+
+
+
+
+
+
+// Example function that we want to register (doesn't have to be in this file).
+s64 add(s64 a, s64 b) {
+    return a + b;
+}
+
 //////// CONSOLE WRAPPER COMMANDS GO HERE
+
+#define COMMAND_PREFIX(name)    _command_##name
+
 void COMMAND_PREFIX(help)(Command_Argument *args, u32 args_length) {
     if (args[0].str_value.length > 0) {
         console_log("Finding '%.*s' command . . .", UNPACK(args[0].str_value));
         for (u32 i = 0; i < array_list_length(&commands); i++) {
             if (str_equals(args[0].str_value, commands[i].name)) {
-                console_log(" [OK]\n");
+                console_log(" ok\n");
                 print_command(commands + i);
                 return;
             }
         }
 
-        console_log("\n'%.*s' is not a command.\n", UNPACK(args[0].str_value));
+        console_log(" x\n'%.*s' is not a command.\n", UNPACK(args[0].str_value));
         return;
     }
 
@@ -596,44 +632,30 @@ void COMMAND_PREFIX(add)(Command_Argument *args, u32 args_length) {
     console_log("%d + %d = %d\n", args[0].int_value, args[1].int_value, result);
 }
 
-
 void COMMAND_PREFIX(spawn_box)(Command_Argument *args, u32 args_length) {
     spawn_box(vec2f_make(args[0].float_value, args[1].float_value), VEC4F_GREEN);
 }
 
-
-
-
-
-/**
- * 'min_args' <= 'max_args' must be true.
- */
-void register_command(char *name, void (*ptr)(Command_Argument *, u32), u32 min_args, u32 max_args, Command_Argument *args) {
-    Command_Argument *args_cpy = allocator_alloc(&commands_arena, max_args * sizeof(Command_Argument));
-    memcpy(args_cpy, args, max_args * sizeof(Command_Argument));
-
-    array_list_append(&commands, ((Command){ CSTR(name), ptr, min_args, max_args, args_cpy }));
-}
-
+/////// MAKE COMMANDS ABOVE.
 
 void init_console_commands() {
     commands = array_list_make(Command, 8, &std_allocator); // @Leak.
     commands_arena = arena_make(256); // @Leak.
                     
     // Register commands here.
-    register_command("help", COMMAND_PREFIX(help), 0, 1, (Command_Argument[1]) { arg_str("") });
-    register_command("quit", COMMAND_PREFIX(quit), 0, 0, (Command_Argument[0]) {  });
-    register_command("add", COMMAND_PREFIX(add), 1, 2, (Command_Argument[2]) { arg_int(0), arg_int(0) } );
-    register_command("spawn_box", COMMAND_PREFIX(spawn_box), 0, 2, (Command_Argument[2]) { arg_float(0), arg_float(0) } );
+    register_command("help",        COMMAND_PREFIX(help),       0, 1, (Command_Argument[1]) { arg_str("") });
+    register_command("quit",        COMMAND_PREFIX(quit),       0, 0, (Command_Argument[0]) {  });
+    register_command("add",         COMMAND_PREFIX(add),        1, 2, (Command_Argument[2]) { arg_int(0), arg_int(0) } );
+    register_command("spawn_box",   COMMAND_PREFIX(spawn_box),  0, 2, (Command_Argument[2]) { arg_float(0), arg_float(0) } );
 }
 
 
 
 
-
-void console_command(String command) {
-    cprintf(MESSAGE_USER, "%.*s\n", UNPACK(command));
-
+/**
+ * @Speed: When list of commands grows it will be benificial to store them in a hash table.
+ */
+void console_exec_command(String command) {
     String str = command;
 
     str = str_eat_spaces(str);
@@ -646,8 +668,6 @@ void console_command(String command) {
     String command_name = str_get_until_space(str);
     str.data += command_name.length;
     str.length -= command_name.length;
-
-    console_log("%.*s: ", UNPACK(command_name));
 
     for (s64 i = 0; i < array_list_length(&commands); i++) {
         if (str_equals(command_name, commands[i].name)) {
@@ -667,9 +687,9 @@ void console_command(String command) {
                 args_count++;
                 if (args_count > commands[i].max_args) {
                     if (commands[i].max_args == 1)
-                        console_log("Expected no more than '%d' argument for '%.*s' command.\n", commands[i].max_args, UNPACK(commands[i].name));
+                        console_log("%.*s: Expected no more than '%d' argument for '%.*s' command.\n", UNPACK(command_name), commands[i].max_args, UNPACK(commands[i].name));
                     else
-                        console_log("Expected no more than '%d' arguments for '%.*s' command.\n", commands[i].max_args, UNPACK(commands[i].name));
+                        console_log("%.*s: Expected no more than '%d' arguments for '%.*s' command.\n", UNPACK(command_name), commands[i].max_args, UNPACK(commands[i].name));
                     return;
                 }
 
@@ -684,7 +704,7 @@ void console_command(String command) {
                 switch(commands[i].args[args_count - 1].type) {
                     case INTEGER:
                         if (!str_is_int(arg)) {
-                            console_log("Argument [%d]: '%.*s' type mismatch, expected 'Integer'.\n", args_count - 1, UNPACK(arg));
+                            console_log("%.*s: Argument [%d]: '%.*s' type mismatch, expected 'Integer'.\n", UNPACK(command_name), args_count - 1, UNPACK(arg));
                             return;
                         }
                         parsed_args[args_count - 1] = arg_int(str_parse_int(arg));
@@ -692,7 +712,7 @@ void console_command(String command) {
                         break;
                     case FLOAT:
                         if (!str_is_float(arg)) {
-                            console_log("Argument [%d]: '%.*s' type mismatch, expected 'Float'.\n", args_count - 1, UNPACK(arg));
+                            console_log("%.*s: Argument [%d]: '%.*s' type mismatch, expected 'Float'.\n", UNPACK(command_name), args_count - 1, UNPACK(arg));
                             return;
                         }
                         parsed_args[args_count - 1] = arg_float(str_parse_float(arg));
@@ -708,9 +728,9 @@ void console_command(String command) {
 
             if (args_count < commands[i].min_args) {
                 if (commands[i].min_args == 1)
-                    console_log("Expected at least '%d' argument for '%.*s' command.\n", commands[i].min_args, UNPACK(commands[i].name));
+                    console_log("%.*s: Expected at least '%d' argument for '%.*s' command.\n", UNPACK(command_name), commands[i].min_args, UNPACK(commands[i].name));
                 else
-                    console_log("Expected at least '%d' arguments for '%.*s' command.\n", commands[i].min_args, UNPACK(commands[i].name));
+                    console_log("%.*s: Expected at least '%d' arguments for '%.*s' command.\n", UNPACK(command_name), commands[i].min_args, UNPACK(commands[i].name));
                 return;
             }
 
@@ -731,7 +751,7 @@ void console_command(String command) {
         }
     }
 
-    console_log("Is not a command.\n");
+    console_log("%.*s: Is not a command.\n", UNPACK(command_name));
 }
 
 
