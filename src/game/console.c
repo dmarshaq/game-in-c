@@ -46,6 +46,7 @@ typedef struct history_message {
 
 static History_Message history[HISTORY_MAX_MESSAGES];
 static s64 history_length;
+static s64 history_index;
 static float history_font_top_pad;
 static float history_block_width;
 static s64 history_peeked_message_index;
@@ -213,8 +214,7 @@ void console_add(char *buffer, s64 length, History_Message_Type type) {
         History_Message *last_message = NULL;
         if (history_length > 0) {
             last_message = history + (history_length - 1);
-            if (last_message->str.data[last_message->str.length - 1] != '\n')
-                concat_with_last_message = true;
+            concat_with_last_message = last_message->str.data[last_message->str.length - 1] != '\n';
         }
 
 

@@ -40,6 +40,45 @@ void  _array_list_clear(void *list);
 void  _array_list_unordered_remove(void *list, u32 index);
 void  _array_list_free(void **list);
 
+
+
+/**
+ * Looped array.
+ */
+#define looped_array_make(type, capacity, ptr_allocator)              (type *)_looped_array_make(sizeof(type), capacity, ptr_allocator)
+
+#define looped_array_length(ptr_list)                                 _looped_array_length((void *)*ptr_list)
+#define looped_array_capacity(ptr_list)                               _looped_array_capacity((void *)*ptr_list)
+#define looped_array_item_size(ptr_list)                              _looped_array_item_size((void *)*ptr_list)
+#define looped_array_append(ptr_list, item)                           (*ptr_list)[_looped_array_next_index((void *)(*ptr_list))] = item
+#define looped_array_pop(ptr_list)                                    _looped_array_pop((void *)*ptr_list, 1)
+#define looped_array_pop_multiple(ptr_list, count)                    _looped_array_pop((void *)*ptr_list, count)
+#define looped_array_clear(ptr_list)                                  _looped_array_clear((void *)*ptr_list)
+#define looped_array_get(ptr_list, index)                             (*ptr_list)[_looped_array_map_index((void *)(*ptr_list), index)]
+// #define looped_array_unordered_remove(ptr_list, index)                _looped_array_unordered_remove((void *)*ptr_list, index)
+#define looped_array_free(ptr_list)                                   _looped_array_free((void **)ptr_list)
+
+typedef struct looped_array_header {
+    u32 capacity;
+    u32 index;
+    u32 length;
+    u32 item_size;
+} Looped_Array_Header;
+
+void *_looped_array_make(u32 item_size, u32 initial_capacity, Allocator *allocator);
+u32   _looped_array_length(void *list);
+u32   _looped_array_capacity(void *list);
+u32   _looped_array_item_size(void *list);
+u32   _looped_array_next_index(void *list);
+u32   _looped_array_map_index(void *list, u32 index);
+void  _looped_array_pop(void *list, u32 count);
+void  _looped_array_clear(void *list);
+// void  _looped_array_unordered_remove(void *list, u32 index);
+void  _looped_array_free(void **list);
+
+
+
+
 /**
  * Hash table.
  */

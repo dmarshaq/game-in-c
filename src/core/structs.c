@@ -129,6 +129,100 @@ void _array_list_unordered_remove(void *list, u32 index) {
     _array_list_pop(list, 1);
 }
 
+
+
+
+/**
+ * Looped Array.
+ */
+
+void *_looped_array_make(u32 item_size, u32 capacity, Allocator *allocator) {
+    Looped_Array_Header *ptr = buffer_data_struct_make(item_size * capacity, sizeof(Looped_Array_Header), allocator) - sizeof(Looped_Array_Header);
+
+    if (ptr == NULL) {
+        printf_err("Couldn't allocate more memory of size: %lld bytes, for the looped array.\n", item_size * capacity + sizeof(Looped_Array_Header));
+        return NULL;
+    }
+
+    ptr->capacity = capacity;
+    ptr->item_size = item_size;
+    ptr->length = 0;
+    ptr->index = 0;
+    
+    // @Important: Because ptr is of type "Looped_Array_Header *", compiler will automatically translate "ptr + 1" to "(void*)(ptr) + sizeof(Looped_Array_Header)".
+    return ptr + 1;
+}
+
+u32 _looped_array_length(void *list) {
+    return ((Looped_Array_Header *)(list - sizeof(Looped_Array_Header)))->length;
+}
+
+u32 _looped_array_index(void *list) {
+    return ((Looped_Array_Header *)(list - sizeof(Looped_Array_Header)))->index;
+}
+
+u32 _looped_array_capacity(void *list) {
+    return ((Looped_Array_Header *)(list - sizeof(Looped_Array_Header)))->capacity;
+}
+
+u32 _looped_array_item_size(void *list) {
+    return ((Looped_Array_Header *)(list - sizeof(Looped_Array_Header)))->item_size;
+}
+
+void _looped_array_free(void **list) {
+    buffer_data_struct_free(*list, sizeof(Looped_Array_Header));
+    *list = NULL;
+}
+
+// void _looped_array_resize_to_fit(void **list, u32 requiered_length) {
+//     Looped_Array_Header *header = *list - sizeof(Looped_Array_Header);
+// 
+//     if (requiered_length > header->capacity) {
+//         u32 capacity_multiplier = (u32)powf(2.0f, (float)((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
+// 
+//         
+//         *list = buffer_data_struct_resize(*list, header->capacity * capacity_multiplier * header->item_size, sizeof(Looped_Array_Header));
+//         header = *list - sizeof(Looped_Array_Header); // @Important: Resizing perfomed above changes the pointer to the list, so it is neccessary to reassign header ptr again, otherwise segfault occure.
+//         header->capacity *= capacity_multiplier; // @Important: Using "buffer_data_struct_resize" will not update capacity in the header, because this function is only designed to only resize the whole data structure, there for it is needed to manually set capacity to the right value, which was intended.
+//     }
+// 
+//     if (header->capacity * header->item_size < requiered_length * header->item_size) {
+//         printf_err("List capacity size is less than requiered length size after being resized, capacity size: %d, size of requiered length: %d.\n", header->capacity * header->item_size, requiered_length * header->item_size);
+//     }
+// }
+
+u32 _looped_array_next_index(void *list) {
+    Looped_Array_Header *header = list - sizeof(Looped_Array_Header);
+    u32 next_index = header->index;
+    header->index = (header->index + 1) % header->capacity;
+    header->length = header->length < header->capacity ? header->length + 1 : header->capacity;
+    return next_index;
+}
+
+u32 _looped_array_map_index(void *list, u32 index) {
+    Looped_Array_Header *header = list - sizeof(Looped_Array_Header);
+    return (header->index - (header->length - index) + header->capacity) % header->capacity;
+}
+
+void _looped_array_pop(void *list, u32 count) {
+    ((Looped_Array_Header *)(list - sizeof(Looped_Array_Header)))->length -= count;
+}
+
+void _looped_array_clear(void *list) {
+    ((Looped_Array_Header *)(list - sizeof(Looped_Array_Header)))->length = 0;
+    ((Looped_Array_Header *)(list - sizeof(Looped_Array_Header)))->index = 0;
+}
+
+// @Refactor: Wrong implementation.
+void _looped_array_unordered_remove(void *list, u32 index) {
+    Looped_Array_Header *header = list - sizeof(Looped_Array_Header);
+    memcpy(list + index * header->item_size, list + (header->length - 1) * header->item_size, header->item_size);
+    _looped_array_pop(list, 1);
+}
+
+
+
+
 /**
  * Hash Table. 
  */
