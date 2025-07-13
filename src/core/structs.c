@@ -205,7 +205,9 @@ u32 _looped_array_map_index(void *list, u32 index) {
 }
 
 void _looped_array_pop(void *list, u32 count) {
-    ((Looped_Array_Header *)(list - sizeof(Looped_Array_Header)))->length -= count;
+    Looped_Array_Header *header = list - sizeof(Looped_Array_Header);
+    header->length -= count;
+    header->index = (header->index - count + header->capacity) % header->capacity;
 }
 
 void _looped_array_clear(void *list) {

@@ -32,13 +32,13 @@ static Plug_State *state;
 
 int main(int argc, char *argv[]) {
 
-    s64 *values = looped_array_make(s64, 2, &std_allocator);
+    s64 *values = looped_array_make(s64, 3, &std_allocator);
 
     looped_array_append(&values, -7);
-    looped_array_append(&values, 0);
     looped_array_append(&values, -1);
+    looped_array_pop(&values);
     looped_array_append(&values, 8);
-    looped_array_append(&values, 4);
+    // looped_array_append(&values, 4);
 
 
     printf("|");
