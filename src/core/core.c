@@ -89,7 +89,7 @@ void arena_destroy(Arena_Allocator *arena) {
 }
 
 // Allocator interface.
-void * allocator_alloc(Allocator *allocator, u64 size) {
+void *allocator_alloc(Allocator *allocator, u64 size) {
     if (allocator->alc_alloc == NULL) {
         printf_err("Allocator couldn't allocate memory since allocataion function is not defined for the allocator.\n");
         return NULL;
@@ -98,7 +98,7 @@ void * allocator_alloc(Allocator *allocator, u64 size) {
     return allocator->alc_alloc(allocator->ptr, size);
 }
 
-void * allocator_zero_alloc(Allocator *allocator, u64 size) {
+void *allocator_zero_alloc(Allocator *allocator, u64 size) {
     if (allocator->alc_zero_alloc == NULL) {
         printf_err("Allocator couldn't zero allocate memory since zero allocataion function is not defined for the allocator.\n");
         return NULL;
@@ -107,7 +107,7 @@ void * allocator_zero_alloc(Allocator *allocator, u64 size) {
     return allocator->alc_zero_alloc(allocator->ptr, size);
 }
 
-void * allocator_re_alloc(Allocator *allocator, void *ptr, u64 size) {
+void *allocator_re_alloc(Allocator *allocator, void *ptr, u64 size) {
     if (allocator->alc_re_alloc == NULL) {
         printf_err("Allocator couldn't reallocate memory since reallocataion function is not defined for the allocator.\n");
         return NULL;
@@ -115,6 +115,7 @@ void * allocator_re_alloc(Allocator *allocator, void *ptr, u64 size) {
 
     return allocator->alc_re_alloc(allocator->ptr, ptr, size);
 }
+
 
 void allocator_free(Allocator *allocator, void *ptr) {
     if (allocator->alc_free == NULL) {

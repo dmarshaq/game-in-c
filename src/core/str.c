@@ -234,6 +234,18 @@ float str_parse_float(String str) {
     return sign * result;
 }
 
+s64 str_count_chars(String str, char c) {
+    s64 count = 0;
+
+    for (s64 i = 0; i < str.length; i++) {
+        if (str.data[i] == c) {
+            count++;
+        }
+    }
+
+    return count;
+}
+
 void str_copy(String src, String dest) {
     (void)memcpy(src.data, dest.data, src.length);
 }

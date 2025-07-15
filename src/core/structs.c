@@ -201,6 +201,7 @@ u32 _looped_array_next_index(void *list) {
 
 u32 _looped_array_map_index(void *list, u32 index) {
     Looped_Array_Header *header = list - sizeof(Looped_Array_Header);
+
     return (header->index - (header->length - index) + header->capacity) % header->capacity;
 }
 

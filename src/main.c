@@ -32,37 +32,6 @@ static Plug_State *state;
 
 int main(int argc, char *argv[]) {
 
-    s64 *values = looped_array_make(s64, 3, &std_allocator);
-
-    looped_array_append(&values, -7);
-    looped_array_append(&values, -1);
-    looped_array_pop(&values);
-    looped_array_append(&values, 8);
-    // looped_array_append(&values, 4);
-
-
-    printf("|");
-    for (s64 i = 0; i < looped_array_length(&values); i++) {
-        printf("%4d|", i);
-    }
-    printf("\n");
-
-    printf("|");
-    for (s64 i = 0; i < looped_array_length(&values); i++) {
-        printf("----|");
-    }
-    printf("\n");
-
-    printf("|");
-    for (s64 i = 0; i < looped_array_length(&values); i++) {
-        printf("%4d|", looped_array_get(&values, i));
-    }
-    printf("\n");
-
-
-
-    return 0; // Looped buffer test.
-
     #ifdef DEV
     fprintf(stdout, "Dev build is launched.\n");
     #endif

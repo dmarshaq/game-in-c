@@ -1569,8 +1569,6 @@ void draw_sword_line(Sword *s) {
 
 
 
-
-
 void game_update() {
 
     /**
@@ -1578,6 +1576,8 @@ void game_update() {
      *  Updating
      * -----------------------------------
      */
+
+    // Console test.
 
 
 

@@ -79,6 +79,11 @@ s64 str_parse_int(String str);
 float str_parse_float(String str);
 
 /**
+ * Counts the number of specific characters in the string.
+ */
+s64 str_count_chars(String str, char c);
+
+/**
  * Copies contents of the src string into dest string.
  * Doesn't resize destination string.
  * @Important: dest.length >= src.length must be true!

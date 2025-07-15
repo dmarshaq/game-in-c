@@ -22,9 +22,10 @@ static const float SPEED = 100;
 static const float OPEN_PERCENT = 0.4f;
 static const float FULL_OPEN_PERCENT = 0.8f;
 static const float TEXT_PAD = 10;
-static const s64 HISTORY_BUFFER_SIZE = 10000;
+static const s64 HISTORY_BUFFER_SIZE = 8192;
 
-#define HISTORY_MAX_MESSAGES  128
+#define HISTORY_MAX_MESSAGES  256
+#define HISTORY_MAX_BUFFERS   2
 #define INPUT_BUFFER_SIZE     100
 
 typedef enum history_message_type : u8 {
@@ -44,14 +45,15 @@ typedef struct history_message {
     String str;
 } History_Message;
 
-static History_Message history[HISTORY_MAX_MESSAGES];
-static s64 history_length;
+static History_Message *history;
 static s64 history_index;
 static float history_font_top_pad;
 static float history_block_width;
-static s64 history_peeked_message_index;
 
+static s64 display_line_offset; // It is amount of line that should be skipped before rendering first (most bottom line) in the console.
+                                // So in case of scrolling console up this value would correspond to the amount of lines scrolled up.
 
+static s64 history_peeked_message_index; // Used to browse through previous user messages in the history of messages.
 
 static char input[INPUT_BUFFER_SIZE] = "";
 static float input_height;
@@ -74,7 +76,10 @@ static float c_x1;
 
 
 
-static Arena_Allocator history_arena;
+static char *history_active_buffer;
+static s64 history_active_buffer_index;
+static s64 history_buffer_write_index;
+static char *history_buffers[HISTORY_MAX_BUFFERS];
 
 
 typedef enum console_openness {
@@ -146,13 +151,14 @@ void console_stop_input(Text_Input *text_i) {
 // Returns index of the user message before 'history_peeked_message_index' if its not -1.
 // If it there is no message returns 'history_peeked_message_index'. 
 void history_peek_up_user_message() {
+    u32 history_length = looped_array_length(&history);
     s64 i = history_length - 1;
     if (history_peeked_message_index > -1)
         i = history_peeked_message_index - 1;
 
     for (; i > -1; i--) {
-        if (history[i].type == MESSAGE_USER) {
-            input_cursor_index = history[i].str.length - 1;
+        if (looped_array_get(&history, i).type == MESSAGE_USER) {
+            input_cursor_index = looped_array_get(&history, i).str.length - 1;
             history_peeked_message_index = i;
             return;
         }
@@ -162,6 +168,7 @@ void history_peek_up_user_message() {
 // Returns index of the user message after 'history_peeked_message_index' if its not -1.
 // If it there is no message returns 'history_peeked_message_index'. 
 void history_peek_down_user_message() {
+    u32 history_length = looped_array_length(&history);
     s64 i = 0;
     if (history_peeked_message_index > -1)
         i = history_peeked_message_index + 1;
@@ -169,8 +176,8 @@ void history_peek_down_user_message() {
         return;
 
     for (; i < history_length; i++) {
-        if (history[i].type == MESSAGE_USER) {
-            input_cursor_index = history[i].str.length - 1;
+        if (looped_array_get(&history, i).type == MESSAGE_USER) {
+            input_cursor_index = looped_array_get(&history, i).str.length - 1;
             history_peeked_message_index = i;
             return;
         }
@@ -183,8 +190,10 @@ void history_peek_down_user_message() {
 
 void history_return_peeked_message() {
     if (history_peeked_message_index != -1) {
-        input_length = history[history_peeked_message_index].str.length - 1; // -1 because last char is '\n' so we skip it.
-        memcpy(input, history[history_peeked_message_index].str.data, input_length);
+        String str = looped_array_get(&history, history_peeked_message_index).str;
+        
+        input_length = str.length - 1; // -1 because last char is '\n' so we skip it.
+        memcpy(input, str.data, input_length);
 
         history_peeked_message_index = -1;
     }
@@ -198,36 +207,42 @@ void history_return_peeked_message() {
  * Console printing.
  */
 void console_add(char *buffer, s64 length, History_Message_Type type) {
-    if (history_length < HISTORY_MAX_MESSAGES) {
-        // Copy actual string data.
-        char *ptr = allocator_alloc(&history_arena, length);
-        if (ptr == NULL) {
-            printf_err("Console's buffer is out of memory, cannot add more strings.\n");
+    // Copy actual string data.
+    if (history_buffer_write_index + length > HISTORY_BUFFER_SIZE) {
+        if (length > HISTORY_BUFFER_SIZE) {
+            printf_err("Message written to the console buffer is too long, not enough memory space to store it.\n");
             return;
         }
 
-        memcpy(ptr, buffer, length);
+        // Swapping buffers.
+        // @Important: Right now it doesn't clear swapped buffer and doesn't track any pointers that migth have been left in the buffer, but it is assumed that buffers are simply big, so that by the time it tracks back to the used buffer all string pointers that pointed to the that memory would be gone.
+        history_active_buffer_index = (history_active_buffer_index + 1) % HISTORY_MAX_BUFFERS;
+        history_buffer_write_index = 0;
+    }
 
-        
-        // Following code will determine to either create a new String if previous was ended with '\n' or append to previous string if not. It is done to properly display messages if previous one wasn't ended with '\n'.
-        bool concat_with_last_message = false;
-        History_Message *last_message = NULL;
-        if (history_length > 0) {
-            last_message = history + (history_length - 1);
-            concat_with_last_message = last_message->str.data[last_message->str.length - 1] != '\n';
-        }
+    char *ptr = history_buffers[history_active_buffer_index] + history_buffer_write_index;
+    history_buffer_write_index += length;
+    memcpy(ptr, buffer, length);
 
 
-        if (concat_with_last_message) {
-            last_message->str.length += length;
-        } else {
-            history[history_length].str = STR(length, ptr);
-            history[history_length].type = type;
-            history_length++;
-        }
+    // Following code will determine to either create a new String if previous was ended with '\n' or append to previous string if not. It is done to properly display messages if previous one wasn't ended with '\n'.
+    bool concat_with_last_message = false;
+    History_Message *last_message = NULL;
+    u32 history_length = looped_array_length(&history);
+    if (history_length > 0) {
+        last_message = history + _looped_array_map_index((void *)history, history_length - 1);
+        concat_with_last_message = last_message->str.data[last_message->str.length - 1] != '\n';
+    }
 
+
+    if (concat_with_last_message) {
+        last_message->str.length += length;
     } else {
-        printf_err("Max console string limit has been reached, cannot add more strings.\n");
+        History_Message msg = (History_Message){
+                    .type = type,
+                    .str = STR(length, ptr),
+                    };
+        looped_array_append(&history, msg);
     }
 }
 
@@ -305,6 +320,9 @@ void init_console(Plug_State *state) {
     // Important not styling, logic vars.
     input_length = 0; 
     input_cursor_index = 0;
+
+    display_line_offset = 0;
+
     history_peeked_message_index = -1;
 
 
@@ -320,9 +338,16 @@ void init_console(Plug_State *state) {
     console_start_input_if_not(&state->events.text_input);
 
 
-    // Initing allocator for history. @Temporary: Later should done using looped array.
-    history_arena = arena_make(HISTORY_BUFFER_SIZE);
-    history_length = 0;
+    // Initing all history buffers. The idea is to swap buffer once it has been filled for the next one.
+    history_active_buffer_index = 0;
+    history_active_buffer = allocator_alloc(&std_allocator, HISTORY_BUFFER_SIZE * HISTORY_MAX_BUFFERS);
+    for (s64 i = 0; i < HISTORY_MAX_BUFFERS; i++) {
+        history_buffers[i] = history_active_buffer + i * HISTORY_BUFFER_SIZE;
+    }
+    history_buffer_write_index = 0;
+
+
+    history = looped_array_make(History_Message, HISTORY_MAX_MESSAGES, &std_allocator);
 
 }
 
@@ -377,14 +402,23 @@ void console_update(Window_Info *window, Events_Info *events, Time_Info *t) {
 
     // Checking for input if active.
     if (SDL_IsTextInputActive()) {
-
+        
         if (repeat(SDLK_UP, t->delta_time_milliseconds)) {
-            history_peek_up_user_message();
-        } 
+            if (hold(SDLK_LSHIFT))
+                display_line_offset++;
+            else
+                history_peek_up_user_message();
+        }
 
         if (repeat(SDLK_DOWN, t->delta_time_milliseconds)) {
-            history_peek_down_user_message();
+            if (hold(SDLK_LSHIFT))
+                display_line_offset--;
+            else
+                history_peek_down_user_message();
         }
+
+        if (display_line_offset < 0) 
+            display_line_offset = 0;
 
         if (repeat(SDLK_LEFT, t->delta_time_milliseconds)) {
             // Stop history command walk when cursor moving.
@@ -457,6 +491,9 @@ void console_update(Window_Info *window, Events_Info *events, Time_Info *t) {
             input[0] = '\0';
             input_length = 0;
             input_cursor_index = 0;
+
+            // Moving display of the console to the very bottom.
+            display_line_offset = 0;
         }
 
         //  input_cursor_index = events->text_input.write_index;
@@ -497,14 +534,35 @@ void console_draw(Window_Info *window) {
     
     // Draw text of the history.
     Vec2f history_draw_origin = vec2f_make(c_x0 + TEXT_PAD, c_y0 + input_height);
-    String str;
+    s64 lines_drawen = 0;
+    History_Message *msg;
+    s64 msg_line_count;
+
+    u32 history_length = looped_array_length(&history);
     for (s64 i = 1; i <= history_length; i++) {
-        str = history[history_length - i].str;
-        history_draw_origin.y += text_size_y(str, &font_output); 
-        draw_text(str, history_draw_origin, HISTORY_MESSAGE_COLORS[history[history_length - i].type], &font_output, 1, NULL);
+        msg = history + _looped_array_map_index((void *)history, history_length - i); // Calling to internal function cause it is just faster to get pointer this way.
+        msg_line_count = str_count_chars(msg->str, '\n'); // Later when wrapping of text will be made in the console, the counting of lines will change.
+
+        lines_drawen += msg_line_count;
+        if (lines_drawen <= display_line_offset) {
+            continue;
+        }
+
+        // Cutting off lines that are in the same message but are supposed to be offseted.
+        String msg_str = msg->str;
+        s64 msg_cut_lines = msg_line_count - mini(msg_line_count, lines_drawen - display_line_offset);
+        for (s64 j = -1; j < msg_cut_lines; j++) { // @Important: -1 is here because this for loop is given extra turn to remove the very last '\n' at the end of every message.
+            msg_str = str_substring(msg_str, 0, str_find_char_right(msg_str, '\n'));
+        }
+
+
+        history_draw_origin.y += (msg_line_count - msg_cut_lines) * font_output.line_height; 
         // history_draw_origin.y += history_font_top_pad;
+
+        draw_text(msg_str, history_draw_origin, HISTORY_MESSAGE_COLORS[msg->type], &font_output, 1, NULL);
     }
     
+    display_line_offset = mini(display_line_offset, lines_drawen);
     
     // Draw input cursor.
     if (input_cursor_visible) {
@@ -522,7 +580,7 @@ void console_draw(Window_Info *window) {
 
     // Draw input text.
     if (history_peeked_message_index != -1) {
-        draw_text(history[history_peeked_message_index].str, vec2f_make(c_x0 + TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_YELLOW, &font_input, 1, NULL);
+        draw_text(looped_array_get(&history, history_peeked_message_index).str, vec2f_make(c_x0 + TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_YELLOW, &font_input, 1, NULL);
     } else {
         draw_text(STR(input_length, input), vec2f_make(c_x0 + TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_CYAN, &font_input, 1, NULL);
     }
@@ -533,7 +591,7 @@ void console_draw(Window_Info *window) {
 
 
 void console_free() {
-    arena_destroy(&history_arena);
+    allocator_free(&std_allocator, history_buffers[0]);
 }
 
 
@@ -632,6 +690,12 @@ void COMMAND_PREFIX(add)(Command_Argument *args, u32 args_length) {
     console_log("%d + %d = %d\n", args[0].int_value, args[1].int_value, result);
 }
 
+void COMMAND_PREFIX(for)(Command_Argument *args, u32 args_length) {
+    for (s64 i = args[0].int_value; i < args[1].int_value; i++) {
+        console_log("%d\n", i);
+    }
+}
+
 void COMMAND_PREFIX(spawn_box)(Command_Argument *args, u32 args_length) {
     spawn_box(vec2f_make(args[0].float_value, args[1].float_value), VEC4F_GREEN);
 }
@@ -646,6 +710,7 @@ void init_console_commands() {
     register_command("help",        COMMAND_PREFIX(help),       0, 1, (Command_Argument[1]) { arg_str("") });
     register_command("quit",        COMMAND_PREFIX(quit),       0, 0, (Command_Argument[0]) {  });
     register_command("add",         COMMAND_PREFIX(add),        1, 2, (Command_Argument[2]) { arg_int(0), arg_int(0) } );
+    register_command("for",         COMMAND_PREFIX(for),        2, 2, (Command_Argument[2]) { arg_int(0), arg_int(1) } );
     register_command("spawn_box",   COMMAND_PREFIX(spawn_box),  0, 2, (Command_Argument[2]) { arg_float(0), arg_float(0) } );
 }
 
