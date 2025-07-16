@@ -66,7 +66,7 @@ typedef struct user_input_handle {
 } User_Input_Handle;
 
 static User_Input_Handle *user_input_history;
-static int user_input_peeked_message_index;
+static s64 user_input_peeked_message_index;
 
 
 static char input[INPUT_BUFFER_SIZE] = "";
@@ -167,7 +167,7 @@ void console_stop_input(Text_Input *text_i) {
 // @Refactor: This code is bad.
 void history_peek_up_user_message() {
     if (user_input_peeked_message_index == -1) {
-        user_input_peeked_message_index = array_list_length(&user_input_history) - 1;
+        user_input_peeked_message_index = (s64)array_list_length(&user_input_history) - 1;
     }
     else {
         user_input_peeked_message_index--;
