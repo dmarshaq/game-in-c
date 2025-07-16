@@ -1577,9 +1577,6 @@ void game_update() {
      * -----------------------------------
      */
 
-    // Console test.
-
-
 
     // Spawning box.
     if (state->events.mouse_input.right_pressed) {

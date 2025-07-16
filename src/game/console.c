@@ -53,7 +53,21 @@ static float history_block_width;
 static s64 display_line_offset; // It is amount of line that should be skipped before rendering first (most bottom line) in the console.
                                 // So in case of scrolling console up this value would correspond to the amount of lines scrolled up.
 
-static s64 history_peeked_message_index; // Used to browse through previous user messages in the history of messages.
+
+
+
+/**
+ * This structs sole purpose is to point to the specific user input relatively to the user input history array.
+ * String cannot be used since they hold absolute address of the data not the realtive one to the beginning of the array.
+ */
+typedef struct user_input_handle {
+    s64 length;
+    s64 index;
+} User_Input_Handle;
+
+static User_Input_Handle *user_input_history;
+static int user_input_peeked_message_index;
+
 
 static char input[INPUT_BUFFER_SIZE] = "";
 static float input_height;
@@ -80,6 +94,8 @@ static char *history_active_buffer;
 static s64 history_active_buffer_index;
 static s64 history_buffer_write_index;
 static char *history_buffers[HISTORY_MAX_BUFFERS];
+
+static char *user_input_history_buffer;
 
 
 typedef enum console_openness {
@@ -148,54 +164,48 @@ void console_stop_input(Text_Input *text_i) {
     SDL_StopTextInput();
 }
 
-// Returns index of the user message before 'history_peeked_message_index' if its not -1.
-// If it there is no message returns 'history_peeked_message_index'. 
+// @Refactor: This code is bad.
 void history_peek_up_user_message() {
-    u32 history_length = looped_array_length(&history);
-    s64 i = history_length - 1;
-    if (history_peeked_message_index > -1)
-        i = history_peeked_message_index - 1;
+    if (user_input_peeked_message_index == -1) {
+        user_input_peeked_message_index = array_list_length(&user_input_history) - 1;
+    }
+    else {
+        user_input_peeked_message_index--;
+        if (user_input_peeked_message_index == -1)
+            user_input_peeked_message_index = 0;
+    }
 
-    for (; i > -1; i--) {
-        if (looped_array_get(&history, i).type == MESSAGE_USER) {
-            input_cursor_index = looped_array_get(&history, i).str.length - 1;
-            history_peeked_message_index = i;
-            return;
-        }
+    if (user_input_peeked_message_index != -1) {
+        input_cursor_index = user_input_history[user_input_peeked_message_index].length - 1;
     }
 }
 
-// Returns index of the user message after 'history_peeked_message_index' if its not -1.
-// If it there is no message returns 'history_peeked_message_index'. 
+// @Refactor: This code is bad.
 void history_peek_down_user_message() {
-    u32 history_length = looped_array_length(&history);
-    s64 i = 0;
-    if (history_peeked_message_index > -1)
-        i = history_peeked_message_index + 1;
-    else
+    if (user_input_peeked_message_index == -1) {
         return;
-
-    for (; i < history_length; i++) {
-        if (looped_array_get(&history, i).type == MESSAGE_USER) {
-            input_cursor_index = looped_array_get(&history, i).str.length - 1;
-            history_peeked_message_index = i;
-            return;
-        }
     }
-    
-    input_cursor_index = input_length;
-    history_peeked_message_index = -1;
+
+    u32 length = array_list_length(&user_input_history);
+    user_input_peeked_message_index++;
+    if (user_input_peeked_message_index == length) {
+        user_input_peeked_message_index = -1;
+        input_cursor_index = input_length;
+        return;
+    }
+
+    input_cursor_index = user_input_history[user_input_peeked_message_index].length - 1;
 }
 
 
 void history_return_peeked_message() {
-    if (history_peeked_message_index != -1) {
-        String str = looped_array_get(&history, history_peeked_message_index).str;
+    if (user_input_peeked_message_index != -1) {
+        User_Input_Handle handle = user_input_history[user_input_peeked_message_index];
         
-        input_length = str.length - 1; // -1 because last char is '\n' so we skip it.
-        memcpy(input, str.data, input_length);
+        input_length = handle.length - 1; // handle.length - 1 because last char is '\n' so we skip it.
+        memcpy(input, &user_input_history_buffer[handle.index], input_length);
 
-        history_peeked_message_index = -1;
+        user_input_peeked_message_index = -1;
     }
 }
 
@@ -223,6 +233,12 @@ void console_add(char *buffer, s64 length, History_Message_Type type) {
     char *ptr = history_buffers[history_active_buffer_index] + history_buffer_write_index;
     history_buffer_write_index += length;
     memcpy(ptr, buffer, length);
+
+    // Saving user input into user input history.
+    if (type == MESSAGE_USER) {
+        array_list_append(&user_input_history, ((User_Input_Handle){ .length = length, .index = array_list_length(&user_input_history_buffer) }));
+        array_list_append_multiple(&user_input_history_buffer, buffer, length);
+    }
 
 
     // Following code will determine to either create a new String if previous was ended with '\n' or append to previous string if not. It is done to properly display messages if previous one wasn't ended with '\n'.
@@ -318,12 +334,18 @@ void init_console(Plug_State *state) {
     history_block_width = font_output.chars[(s32)' ' - font_input.first_char_code].xadvance;
 
     // Important not styling, logic vars.
+    history = looped_array_make(History_Message, HISTORY_MAX_MESSAGES, &std_allocator);
+    display_line_offset = 0;
+
+
+    user_input_history = array_list_make(User_Input_Handle, 8, &std_allocator);
+    user_input_peeked_message_index = -1;
+
+
+
     input_length = 0; 
     input_cursor_index = 0;
 
-    display_line_offset = 0;
-
-    history_peeked_message_index = -1;
 
 
     // Cursor.
@@ -346,9 +368,7 @@ void init_console(Plug_State *state) {
     }
     history_buffer_write_index = 0;
 
-
-    history = looped_array_make(History_Message, HISTORY_MAX_MESSAGES, &std_allocator);
-
+    user_input_history_buffer = array_list_make(char, HISTORY_BUFFER_SIZE, &std_allocator);
 }
 
 void console_update(Window_Info *window, Events_Info *events, Time_Info *t) {
@@ -579,8 +599,9 @@ void console_draw(Window_Info *window) {
 
 
     // Draw input text.
-    if (history_peeked_message_index != -1) {
-        draw_text(looped_array_get(&history, history_peeked_message_index).str, vec2f_make(c_x0 + TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_YELLOW, &font_input, 1, NULL);
+    if (user_input_peeked_message_index != -1) {
+        User_Input_Handle handle = user_input_history[user_input_peeked_message_index];
+        draw_text(STR(handle.length, &user_input_history_buffer[handle.index]), vec2f_make(c_x0 + TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_YELLOW, &font_input, 1, NULL);
     } else {
         draw_text(STR(input_length, input), vec2f_make(c_x0 + TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_CYAN, &font_input, 1, NULL);
     }
@@ -681,6 +702,10 @@ void COMMAND_PREFIX(help)(Command_Argument *args, u32 args_length) {
     }
 }
 
+void COMMAND_PREFIX(clear)(Command_Argument *args, u32 args_length) {
+    looped_array_clear(&history);
+}
+
 void COMMAND_PREFIX(quit)(Command_Argument *args, u32 args_length) {
     quit();
 }
@@ -708,6 +733,7 @@ void init_console_commands() {
                     
     // Register commands here.
     register_command("help",        COMMAND_PREFIX(help),       0, 1, (Command_Argument[1]) { arg_str("") });
+    register_command("clear",       COMMAND_PREFIX(clear),      0, 0, (Command_Argument[0]) {  });
     register_command("quit",        COMMAND_PREFIX(quit),       0, 0, (Command_Argument[0]) {  });
     register_command("add",         COMMAND_PREFIX(add),        1, 2, (Command_Argument[2]) { arg_int(0), arg_int(0) } );
     register_command("for",         COMMAND_PREFIX(for),        2, 2, (Command_Argument[2]) { arg_int(0), arg_int(1) } );
