@@ -23,8 +23,8 @@ static const float OPEN_PERCENT = 0.4f;
 static const float FULL_OPEN_PERCENT = 0.8f;
 static const float TEXT_PAD = 10;
 static const s64 HISTORY_BUFFER_SIZE = 8192;
+static const s64 HISTORY_MAX_MESSAGES = 256;
 
-#define HISTORY_MAX_MESSAGES  256
 #define HISTORY_MAX_BUFFERS   2
 #define INPUT_BUFFER_SIZE     100
 
@@ -69,7 +69,7 @@ static User_Input_Handle *user_input_history;
 static s64 user_input_peeked_message_index;
 
 
-static char input[INPUT_BUFFER_SIZE] = "";
+static char input[INPUT_BUFFER_SIZE];
 static float input_height;
 static float input_font_top_pad;
 static float input_block_width;
@@ -313,7 +313,6 @@ void init_console(Plug_State *state) {
     init_console_commands();
 
 
-
     // Get resources.
     drawer = &state->quad_drawer;
 
@@ -341,8 +340,7 @@ void init_console(Plug_State *state) {
     user_input_history = array_list_make(User_Input_Handle, 8, &std_allocator);
     user_input_peeked_message_index = -1;
 
-
-
+    // Input.
     input_length = 0; 
     input_cursor_index = 0;
 
