@@ -164,37 +164,40 @@ void console_stop_input(Text_Input *text_i) {
     SDL_StopTextInput();
 }
 
-// @Refactor: This code is bad.
 void history_peek_up_user_message() {
+    // Case: index is -1.
     if (user_input_peeked_message_index == -1) {
-        user_input_peeked_message_index = (s64)array_list_length(&user_input_history) - 1;
-    }
-    else {
-        user_input_peeked_message_index--;
-        if (user_input_peeked_message_index == -1)
-            user_input_peeked_message_index = 0;
-    }
+        user_input_peeked_message_index = (s64)array_list_length(&user_input_history) - 1; // @Important: s64 cast is needed since array list length return u32.
+        
+        if (user_input_peeked_message_index == -1) return; // This is a rare case when the 'user_input_peeked_message_index' is -1 because length of user input history is 0, in this case we don't want to move the cursor so we just early return.
 
-    if (user_input_peeked_message_index != -1) {
-        input_cursor_index = user_input_history[user_input_peeked_message_index].length - 1;
+        goto move_cursor_return;
     }
+    
+
+    // Default case: index is not -1.
+    user_input_peeked_message_index--;
+    user_input_peeked_message_index = maxi(0, user_input_peeked_message_index); // Making sure user_input_peeked_message_index is clamped to 0.
+
+move_cursor_return:
+    input_cursor_index = user_input_history[user_input_peeked_message_index].length - 1; // Cutting off '\n', because input field shouldn't have any newlines.  
 }
 
-// @Refactor: This code is bad.
 void history_peek_down_user_message() {
-    if (user_input_peeked_message_index == -1) {
-        return;
-    }
+    // Case: index is -1
+    if (user_input_peeked_message_index == -1) return;
 
-    u32 length = array_list_length(&user_input_history);
+    // Default case: index is not -1.
     user_input_peeked_message_index++;
-    if (user_input_peeked_message_index == length) {
+
+    // If to avoid out of bounds problem and jump to the -1 index (input field message).
+    if (user_input_peeked_message_index == (s64)array_list_length(&user_input_history)) {
         user_input_peeked_message_index = -1;
         input_cursor_index = input_length;
         return;
     }
 
-    input_cursor_index = user_input_history[user_input_peeked_message_index].length - 1;
+    input_cursor_index = user_input_history[user_input_peeked_message_index].length - 1; // Cutting off '\n', because input field shouldn't have any newlines.
 }
 
 
