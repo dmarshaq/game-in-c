@@ -463,7 +463,7 @@ void game_update() {
         state->t.time_slow_factor++;
         state->t.delta_time_multi = 1.0f / (state->t.time_slow_factor % 5);
         
-        printf("Delta Time Multiplier: %f\n", state->t.delta_time_multi);
+        console_log("Delta Time Multiplier: %f\n", state->t.delta_time_multi);
     }
 
     // Player logic.
@@ -814,7 +814,6 @@ void plug_init(Plug_State *s) {
     
 
 
-    ui_init(&state->ui, &state->events.mouse_input);
 
     // Allocating space for phys boxes.
     state->phys_boxes = array_list_make(Phys_Box *, 8, &std_allocator);
@@ -890,6 +889,8 @@ void plug_load(Plug_State *s) {
     // Init console.
     init_console(state);
 
+    // Init ui.
+    ui_init(&state->ui, &state->events.mouse_input);
 
     // Player loading.
     state->player.speed = 5.0f;
