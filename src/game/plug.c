@@ -1,6 +1,4 @@
 #include "game/plug.h"
-#include "console.h"
-#include "game/console.h"
 #include "core/core.h"
 #include "core/type.h"
 #include "core/graphics.h"
@@ -9,8 +7,10 @@
 #include "core/mathf.h"
 #include "core/input.h"
 
-#include "game/event.h"
 #include "game/draw.h"
+#include "game/event.h"
+#include "game/console.h"
+#include "game/imui.h"
 
 #include <SDL2/SDL_keycode.h>
 #include <SDL2/SDL_keyboard.h>
@@ -69,501 +69,6 @@ static const s32 KEYBIND_CONSOLE_ENTER     = SDLK_RETURN;
 
 void quit() {
     state->events.should_quit = true;
-}
-
-
-/**
- * User Interface.
- */
-
-
-
-// UI Origin logic.
-Vec2f ui_current_frame_origin() {
-    if (array_list_length(&state->ui.frame_stack) < 1) {
-        printf_err("UI Current frame doesn't exist.\n");
-        return VEC2F_ORIGIN;
-    }
-    return state->ui.frame_stack[array_list_length(&state->ui.frame_stack) - 1].origin;
-}
-
-Vec2f ui_current_frame_size() {
-    if (array_list_length(&state->ui.frame_stack) < 1) {
-        printf_err("UI Current frame doesn't exist.\n");
-        return VEC2F_ORIGIN;
-    }
-    return state->ui.frame_stack[array_list_length(&state->ui.frame_stack) - 1].size;
-}
-
-void ui_push_frame(float x, float y, float width, float height) {
-    array_list_append(&state->ui.frame_stack, ((UI_Frame){
-            .origin = vec2f_make(x, y),
-            .size = vec2f_make(width, height),
-            }) );
-}
-
-void ui_pop_frame() {
-    array_list_pop(&state->ui.frame_stack);
-}
-
-
-
-// UI Init
-void ui_init() {
-    state->ui.cursor = vec2f_make(0, 0);
-    state->ui.frame_stack = array_list_make(UI_Frame, 8, &std_allocator); // Maybe replace with the custom defined arena allocator later. @Leak.
-
-    state->ui.x_axis = UI_ALIGN_OPPOSITE;
-    state->ui.y_axis = UI_ALIGN_OPPOSITE;
-
-    state->ui.element_size = VEC2F_ORIGIN;
-    state->ui.sameline = false;
-
-    state->ui.active_line_id = -1;
-    state->ui.active_prefix_id = -1;
-    state->ui.set_prefix_id = -1;
-
-    state->ui.theme = (UI_Theme) {
-        .bg             = (Vec4f){ 0.12f, 0.12f, 0.14f, 1.0f },   // Dark slate background
-        .light          = (Vec4f){ 0.85f, 0.85f, 0.88f, 1.0f },   // Soft light gray
-        .btn_bg         = (Vec4f){ 0.12f, 0.16f, 0.28f, 1.0f },   // Deeper, richer base button
-        .btn_bg_hover   = (Vec4f){ 0.20f, 0.26f, 0.40f, 1.0f },   // Gentle contrast on hover
-        .btn_bg_press   = (Vec4f){ 0.08f, 0.10f, 0.22f, 1.0f },   // Subtle shadowy press state
-        .text           = (Vec4f){ 0.97f, 0.96f, 0.92f, 1.0f },   // Warm white text
-    };
-}
-
-// UI prefix id.
-void ui_set_prefix(s32 id) {
-    state->ui.set_prefix_id = id;
-}
-
-void ui_activate_next() {
-    state->ui.activate_next = true;
-}
-
-void ui_end_element() {
-    state->ui.set_prefix_id = -1;
-    state->ui.activate_next = false;
-}
-
-// UI Alignment.
-Vec2f ui_current_aligned_origin() {
-    Vec2f origin = ui_current_frame_origin();
-    Vec2f size = ui_current_frame_size();
-    if (state->ui.x_axis > 0)
-        origin.x += size.x;
-    if (state->ui.y_axis > 0)
-        origin.y += size.y;
-    return origin;
-}
-
-
-// UI Cursor related logic.
-void ui_cursor_reset() {
-    state->ui.cursor = ui_current_aligned_origin();
-    state->ui.element_size = VEC2F_ORIGIN;
-    state->ui.sameline = false;
-}
-
-/**
- * Advances cursor based on "sameline", "element_size", and next element "size" values, according to alignment.
- */
-void ui_cursor_advance(Vec2f size) {
-    if (state->ui.sameline) {
-        state->ui.cursor.y += state->ui.y_axis * (state->ui.line_height - size.y);
-        state->ui.line_height = size.y > state->ui.line_height ? size.y : state->ui.line_height;
-        state->ui.cursor.x += !state->ui.x_axis * state->ui.element_size.x - state->ui.x_axis * size.x;
-        state->ui.sameline = false;
-    } else {
-        state->ui.line_height = size.y;
-        state->ui.cursor.x = ui_current_aligned_origin().x - state->ui.x_axis * size.x;
-        state->ui.cursor.y += !state->ui.y_axis * state->ui.element_size.y - state->ui.y_axis * size.y;
-    }
-}
-
-void ui_set_element_size(Vec2f size) {
-    state->ui.element_size = size;
-}
-
-void ui_sameline() {
-    state->ui.sameline = true;
-}
-
-
-
-
-
-
-
-
-
-// UI Frame.
-void ui_draw_rect(Vec2f position, Vec2f size, Vec4f color) {
-    Vec2f p0 = position;
-    Vec2f p1 = vec2f_sum(position, size);
-
-    float quad_data[48] = {
-        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 0.0f, size.x, size.y, -1.0f,
-        p1.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 0.0f, size.x, size.y, -1.0f,
-        p0.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 0.0f, 1.0f, size.x, size.y, -1.0f,
-        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, 1.0f, 1.0f, size.x, size.y, -1.0f,
-    };
-    
-    draw_quad_data(quad_data, 1);
-}
-
-
-#define UI_FRAME(width, height, code)\
-    ui_cursor_advance(vec2f_make(width, height));\
-    ui_draw_rect(state->ui.cursor, vec2f_make(width, height), state->ui.theme.bg);\
-    ui_push_frame(state->ui.cursor.x, state->ui.cursor.y, width, height);\
-    ui_cursor_reset();\
-    code\
-    ui_cursor_reset();\
-    ui_pop_frame();\
-    ui_cursor_advance(vec2f_make(width, height));\
-    ui_set_element_size(vec2f_make(width, height))
-
-#define UI_WINDOW(code)\
-    ui_push_frame(0, 0, state->window.width, state->window.height);\
-    ui_cursor_reset();\
-    code\
-    ui_pop_frame()\
-
-    
-
-
-
-
-
-
-
-bool ui_is_hover(Vec2f size) {
-    return value_inside_domain(state->ui.cursor.x, state->ui.cursor.x + size.x, state->events.mouse_input.position.x) && value_inside_domain(state->ui.cursor.y, state->ui.cursor.y + size.y, state->events.mouse_input.position.y);
-}
-
-void ui_draw_text(char *text, Vec2f position, Vec4f color) {
-    u64 text_length = strlen(text);
-
-    // Scale and adjust current_point.
-    Vec2f current_point = position;
-    Font_Baked *font = state->ui.font;
-    float origin_x = current_point.x;
-    current_point.y += (float)font->baseline;
-
-    // Text rendering variables.
-    s32 font_char_index;
-    u16 width, height;
-    stbtt_bakedchar *c;
-
-    for (u64 i = 0; i < text_length; i++) {
-        if (text[i] == '\n') {
-            current_point.x = origin_x;
-            current_point.y -= (float)font->line_height;
-            continue;
-        }
-
-        // Character drawing.
-        font_char_index = (s32)text[i] - font->first_char_code;
-        if (font_char_index < font->chars_count) {
-            c = &font->chars[font_char_index];
-            width  = font->chars[font_char_index].x1 - font->chars[font_char_index].x0;
-            height = font->chars[font_char_index].y1 - font->chars[font_char_index].y0;
-
-
-            Vec2f p0 = vec2f_make(current_point.x + c->xoff, current_point.y - c->yoff - height);
-            Vec2f p1 = vec2f_make(current_point.x + c->xoff + width, current_point.y - c->yoff);
-
-            Vec2f uv0 = vec2f_make(c->x0 / (float)font->bitmap.width, c->y1 / (float)font->bitmap.height);
-            Vec2f uv1 = vec2f_make(c->x1 / (float)font->bitmap.width, c->y0 / (float)font->bitmap.height);
-
-            float mask_slot = add_texture_to_slots(&font->bitmap);              
-
-            float quad_data[48] = {
-                p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, uv0.x, uv0.y, 1.0f, 1.0f, mask_slot,
-                p1.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, uv1.x, uv0.y, 1.0f, 1.0f, mask_slot,
-                p0.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, uv0.x, uv1.y, 1.0f, 1.0f, mask_slot,
-                p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, uv1.x, uv1.y, 1.0f, 1.0f, mask_slot,
-            };
-
-            draw_quad_data(quad_data, 1);
-
-
-            current_point.x += font->chars[font_char_index].xadvance;
-        }
-
-    }
-}
-
-void ui_draw_text_centered(char *text, Vec2f position, Vec2f size, Vec4f color) {
-    if (text == NULL)
-        return;
-
-    Vec2f t_size = text_size(CSTR(text), state->ui.font);
-
-    // Following ui_draw_text centered calculations are for the system where y axis points up, and x axis to the right.
-    ui_draw_text(text, vec2f_make(position.x + (size.x - t_size.x) * 0.5f, position.y + (size.y + t_size.y) * 0.5f), color);
-}
-
-
-// UI Button
-
-#define UI_BUTTON(size, text) ui_button(size, text, __LINE__)
-
-bool ui_button(Vec2f size, char *text, s32 id) {
-    ui_cursor_advance(size);
-    ui_set_element_size(size);
-
-    s32 prefix_id = state->ui.set_prefix_id;
-
-    Vec4f res_color = state->ui.theme.btn_bg;
-    bool  res_ret   = false;
-    
-
-    if (ui_is_hover(size) || state->ui.activate_next) {
-        if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
-            if (state->events.mouse_input.left_unpressed) {
-                state->ui.active_line_id = -1;
-                state->ui.active_prefix_id = -1;
-
-                res_color = state->ui.theme.btn_bg_hover;
-                res_ret   = true;
-                goto leave_draw;
-            }
-
-            res_color = state->ui.theme.btn_bg_press;
-            goto leave_draw;
-        }
-
-        if (state->events.mouse_input.left_pressed || state->ui.activate_next) {
-            state->ui.active_line_id = id;
-            state->ui.active_prefix_id = prefix_id;
-        }
-
-        res_color = state->ui.theme.btn_bg_hover;
-
-    } else if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
-        state->ui.active_line_id = -1;
-        state->ui.active_prefix_id = -1;
-    } 
-
-leave_draw:
-    
-    ui_draw_rect(state->ui.cursor, size, res_color);
-    ui_draw_text_centered(text, state->ui.cursor, size, state->ui.theme.text);
-
-    ui_end_element();
-
-    return res_ret;
-}
-
-
-// UI Slider
-
-
-#define UI_SLIDER_INT(size, output, min, max) ui_slider_int(size, output, min, max, __LINE__)
-
-bool ui_slider_int(Vec2f size, s32 *output, s32 min, s32 max, s32 id) {
-    ui_cursor_advance(size);
-    ui_set_element_size(size);
-
-    s32 prefix_id = state->ui.set_prefix_id;
-
-    float scale = (max - min) / size.x;
-
-    Vec4f res_color = state->ui.theme.btn_bg;
-    Vec4f res_knob_color = state->ui.theme.btn_bg_hover;
-    bool  res_ret   = false;
-    
-    if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
-        if (state->events.mouse_input.left_hold) {
-            // If was pressed, and holding.
-            float a = state->events.mouse_input.position.x * scale - (state->ui.cursor.x * scale - min);
-            *output = (s32)clamp(a, min, max);
-
-            res_color = state->ui.theme.btn_bg_press;
-            res_knob_color = state->ui.theme.text;
-            res_ret   = true;
-            goto leave_draw;
-        } else {
-            // If was pressed, but not holding anymore.
-            state->ui.active_line_id = -1;
-            state->ui.active_prefix_id = -1;
-            goto leave_draw;
-        }
-    }
-    
-    if (ui_is_hover(size)) {
-        // If just pressed.
-        if (state->events.mouse_input.left_pressed) {
-            state->ui.active_line_id = id;
-            state->ui.active_prefix_id = prefix_id;
-        }
-
-        res_color = state->ui.theme.btn_bg_hover;
-    } 
-
-
-leave_draw:
-
-    ui_draw_rect(vec2f_make(state->ui.cursor.x, state->ui.cursor.y + size.y * 0.5f - 5), vec2f_make(size.x, 10), res_color); // Slider line.
-    ui_draw_rect(vec2f_make(state->ui.cursor.x + (*output - min) / scale - 8, state->ui.cursor.y + size.y * 0.5f - 8), vec2f_make(16, 16), res_knob_color); // Slider knob.
-
-    ui_end_element();
-
-    return res_ret;
-}
-
-#define UI_SLIDER_FLOAT(size, output, min, max) ui_slider_float(size, output, min, max, __LINE__)
-
-bool ui_slider_float(Vec2f size, float *output, float min, float max, s32 id) {
-    ui_cursor_advance(size);
-    ui_set_element_size(size);
-
-    s32 prefix_id = state->ui.set_prefix_id;
-
-    float scale = (max - min) / size.x;
-
-    Vec4f res_color = state->ui.theme.btn_bg;
-    Vec4f res_knob_color = state->ui.theme.btn_bg_hover;
-    bool  res_ret   = false;
-    
-    if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
-        if (state->events.mouse_input.left_hold) {
-            // If was pressed, and holding.
-            float a = state->events.mouse_input.position.x * scale - (state->ui.cursor.x * scale - min);
-            *output = clamp(a, min, max);
-
-            res_color = state->ui.theme.btn_bg_press;
-            res_knob_color = state->ui.theme.text;
-            res_ret   = true;
-            goto leave_draw;
-        } else {
-            // If was pressed, but not holding anymore.
-            state->ui.active_line_id = -1;
-            state->ui.active_prefix_id = -1;
-            goto leave_draw;
-        }
-    }
-    
-    if (ui_is_hover(size)) {
-        // If just pressed.
-        if (state->events.mouse_input.left_pressed) {
-            state->ui.active_line_id = id;
-            state->ui.active_prefix_id = prefix_id;
-        }
-
-        res_color = state->ui.theme.btn_bg_hover;
-    } 
-
-
-leave_draw:
-
-    ui_draw_rect(vec2f_make(state->ui.cursor.x, state->ui.cursor.y + size.y * 0.5f - 5), vec2f_make(size.x, 10), res_color); // Slider line.
-    ui_draw_rect(vec2f_make(state->ui.cursor.x + (*output - min) / scale - 8, state->ui.cursor.y + size.y * 0.5f - 8), vec2f_make(16, 16), res_knob_color); // Slider knob.
-    // ui_draw_rect(vec2f_make(state->ui.cursor.x + (*output - min) / scale - 5, state->ui.cursor.y), vec2f_make(10, size.y), res_knob_color); // Slider knob bar.
-
-    ui_end_element();
-
-    return res_ret;
-}
-
-
-// UI Input field
-
-#define UI_INPUT_FIELD(size, buffer, buffer_size) ui_input_field(size, buffer, buffer_size, __LINE__)
-
-bool ui_input_field(Vec2f size, char *buffer, s32 buffer_size, s32 id) {
-    // Mouse_Input *mouse_i = &state->events.mouse_input;
-    // Text_Input *text_i = &state->events.text_input;
-
-    // ui_cursor_advance(size);
-    // ui_set_element_size(size);
-
-    // s32 prefix_id = state->ui.set_prefix_id;
-
-    // Vec4f res_color = state->ui.theme.btn_bg;
-    // Vec4f res_bar_color = state->ui.theme.btn_bg_hover;
-    // bool  res_flushed = false;
-
-    // if (state->ui.active_line_id == id && state->ui.active_prefix_id == prefix_id) {
-    //     if (mouse_i->left_pressed || pressed(SDLK_ESCAPE)) {
-    //         // If was pressed but was pressed again outside (deselected)
-    //         state->ui.active_line_id = -1;
-    //         state->ui.active_prefix_id = -1;
-
-    //         SDL_StopTextInput();
-
-    //         text_i->buffer = NULL;
-    //         text_i->capacity = 0;
-    //         text_i->length = 0;
-    //         text_i->write_index = 0;
-
-
-    //         goto leave_draw;
-    //     }
-
-    //     res_color = state->ui.theme.btn_bg_press;
-
-    //     if (pressed(SDLK_RETURN)) {
-    //         res_flushed = true;
-    //         goto leave_draw;
-    //     } 
-
-
-    //     // If is still active.
-    //     
-
-
-    // }
-
-
-
-    // if (ui_is_hover(size) || state->ui.activate_next) {
-    //     // If just pressed.
-    //     if (mouse_i->left_pressed || state->ui.activate_next) {
-    //         state->ui.active_line_id = id;
-    //         state->ui.active_prefix_id = prefix_id;
-    //         
-    //         SDL_StartTextInput();
-
-    //         // Setting text input for appending.
-    //         text_i->buffer = buffer;
-    //         text_i->capacity = buffer_size;
-    //         text_i->length = strlen(buffer);
-    //         text_i->write_index = text_i->length;
-    //         
-    //     }
-
-    //     res_color = state->ui.theme.btn_bg_hover;
-
-    //     goto leave_draw;
-    // }
-
-
-
-//leav// e_draw:
-    //  Vec2f t_size = text_size(CSTR(buffer), state->ui.font);
-    //  ui_draw_rect(state->ui.cursor, size, res_color); // Input field.
-    // // Please rework
-    //  // ui_draw_rect(vec2f_make(state->ui.cursor.x + text_size(CSTR(buffer), text_i->write_index, state->ui.font).x, state->ui.cursor.y), vec2f_make(10, size.y), res_bar_color); // Input bar.
-    //  ui_draw_text(buffer, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + (size.y + t_size.y) * 0.5f), state->ui.theme.text);
-
-    //  ui_end_element();
-
-    //  return res_flushed;
-    return false;
-}
-
-
-
-
-void ui_text(char *text) {
-    Vec2f t_size = text_size(CSTR(text), state->ui.font);
-    ui_cursor_advance(t_size);
-    ui_set_element_size(t_size);
-    ui_draw_text(text, vec2f_make(state->ui.cursor.x, state->ui.cursor.y + t_size.y), state->ui.theme.text);
 }
 
 
@@ -1118,7 +623,7 @@ void game_draw() {
 
     state->ui.x_axis = UI_ALIGN_OPPOSITE;
     state->ui.y_axis = UI_ALIGN_DEFAULT;
-    UI_WINDOW(
+    UI_WINDOW(state->window.width, state->window.height,
         UI_FRAME(220, 120, 
             UI_FRAME(120, 120, 
                 if (UI_BUTTON(vec2f_make(120, 80), "Spawn box")) {
@@ -1177,7 +682,7 @@ void game_draw() {
     state->ui.x_axis = UI_ALIGN_DEFAULT;
     state->ui.y_axis = UI_ALIGN_OPPOSITE;
 
-    UI_WINDOW(
+    UI_WINDOW(state->window.width, state->window.height,
         // if (UI_INPUT_FIELD(vec2f_make(500, 40), text_input_buffer, 100)) {
         //     printf("%s\n", text_input_buffer);
         //     text_input_buffer[0] = '\0';
@@ -1235,7 +740,7 @@ void menu_draw() {
     state->ui.x_axis = UI_ALIGN_DEFAULT;
     state->ui.y_axis = UI_ALIGN_OPPOSITE;
 
-    UI_WINDOW(
+    UI_WINDOW(state->window.width, state->window.height,
         UI_FRAME(state->window.width, 50,
             if (UI_BUTTON(vec2f_make(100, 50), "Go Back")) {
                 state->gs = PLAY;
@@ -1245,7 +750,7 @@ void menu_draw() {
 
     state->ui.y_axis = UI_ALIGN_DEFAULT;
 
-    UI_WINDOW(
+    UI_WINDOW(state->window.width, state->window.height,
         ui_text("Menu");
     );
 
@@ -1309,7 +814,7 @@ void plug_init(Plug_State *s) {
     
 
 
-    ui_init();
+    ui_init(&state->ui, &state->events.mouse_input);
 
     // Allocating space for phys boxes.
     state->phys_boxes = array_list_make(Phys_Box *, 8, &std_allocator);

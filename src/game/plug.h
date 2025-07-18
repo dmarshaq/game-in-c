@@ -8,73 +8,7 @@
 
 #include "game/event.h"
 #include "game/physics.h"
-
-
-
-
-
-
-
-
-
-
-
-
-
-typedef struct ui_theme {
-    Vec4f bg;
-    Vec4f light;
-    Vec4f btn_bg;
-    Vec4f btn_bg_hover;
-    Vec4f btn_bg_press;
-    Vec4f text;
-} UI_Theme;
-
-
-typedef struct ui_frame {
-    Vec2f origin;
-    Vec2f size;
-} UI_Frame;
-
-typedef enum ui_alignment : s8 {
-    UI_ALIGN_DEFAULT  = 0,
-    UI_ALIGN_OPPOSITE = 1,
-} UI_Alignment;
-
-
-
-typedef struct ui_state {
-    // Cursor
-    Vec2f cursor;
-    UI_Frame *frame_stack;
-
-    // Alignment
-    UI_Alignment x_axis;
-    UI_Alignment y_axis;
-    
-    // Advancing
-    float line_height;
-    Vec2f element_size;
-    bool sameline;
-
-    // Element activation
-    s32 active_line_id;
-    s32 active_prefix_id;
-    s32 set_prefix_id;
-    bool activate_next;
-
-    // Customization
-    Font_Baked *font;
-    UI_Theme theme;
-} UI_State;
-
-
-
-
-
-
-
-
+#include "game/imui.h"
 
 
 /**
@@ -131,22 +65,6 @@ typedef enum game_state {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /**
  * Definition of plug_state.
  *
@@ -190,6 +108,8 @@ typedef struct plug_state {
 
 
 } Plug_State;
+
+
 
 
 
