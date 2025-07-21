@@ -10,6 +10,7 @@
 #include "game/draw.h"
 #include "game/event.h"
 #include "game/console.h"
+#include "game/vars.h"
 #include "game/imui.h"
 
 #include <SDL2/SDL_keycode.h>
@@ -843,6 +844,10 @@ void plug_init(Plug_State *s) {
 
 void plug_load(Plug_State *s) {
     state = s;
+
+    // Loading globals.
+    load_globals();
+
 
     state->clear_color = vec4f_make(0.1f, 0.1f, 0.4f, 1.0f);
 

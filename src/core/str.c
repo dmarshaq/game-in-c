@@ -92,6 +92,10 @@ s64 str_find_whitespace_right(String str) {
     return -1;
 }
 
+String str_eat_chars(String str, s64 count) {
+    return str_substring(str, count, str.length);
+}
+
 String str_eat_spaces(String str) {
     s64 i = 0;
 

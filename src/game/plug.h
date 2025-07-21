@@ -68,7 +68,10 @@ typedef enum game_state {
 /**
  * Definition of plug_state.
  *
+ *
+ *
  * @Todo: Divide global state on smalle sub states and pack them together so code pieces can choose what part of global state is specifically used at the moment rather than throwing all in one group and everytime time accessing all variables at the same time.
+ * @Todo: Divide plug state even more, and make dynamic global vars loading from some kind of variables file or context. Can be used .json but it probably more reasonable to use straight up basic key value format.
  */
 typedef struct plug_state {
     Window_Info window;
@@ -82,7 +85,7 @@ typedef struct plug_state {
     /**
      * Game Globals, @Important: Must be loaded or/and unloaded when hot reloading plug.
      */
-    Vec4f clear_color;
+    Vec4f clear_color; // @Refactor: Reduntant variable since there is gl function to set clear color.
     Camera main_camera;
     
     Shader *shader_table;

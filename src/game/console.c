@@ -357,8 +357,7 @@ void init_console(Plug_State *state) {
 
     // Console positions and state.
     c_y0 = state->window.height;
-    console_state = OPEN;
-    console_start_input_if_not(&state->events.text_input);
+    console_state = CLOSED;
 
 
     // Initing all history buffers. The idea is to swap buffer once it has been filled for the next one.

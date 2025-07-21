@@ -64,6 +64,8 @@ s64 str_find_whitespace_left(String str);
 
 s64 str_find_whitespace_right(String str);
 
+String str_eat_chars(String str, s64 count);
+
 String str_eat_spaces(String str);
 
 String str_eat_until_space(String str);
