@@ -186,7 +186,7 @@ void vars_tree_free(Vars_Tree *tree, Allocator *allocator) {
 
 
 void vars_tree_print_node(Vars_Node *node, s64 depth) {
-    for (int i = 0; i < depth; i++) {
+    for (s64 i = 0; i < depth; i++) {
         printf("  "); // Indent 2 spaces per level
     }
 
@@ -209,65 +209,71 @@ void vars_tree_print_node(Vars_Node *node, s64 depth) {
 
 
 
+
+
+
+
+
 typedef struct console {
     s64 speed;
     float open_percent;
     float full_open_percent;
     s64 text_pad;
-} Console;
+} Console; 
 
 static Console console_data;
 
 
-void load_globals() {
+
+#define VT_BUILDER_STRUCT(builder_ptr, str, struct_ptr, code)\
+    vars_tree_builder_struct_begin(builder_ptr, str, struct_ptr);\
+    code\
+    vars_tree_builder_struct_end(builder_ptr)
+
+#define VT_BUILDER_FIELD(builder_ptr, str, field_ptr)   vars_tree_builder_add_field(builder_ptr, str, field_ptr)
+
+
+Vars_Tree vars_tree_make() {
     Vars_Tree_Builder builder = vars_tree_builder_make(8, &std_allocator);
 
-    // Build tree here.
-    vars_tree_builder_add_field(&builder, CSTR("shield"), NULL);
-    printf("Added node\n");
+    // Build vars tree here.
+
+    VT_BUILDER_STRUCT(&builder, CSTR("console_data"), &console_data,
+
+            VT_BUILDER_FIELD(&builder, CSTR("speed"),               &console_data.speed);
+            VT_BUILDER_FIELD(&builder, CSTR("open_percent"),        &console_data.open_percent);
+            VT_BUILDER_FIELD(&builder, CSTR("full_open_percent"),   &console_data.full_open_percent);
+            VT_BUILDER_FIELD(&builder, CSTR("text_pad"),            &console_data.text_pad);
+
+            );
 
 
-    vars_tree_builder_struct_begin(&builder, CSTR("Parts"), NULL);
+
+    return vars_tree_builder_build(&builder, &std_allocator);
+}
 
 
-    vars_tree_builder_struct_begin(&builder, CSTR("Specials"), NULL);
-
-    vars_tree_builder_add_field(&builder, CSTR("balls"), NULL);
-    printf("Added node\n");
-
-    vars_tree_builder_struct_end(&builder);
-    printf("Added struct\n");
 
 
-    vars_tree_builder_add_field(&builder, CSTR("eyes"), NULL);
-    printf("Added node\n");
-    vars_tree_builder_add_field(&builder, CSTR("nose"), NULL);
-    printf("Added node\n");
+void load_globals() {
+    Vars_Tree tree = vars_tree_make();
 
-    vars_tree_builder_struct_end(&builder);
-    printf("Added struct\n");
-
-
-    vars_tree_builder_add_field(&builder, CSTR("sword"), NULL);
-    printf("Added node\n");
-
-    
-    Vars_Tree tree = vars_tree_builder_build(&builder, &std_allocator);
-    printf("Built tree\n");
-
-    // Use tree here.
+    // Displaying tree.
     printf("Tree nodes count: %d\n", tree.count);
     vars_tree_print_node(tree.root, 0);
 
-    // Dispose tree.
-    vars_tree_free(&tree, &std_allocator);
 
 
 
     String _content = read_file_into_str("res/globals.vars", &std_allocator);
-    
+
 
     String content = _content;
+
+    Vars_Node *current_node = tree.root;
+    
+    String found_field = {0};
+
     while (true) {
         // Eat until literal. Not including newline symbols.
         content = str_eat_spaces(content);
@@ -283,16 +289,126 @@ void load_globals() {
             content = str_eat_chars(content, comment.length);
             continue;
         }
+
+        // Check if vars tree node path
+        if (content.data[0] == '[') {
+
+
+            s64 end_of_path = str_find_char_left(content, ']');
+            if (end_of_path == -1) {
+                printf_err("Couldn't parse '%s': Missing ']'.\n", "res/globals.vars");
+                exit(1);
+            }
+            
+            String path = str_substring(content, 1, end_of_path);
+            printf("%-10s:    %.*s\n", "Path", UNPACK(path));
+
+            content = str_eat_chars(content, path.length + 2);
+            
+            // Parsing path.
+            current_node = tree.root;
+            while (true) {
+                if (path.length <= 0) break;
+
+                s64 end_of_node_name = str_find_char_left(path, '.');
+                if (end_of_node_name == -1)
+                    end_of_node_name = path.length;
+
+                String node_name = str_substring(path, 0, end_of_node_name);
+                printf("    %-10s:    %.*s\n", "Node name", UNPACK(node_name));
+
+                // Searching node in the tree.
+                Vars_Node *children = REL2ABS_32(current_node->children_rptr);
+                for (u32 i = 0; i < current_node->children_count; i++) {
+                    if (str_equals(children[i].name, node_name)) {
+                        current_node = children + i;
+                        break;
+                    }
+
+                    if (i + 1 == current_node->children_count) {
+                        printf_err("Couldn't parse '%s': No vars node named: '%.*s'.\n", "res/globals.vars", UNPACK(node_name));
+                        exit(1);
+                    }
+                }
+                
+                path = str_eat_chars(path, node_name.length + 1);
+            }
+
+
+
+            continue;
+        }
         
 
         // Default case.
         String literal = str_get_until_space(content);
-        printf("%-10s:    %.*s\n", "Literal", UNPACK(literal));
 
         content = str_eat_chars(content, literal.length);
 
+        if (found_field.length == 0 ) {
+            if (!str_is_int(literal) && !str_is_float(literal)) {
+                found_field = literal; // Basically any new literal which is not a number could be counted as a new field if other field was not found before.
+                printf("%-10s:    %.*s\n", "Key", UNPACK(literal));
+            }
+
+        }
+        else {
+            if (str_is_int(literal)) {
+                
+                // Searching node in the tree.
+                Vars_Node *children = REL2ABS_32(current_node->children_rptr);
+                for (u32 i = 0; i < current_node->children_count; i++) {
+                    if (str_equals(children[i].name, found_field)) {
+                        *(s64 *)children[i].data = str_parse_int(literal);
+                        break;
+                    }
+
+                    if (i + 1 == current_node->children_count) {
+                        printf_err("Couldn't parse '%s': No field node named: '%.*s'.\n", "res/globals.vars", UNPACK(found_field));
+                        exit(1);
+                    }
+                }
+
+                found_field = (String){0};
+
+                printf("%-10s:    %.*s\n", "Integer", UNPACK(literal));
+                continue;
+            }
+
+            if (str_is_float(literal)) {
+
+                Vars_Node *children = REL2ABS_32(current_node->children_rptr);
+                for (u32 i = 0; i < current_node->children_count; i++) {
+                    if (str_equals(children[i].name, found_field)) {
+                        *(float *)children[i].data = str_parse_float(literal);
+                        break;
+                    }
+
+                    if (i + 1 == current_node->children_count) {
+                        printf_err("Couldn't parse '%s': No field node named: '%.*s'.\n", "res/globals.vars", UNPACK(found_field));
+                        exit(1);
+                    }
+                }
+
+                found_field = (String){0};
+
+                printf("%-10s:    %.*s\n", "Float", UNPACK(literal));
+                continue;
+            }
+            
+            printf_err("Couldn't parse '%s': '%.*s' is not a valid field value.\n", "res/globals.vars", UNPACK(literal));
+            exit(1);
+        }
     }
 
 
     allocator_free(&std_allocator, _content.data);
+
+
+
+    printf("console_data from code:\n");
+    printf("speed = %d\n", console_data.speed);
+    printf("open_percent = %f\n", console_data.open_percent);
+    printf("full_open_percent = %f\n", console_data.full_open_percent);
+    printf("text_pad = %d\n", console_data.text_pad);
 }
