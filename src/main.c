@@ -1,8 +1,8 @@
 #include "core/core.h"
-#include "core/graphics.h"
-#include "core/input.h"
 #include "core/structs.h"
 #include "game/plug.h"
+#include "game/graphics.h"
+#include "game/input.h"
 
 #include <SDL2/SDL_events.h>
 #include <SDL2/SDL_mouse.h>
@@ -11,11 +11,6 @@
 #ifdef DEV
 #include <windows.h>
 #endif
-
-#define WINDOW_WIDTH 1280
-#define WINDOW_HEIGHT 700
-
-const char* APP_NAME = "Game in C";
 
 
 #ifdef DEV
@@ -36,43 +31,14 @@ int main(int argc, char *argv[]) {
     fprintf(stdout, "Dev build is launched.\n");
     #endif
 
-    // Init SDL and GL.
-    if (init_sdl_gl()) {
-        fprintf(stderr, "%s Couldn't init SDL and GL.\n", debug_error_str);
-        return 1;
-    }
-    
-    // Init audio.
-    if (init_sdl_audio()) {
-        fprintf(stderr, "%s Couldn't init audio.\n", debug_error_str);
-        return 1;
-    }
-
-
     // Allocate global state.
     state = allocator_alloc(&std_allocator, sizeof(Plug_State));
-
-
-    // Create window.
-    state->window = create_gl_window(APP_NAME, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT);
-
-    if (state->window.ptr == NULL) {
-        fprintf(stderr, "%s Couldn't create window.\n", debug_error_str);
-        return 1;
-    }
-
-
-
-
-
-    keyboard_state_init();
-
-    graphics_init();
     
     state->t.delta_time_multi = 1.0f;
     state->t.time_slow_factor = 1;
 
     #ifdef DEV
+    state->should_hot_reload = false;
     reload_libplug();
     #else
     plug_init(state);
@@ -100,14 +66,13 @@ int main(int argc, char *argv[]) {
         plug_update(state);
 
         #ifdef DEV
-        if (!SDL_IsTextInputActive() && pressed(SDLK_r)) {
+        if (state->should_hot_reload) {
             if(!reload_libplug()) {
                 fprintf(stderr, "%s Failed to hot reload plug.dll.\n", debug_error_str);
             }
         }
         #endif
 
-        keyboard_state_old_update();
 
         if (state->events.should_quit) {
             break;

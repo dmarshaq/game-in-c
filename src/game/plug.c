@@ -1,12 +1,12 @@
 #include "game/plug.h"
 #include "core/core.h"
 #include "core/type.h"
-#include "core/graphics.h"
 #include "core/structs.h"
 #include "core/file.h"
 #include "core/mathf.h"
-#include "core/input.h"
 
+#include "game/graphics.h"
+#include "game/input.h"
 #include "game/draw.h"
 #include "game/event.h"
 #include "game/console.h"
@@ -790,9 +790,49 @@ void menu_draw() {
 
 
 
+#define WINDOW_WIDTH 1280
+#define WINDOW_HEIGHT 700
+
+const char* APP_NAME = "Game in C";
+
 
 void plug_init(Plug_State *s) {
     state = s;
+
+
+
+    // Init SDL and GL.
+    if (init_sdl_gl()) {
+        fprintf(stderr, "%s Couldn't init SDL and GL.\n", debug_error_str);
+        exit(1);
+    }
+    
+    // Init audio.
+    if (init_sdl_audio()) {
+        fprintf(stderr, "%s Couldn't init audio.\n", debug_error_str);
+        exit(1);
+    }
+
+
+    // Create window.
+    state->window = create_gl_window(APP_NAME, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT);
+
+    if (state->window.ptr == NULL) {
+        fprintf(stderr, "%s Couldn't create window.\n", debug_error_str);
+        exit(1);
+    }
+
+
+
+
+    // Keyboard init.
+    keyboard_state_init();
+
+    // Initing graphics.
+    graphics_init();
+
+
+
 
     // Initing events.
     init_events_handler(&state->events);
@@ -954,6 +994,18 @@ void plug_update(Plug_State *s) {
 
     // Swap buffers to display the rendered image.
     SDL_GL_SwapWindow(state->window.ptr);
+
+    
+    // Checking for hot reload.
+#ifdef DEV
+    if (BIND_PRESSED(SDLK_r)) {
+        state->should_hot_reload = true;
+    }
+#endif
+
+
+    // Post updating input.
+    keyboard_state_old_update();
 }
 
 void plug_unload(Plug_State *s) {

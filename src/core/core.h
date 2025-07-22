@@ -33,14 +33,7 @@ extern const char *debug_ok_str;
 
 /**
  * Allocators.
- * @Important: There are different ways to approach memory allocation situation, using malloc() calloc() and realloc() is all great, and if used correctly can benefit the program flow.
- * The problem that arises is when you want to have more flexibility over memory use.
- * For example - arena allocator uses pre-allocated memory to linearly distribute this "prepared" memory.
- * And ideally all allocations of such should be easily done, without any overhead.
- * So the use of dynamic memory becomes more convinient and logical when deciding what to use Stack or Heap.
- * It is important that the whole process doesn't become super simple, since it is not about making garbade collection system, but about making the whole process more organized and easy to follow.
- * This is why free(), malloc(), calloc(), realloc() and other std calls is fine to use. It is even convinient to provide an Allocator instance that directly calls this functions.
- * The idea is to have a workflow where if you allocate dynamically something in the function, and the function returns it to you, you pass your allocator of choice to do this job.
+ * @Todo: Refactor allocators, avoid standarlized allocator structure. One interface per allocator.
  *
  * Arena allocator.
  */

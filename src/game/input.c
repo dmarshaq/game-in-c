@@ -1,4 +1,4 @@
-#include "core/input.h"
+#include "game/input.h"
 #include "core/core.h"
 #include "core/type.h"
 #include "core/mathf.h"

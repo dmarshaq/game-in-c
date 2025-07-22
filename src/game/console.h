@@ -3,7 +3,7 @@
 
 #include "game/plug.h"
 #include "game/draw.h"
-#include "core/graphics.h"
+#include "game/graphics.h"
 #include "core/structs.h"
 #include "core/str.h"
 #include "core/mathf.h"

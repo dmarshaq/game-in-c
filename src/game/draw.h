@@ -1,10 +1,11 @@
 #ifndef DRAW_H
 #define DRAW_H
 
+#include "game/graphics.h"
+
 #include "core/core.h"
 #include "core/type.h"
 #include "core/mathf.h"
-#include "core/graphics.h"
 #include "core/str.h"
 
 // Drawing basics.

@@ -1,8 +1,8 @@
 #ifndef EVENT_H
 #define EVENT_H
 
+#include "game/graphics.h"
 #include "core/core.h"
-#include "core/graphics.h"
 #include "core/mathf.h"
 
 #include <stdbool.h>

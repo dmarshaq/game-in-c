@@ -1,7 +1,7 @@
 # Compiler and flags
 CC = gcc
 CFLAGS = -std=gnu11
-DEV_CFLAGS = -g -O0 -DDEBUG -DDEV
+DEV_CFLAGS = -g -O0 -DDEBUG
 RELEASE_CFLAGS = -O2 -DNDEBUG
 LIBFLAGS = -lmingw32 -lSDL2main -lSDL2 -lSDL2_mixer -lopengl32 -lglew32
 
@@ -37,23 +37,23 @@ TARGET_META_EXE = $(BIN_DIR)/meta.exe
 TARGET_MAIN_EXE = $(BIN_DIR)/main.exe
 
 # Target plug.dll
-TARGET_PLUG_DLL = $(BIN_DIR)/plug.dll
+# TARGET_PLUG_DLL = $(BIN_DIR)/plug.dll
 
 # Target core.dll
-TARGET_CORE_DLL = $(BIN_DIR)/dyncore.dll
+# TARGET_CORE_DLL = $(BIN_DIR)/dyncore.dll
 
 # Target libcore.a
 TARGET_CORE_STATIC = $(BIN_DIR)/libcore.a
 
 # Release executable
-TARGET_RELEASE = $(BIN_DIR)/release.exe
+# TARGET_RELEASE = $(BIN_DIR)/release.exe
 
 # Default target logic
 all: 
 ifeq ($(BUILD),dev)
-	$(MAKE) clean libcore dyncore plug main
+	$(MAKE) clean libcore main
 else
-	$(MAKE) clean libcore release
+	$(MAKE) release
 endif
 
 # Make .o files for libcore.a
@@ -67,31 +67,31 @@ $(TARGET_CORE_STATIC): | $(BIN_DIR)
 	ar rcs $@ $(CORE_OBJ) 
 
 # Link into core.dll
-$(TARGET_CORE_DLL): | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ -fPIC -shared $(INCLUDES) $(CORE_SRC) $(LIBFLAGS)
+# $(TARGET_CORE_DLL): | $(BIN_DIR)
+# 	$(CC) $(CFLAGS) -o $@ -fPIC -shared $(INCLUDES) $(CORE_SRC) $(LIBFLAGS)
+# 
+# # Link into plug.dll
+# $(TARGET_PLUG_DLL): | $(BIN_DIR)
+# 	$(CC) $(CFLAGS) -o $@ -fPIC -shared $(INCLUDES) $(GAME_SRC) -L$(BIN_DIR) -lcore $(LIBFLAGS) 
+# 
+# # Link into main.exe
+# $(TARGET_MAIN_EXE): | $(BIN_DIR)
+# 	$(CC) $(CFLAGS) -o $@ $(INCLUDES) $(MAIN_SRC) -L$(BIN_DIR) -lcore $(LIBFLAGS)
 
-# Link into plug.dll
-$(TARGET_PLUG_DLL): | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ -fPIC -shared $(INCLUDES) $(GAME_SRC) $(LIBFLAGS) -L$(BIN_DIR) -ldyncore 
-
-# Link into main.exe
+# Link all into a single main.exe
 $(TARGET_MAIN_EXE): | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $(INCLUDES) $(MAIN_SRC) $(LIBFLAGS) -L$(BIN_DIR) -ldyncore 
-
-# Link all into a single release.exe
-$(TARGET_RELEASE): | $(BIN_DIR)
 	$(CC) $(CFLAGS) -o $@ $(INCLUDES) $(MAIN_SRC) $(GAME_SRC) -L$(BIN_DIR) -lcore $(LIBFLAGS)
 
 
 libcore: $(CORE_OBJ) $(TARGET_CORE_STATIC)
 
-dyncore: $(TARGET_CORE_DLL)
-
-plug: $(TARGET_PLUG_DLL)
+# dyncore: $(TARGET_CORE_DLL)
+# 
+# plug: $(TARGET_PLUG_DLL)
 
 main: $(TARGET_MAIN_EXE)
 
-release: clean $(TARGET_RELEASE)
+release: clean libcore main
 	@echo "Copying resources to $(BUILD_DIR)/res..."
 	@mkdir -p $(BUILD_DIR)/res
 	@cp -r res/* $(BUILD_DIR)/res/

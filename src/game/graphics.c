@@ -1,5 +1,5 @@
-#include "core/graphics.h"
-#include "core.h"
+#include "game/graphics.h"
+
 #include "core/core.h"
 #include "core/type.h"
 #include "core/str.h"
@@ -7,8 +7,8 @@
 #include "core/structs.h"
 #include "core/mathf.h"
 
+
 #include "SDL2/SDL_video.h"
-#include "graphics.h"
 #include <GL/glew.h>
 
 #define STB_IMAGE_IMPLEMENTATION

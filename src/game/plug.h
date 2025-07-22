@@ -2,10 +2,10 @@
 #define PLUG_H_
 
 #include "core/core.h"
-#include "core/graphics.h"
 #include "core/mathf.h"
-#include "core/input.h"
 
+#include "game/graphics.h"
+#include "game/input.h"
 #include "game/event.h"
 #include "game/physics.h"
 #include "game/imui.h"
@@ -109,6 +109,9 @@ typedef struct plug_state {
     Player player;
     Game_State gs;
 
+#ifdef DEV
+    bool should_hot_reload;
+#endif
 
 } Plug_State;
 

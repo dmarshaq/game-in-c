@@ -1,9 +1,9 @@
 #include "game/imui.h"
 
-#include "core/graphics.h"
 #include "core/structs.h"
 
 #include "game/draw.h"
+#include "game/graphics.h"
 #include "game/event.h"
 
 /**

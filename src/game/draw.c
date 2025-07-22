@@ -1,8 +1,8 @@
 #include "game/draw.h"
+#include "game/graphics.h"
 #include "core/core.h"
 #include "core/type.h"
 #include "core/mathf.h"
-#include "core/graphics.h"
 
 
 static const float DOT_SCALE = 0.005f;

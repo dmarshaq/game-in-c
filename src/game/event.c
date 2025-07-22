@@ -1,7 +1,7 @@
 #include "game/event.h"
+#include "game/input.h"
+#include "game/graphics.h"
 #include "core/type.h"
-#include "core/input.h"
-#include "core/graphics.h"
 #include "core/mathf.h"
 
 #include <SDL2/SDL_events.h>

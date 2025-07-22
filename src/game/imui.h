@@ -1,8 +1,7 @@
 #ifndef IMUI_H
 #define IMUI_H
 
-#include "core/graphics.h"
-
+#include "game/graphics.h"
 #include "game/event.h"
 
 
