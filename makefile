@@ -17,25 +17,33 @@ else
 endif
 
 # Directories
-OBJ_DIR := $(BUILD_DIR)/obj
+OBJ_DIR := obj
 BIN_DIR := $(BUILD_DIR)/bin
 SRC_DIR := src
 
 MAIN_SRC := $(SRC_DIR)/main.c
 GAME_SRC := $(wildcard $(SRC_DIR)/game/*.c)
 CORE_SRC :=	$(wildcard $(SRC_DIR)/core/*.c)
+META_SRC := $(wildcard $(SRC_DIR)/meta/*.c)
+
+CORE_OBJ := $(patsubst $(SRC_DIR)/core/%.c, $(OBJ_DIR)/core/%.o, $(CORE_SRC))
 
 INCLUDES := -I$(SRC_DIR)
 
+# Meta preprocess target executable
+TARGET_META_EXE = $(BIN_DIR)/meta.exe
 
 # Target executable
 TARGET_MAIN_EXE = $(BIN_DIR)/main.exe
 
-# Target plug dll
+# Target plug.dll
 TARGET_PLUG_DLL = $(BIN_DIR)/plug.dll
 
-# Target core dll
-TARGET_CORE_DLL = $(BIN_DIR)/core.dll
+# Target core.dll
+TARGET_CORE_DLL = $(BIN_DIR)/dyncore.dll
+
+# Target libcore.a
+TARGET_CORE_STATIC = $(BIN_DIR)/libcore.a
 
 # Release executable
 TARGET_RELEASE = $(BIN_DIR)/release.exe
@@ -43,29 +51,41 @@ TARGET_RELEASE = $(BIN_DIR)/release.exe
 # Default target logic
 all: 
 ifeq ($(BUILD),dev)
-	$(MAKE) clean core plug main
+	$(MAKE) clean libcore dyncore plug main
 else
-	$(MAKE) clean release
+	$(MAKE) clean libcore release
 endif
 
-# Link into core dll
+# Make .o files for libcore.a
+
+# Rule to build obj/core/*.o from src/core/*.c
+$(OBJ_DIR)/core/%.o: $(SRC_DIR)/core/%.c | $(OBJ_DIR)/core
+	$(CC) $(CFLAGS) -c $< -o $@ $(INCLUDES)
+
+# Link to libcore.a
+$(TARGET_CORE_STATIC): | $(BIN_DIR)
+	ar rcs $@ $(CORE_OBJ) 
+
+# Link into core.dll
 $(TARGET_CORE_DLL): | $(BIN_DIR)
 	$(CC) $(CFLAGS) -o $@ -fPIC -shared $(INCLUDES) $(CORE_SRC) $(LIBFLAGS)
 
-# Link into plug dll
+# Link into plug.dll
 $(TARGET_PLUG_DLL): | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ -fPIC -shared $(INCLUDES) $(GAME_SRC) $(LIBFLAGS) -L$(BIN_DIR) -lcore
+	$(CC) $(CFLAGS) -o $@ -fPIC -shared $(INCLUDES) $(GAME_SRC) $(LIBFLAGS) -L$(BIN_DIR) -ldyncore 
 
-# Link into main exe
+# Link into main.exe
 $(TARGET_MAIN_EXE): | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $(INCLUDES) $(MAIN_SRC) $(LIBFLAGS) -L$(BIN_DIR) -lcore
+	$(CC) $(CFLAGS) -o $@ $(INCLUDES) $(MAIN_SRC) $(LIBFLAGS) -L$(BIN_DIR) -ldyncore 
 
-# Link all into a single main exe
+# Link all into a single release.exe
 $(TARGET_RELEASE): | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $(INCLUDES) $(MAIN_SRC) $(CORE_SRC) $(GAME_SRC) $(LIBFLAGS)
+	$(CC) $(CFLAGS) -o $@ $(INCLUDES) $(MAIN_SRC) $(GAME_SRC) -L$(BIN_DIR) -lcore $(LIBFLAGS)
 
 
-core: $(TARGET_CORE_DLL)
+libcore: $(CORE_OBJ) $(TARGET_CORE_STATIC)
+
+dyncore: $(TARGET_CORE_DLL)
 
 plug: $(TARGET_PLUG_DLL)
 
@@ -76,7 +96,7 @@ release: clean $(TARGET_RELEASE)
 	@mkdir -p $(BUILD_DIR)/res
 	@cp -r res/* $(BUILD_DIR)/res/
 
-
+# core_obj: $(CORE_OBJ)
 
 $(BIN_DIR) $(OBJ_DIR):
 	mkdir -p $@
@@ -84,7 +104,9 @@ $(BIN_DIR) $(OBJ_DIR):
 
 # Clean build artifacts
 clean:
+	rm -f $(OBJ_DIR)/core/*.o
 	rm -f $(OBJ_DIR)/*.o
+	rm -f $(BIN_DIR)/*.a
 	rm -f $(BIN_DIR)/*.dll
 	rm -f $(BIN_DIR)/*.exe
 
