@@ -113,8 +113,8 @@ clean:
 	rm -f $(BIN_DIR)/*.exe
 
 clean_meta:
-	rm -f $(SRC_DIR)/*_meta_.c
-	rm -f $(SRC_DIR)/*_meta_.h
+	rm -f $(SRC_DIR)/game/*_meta_.c
+	rm -f $(SRC_DIR)/game/*_meta_.h
 
 
 
