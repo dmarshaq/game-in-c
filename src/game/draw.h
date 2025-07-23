@@ -1,7 +1,7 @@
 #ifndef DRAW_H
 #define DRAW_H
 
-#include "game/graphics.h"
+#include "game/graphics_meta_.h"
 
 #include "core/core.h"
 #include "core/type.h"

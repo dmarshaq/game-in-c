@@ -1,17 +1,18 @@
-#include "game/plug.h"
+#include "game/game_meta_.h"
+
 #include "core/core.h"
 #include "core/type.h"
 #include "core/structs.h"
 #include "core/file.h"
 #include "core/mathf.h"
 
-#include "game/graphics.h"
-#include "game/input.h"
-#include "game/draw.h"
-#include "game/event.h"
-#include "game/console.h"
-#include "game/vars.h"
-#include "game/imui.h"
+#include "game/graphics_meta_.h"
+#include "game/input_meta_.h"
+#include "game/draw_meta_.h"
+#include "game/event_meta_.h"
+#include "game/console_meta_.h"
+#include "game/vars_meta_.h"
+#include "game/imui_meta_.h"
 
 #include <SDL2/SDL_keycode.h>
 #include <SDL2/SDL_keyboard.h>
@@ -37,7 +38,7 @@ static const float MAX_PLAYER_SPEED = 6.0f;
 
 
 // Global state.
-static Plug_State *state;
+static State *state;
 
 
 
@@ -796,7 +797,7 @@ void menu_draw() {
 const char* APP_NAME = "Game in C";
 
 
-void plug_init(Plug_State *s) {
+void init(State *s) {
     state = s;
 
 
@@ -823,6 +824,7 @@ void plug_init(Plug_State *s) {
     }
 
 
+                        ;
 
 
     // Keyboard init.
@@ -882,7 +884,9 @@ void plug_init(Plug_State *s) {
     spawn_player(VEC2F_ORIGIN, vec4f_make(0.0f, 1.0f, 0.0f, 0.2f));
 }
 
-void plug_load(Plug_State *s) {
+             ;
+
+void load(State *s) {
     state = s;
 
     // Loading globals.
@@ -950,7 +954,7 @@ static s32 load_counter = 5;
  * Where in updating all logic of the game loop is contained including inputs, sound and so on.
  * Drawing part is only responsible for putting pixels accrodingly with calculated data in "Updating" part.
  */
-void plug_update(Plug_State *s) {
+void update(State *s) {
     state = s;
     
     // Handling events
@@ -1008,7 +1012,7 @@ void plug_update(Plug_State *s) {
     keyboard_state_old_update();
 }
 
-void plug_unload(Plug_State *s) {
+void unload(State *s) {
     state->t.delta_time_multi = 0.0f;
 
     console_free();

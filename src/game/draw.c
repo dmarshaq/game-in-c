@@ -1,5 +1,6 @@
-#include "game/draw.h"
-#include "game/graphics.h"
+#include "game/draw_meta_.h"
+#include "game/graphics_meta_.h"
+
 #include "core/core.h"
 #include "core/type.h"
 #include "core/mathf.h"

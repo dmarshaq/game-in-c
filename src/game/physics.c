@@ -1,4 +1,5 @@
-#include "game/physics.h"
+#include "game/physics_meta_.h"
+
 #include "core/mathf.h"
 #include "core/core.h"
 

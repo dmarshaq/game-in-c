@@ -1,18 +1,20 @@
 #ifndef CONSOLE_H
 #define CONSOLE_H
 
-#include "game/plug.h"
-#include "game/draw.h"
-#include "game/graphics.h"
+#include "game/game_meta_.h"
+#include "game/draw_meta_.h"
+#include "game/graphics_meta_.h"
+
 #include "core/structs.h"
 #include "core/str.h"
 #include "core/mathf.h"
+
 #include <SDL2/SDL_keyboard.h>
 #include <SDL2/SDL_keycode.h>
 
 
 
-void init_console(Plug_State *state);
+void init_console(State *state);
 
 void console_update(Window_Info *window, Events_Info *events, Time_Info *t);
 

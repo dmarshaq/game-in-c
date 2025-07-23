@@ -1,8 +1,8 @@
 #ifndef IMUI_H
 #define IMUI_H
 
-#include "game/graphics.h"
-#include "game/event.h"
+#include "game/graphics_meta_.h"
+#include "game/event_meta_.h"
 
 
 typedef struct ui_theme {

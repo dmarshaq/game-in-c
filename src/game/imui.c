@@ -1,10 +1,10 @@
-#include "game/imui.h"
+#include "game/imui_meta_.h"
 
 #include "core/structs.h"
 
-#include "game/draw.h"
-#include "game/graphics.h"
-#include "game/event.h"
+#include "game/draw_meta_.h"
+#include "game/graphics_meta_.h"
+#include "game/event_meta_.h"
 
 /**
  * User Interface.
@@ -24,6 +24,7 @@ Vec2f ui_current_frame_origin() {
     return ui->frame_stack[array_list_length(&ui->frame_stack) - 1].origin;
 }
 
+             ;
 Vec2f ui_current_frame_size() {
     if (array_list_length(&ui->frame_stack) < 1) {
         printf_err("UI Current frame doesn't exist.\n");

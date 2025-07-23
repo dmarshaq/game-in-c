@@ -21,12 +21,15 @@ OBJ_DIR := obj
 BIN_DIR := $(BUILD_DIR)/bin
 SRC_DIR := src
 
-MAIN_SRC := $(SRC_DIR)/main.c
 GAME_SRC := $(wildcard $(SRC_DIR)/game/*.c)
+GAME_HEADERS := $(wildcard $(SRC_DIR)/game/*.h)
+META_GAME_SRC := $(wildcard $(SRC_DIR)/game/*_meta_.c)
 CORE_SRC :=	$(wildcard $(SRC_DIR)/core/*.c)
 META_SRC := $(wildcard $(SRC_DIR)/meta/*.c)
+META_GENERATED_SRC := $(SRC_DIR)/meta_generated.c
 
 CORE_OBJ := $(patsubst $(SRC_DIR)/core/%.c, $(OBJ_DIR)/core/%.o, $(CORE_SRC))
+
 
 INCLUDES := -I$(SRC_DIR)
 
@@ -36,27 +39,21 @@ TARGET_META_EXE = $(BIN_DIR)/meta.exe
 # Target executable
 TARGET_MAIN_EXE = $(BIN_DIR)/main.exe
 
-# Target plug.dll
-# TARGET_PLUG_DLL = $(BIN_DIR)/plug.dll
-
-# Target core.dll
-# TARGET_CORE_DLL = $(BIN_DIR)/dyncore.dll
-
 # Target libcore.a
 TARGET_CORE_STATIC = $(BIN_DIR)/libcore.a
 
-# Release executable
-# TARGET_RELEASE = $(BIN_DIR)/release.exe
 
 # Default target logic
-all: 
 ifeq ($(BUILD),dev)
-	$(MAKE) clean libcore main
+all: 
+	$(MAKE) clean libcore meta
+	$(MAKE) main clean_meta
 else
-	$(MAKE) release
+all: 
+	$(MAKE) clean libcore meta 
+	$(MAKE) main clean_meta copy_resources
 endif
 
-# Make .o files for libcore.a
 
 # Rule to build obj/core/*.o from src/core/*.c
 $(OBJ_DIR)/core/%.o: $(SRC_DIR)/core/%.c | $(OBJ_DIR)/core
@@ -66,35 +63,40 @@ $(OBJ_DIR)/core/%.o: $(SRC_DIR)/core/%.c | $(OBJ_DIR)/core
 $(TARGET_CORE_STATIC): | $(BIN_DIR)
 	ar rcs $@ $(CORE_OBJ) 
 
-# Link into core.dll
-# $(TARGET_CORE_DLL): | $(BIN_DIR)
-# 	$(CC) $(CFLAGS) -o $@ -fPIC -shared $(INCLUDES) $(CORE_SRC) $(LIBFLAGS)
-# 
-# # Link into plug.dll
-# $(TARGET_PLUG_DLL): | $(BIN_DIR)
-# 	$(CC) $(CFLAGS) -o $@ -fPIC -shared $(INCLUDES) $(GAME_SRC) -L$(BIN_DIR) -lcore $(LIBFLAGS) 
-# 
-# # Link into main.exe
-# $(TARGET_MAIN_EXE): | $(BIN_DIR)
-# 	$(CC) $(CFLAGS) -o $@ $(INCLUDES) $(MAIN_SRC) -L$(BIN_DIR) -lcore $(LIBFLAGS)
+
+# Making meta.exe
+$(TARGET_META_EXE): | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $(INCLUDES) $(META_SRC) -L$(BIN_DIR) -lcore
+
 
 # Link all into a single main.exe
 $(TARGET_MAIN_EXE): | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $(INCLUDES) $(MAIN_SRC) $(GAME_SRC) -L$(BIN_DIR) -lcore $(LIBFLAGS)
+	$(CC) $(CFLAGS) -o $@ $(INCLUDES) $(META_GENERATED_SRC) $(META_GAME_SRC) -L$(BIN_DIR) -lcore $(LIBFLAGS)
 
 
 libcore: $(CORE_OBJ) $(TARGET_CORE_STATIC)
 
-# dyncore: $(TARGET_CORE_DLL)
-# 
-# plug: $(TARGET_PLUG_DLL)
+meta: $(TARGET_META_EXE)
+	$(TARGET_META_EXE) $(GAME_SRC) $(GAME_HEADERS)
 
 main: $(TARGET_MAIN_EXE)
 
-release: clean libcore main
+headers:
+	@echo $(GAME_HEADERS)
+
+
+copy_resources:
 	@echo "Copying resources to $(BUILD_DIR)/res..."
 	@mkdir -p $(BUILD_DIR)/res
 	@cp -r res/* $(BUILD_DIR)/res/
+
+
+restore:
+	for f in $(META_BACKUP); do \
+		cp $$f $${f%.bak}; \
+	done
+	sed -i 's/\r$$//' $$(echo $(META_BACKUP) | sed 's/\.bak//g')
+
 
 # core_obj: $(CORE_OBJ)
 
@@ -109,6 +111,10 @@ clean:
 	rm -f $(BIN_DIR)/*.a
 	rm -f $(BIN_DIR)/*.dll
 	rm -f $(BIN_DIR)/*.exe
+
+clean_meta:
+	rm -f $(SRC_DIR)/*_meta_.c
+	rm -f $(SRC_DIR)/*_meta_.h
 
 
 

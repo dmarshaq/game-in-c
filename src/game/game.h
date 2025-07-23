@@ -1,14 +1,14 @@
-#ifndef PLUG_H_
-#define PLUG_H_
+#ifndef GAME_H
+#define GAME_H
 
 #include "core/core.h"
 #include "core/mathf.h"
 
-#include "game/graphics.h"
-#include "game/input.h"
-#include "game/event.h"
-#include "game/physics.h"
-#include "game/imui.h"
+#include "game/graphics_meta_.h"
+#include "game/input_meta_.h"
+#include "game/event_meta_.h"
+#include "game/physics_meta_.h"
+#include "game/imui_meta_.h"
 
 
 /**
@@ -73,7 +73,7 @@ typedef enum game_state {
  * @Todo: Divide global state on smalle sub states and pack them together so code pieces can choose what part of global state is specifically used at the moment rather than throwing all in one group and everytime time accessing all variables at the same time.
  * @Todo: Divide plug state even more, and make dynamic global vars loading from some kind of variables file or context. Can be used .json but it probably more reasonable to use straight up basic key value format.
  */
-typedef struct plug_state {
+typedef struct state {
     Window_Info window;
     Events_Info events;
     Time_Info t;
@@ -109,11 +109,7 @@ typedef struct plug_state {
     Player player;
     Game_State gs;
 
-#ifdef DEV
-    bool should_hot_reload;
-#endif
-
-} Plug_State;
+} State;
 
 
 
@@ -122,16 +118,13 @@ typedef struct plug_state {
 
 
 
-#ifdef DEV
-typedef void (*Plug_Init)(Plug_State *state);
-typedef void (*Plug_Update)(Plug_State *state);
-typedef void (*Plug_Load)(Plug_State *state);
-typedef void (*Plug_Unload)(Plug_State *state);
-#else
-void plug_init(Plug_State *state);
-void plug_update(Plug_State *state);
-void plug_load(Plug_State *state);
-void plug_unload(Plug_State *state);
-#endif
+
+void init(State *state);
+
+void load(State *state);
+
+void update(State *state);
+
+void unload(State *state);
 
 #endif

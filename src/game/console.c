@@ -1,11 +1,13 @@
-#include "game/console.h"
-#include "game/plug.h"
-#include "game/draw.h"
-#include "game/graphics.h"
+#include "game/console_meta_.h"
+#include "game/game_meta_.h"
+#include "game/draw_meta_.h"
+#include "game/graphics_meta_.h"
+
 #include "core/structs.h"
 #include "core/str.h"
 #include "core/mathf.h"
 #include "core/file.h"
+
 #include <SDL2/SDL_keyboard.h>
 #include <SDL2/SDL_keycode.h>
 #include <stdio.h>
@@ -311,7 +313,7 @@ void console_error(char *format, ...) {
 
 
 
-void init_console(Plug_State *state) {
+void init_console(State *state) {
     // Init commands.
     init_console_commands();
 

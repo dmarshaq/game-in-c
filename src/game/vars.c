@@ -1,11 +1,11 @@
-#include "game/vars.h"
+#include "game/vars_meta_.h"
+
+#include "game/game_meta_.h"
 
 #include "core/core.h"
 #include "core/str.h"
 #include "core/file.h"
 #include "core/structs.h"
-
-#include "game/plug.h"
 
 #include <stddef.h>
 
@@ -213,7 +213,7 @@ void vars_tree_print_node(Vars_Node *node, s64 depth) {
 
 
 
-
+@AddToVars;
 typedef struct console {
     s64 speed;
     float open_percent;
