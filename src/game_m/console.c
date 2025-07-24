@@ -1,7 +1,7 @@
-#include "game/console_meta_.h"
-#include "game/game_meta_.h"
-#include "game/draw_meta_.h"
-#include "game/graphics_meta_.h"
+#include "game/console.h"
+#include "game/game.h"
+#include "game/draw.h"
+#include "game/graphics.h"
 
 #include "core/structs.h"
 #include "core/str.h"

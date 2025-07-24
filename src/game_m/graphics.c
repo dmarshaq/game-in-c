@@ -1,4 +1,4 @@
-#include "game/graphics_meta_.h"
+#include "game/graphics.h"
 
 #include "core/core.h"
 #include "core/type.h"

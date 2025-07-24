@@ -1,6 +1,6 @@
-#include "game/vars_meta_.h"
+#include "game/vars.h"
 
-#include "game/game_meta_.h"
+#include "game/game.h"
 
 #include "core/core.h"
 #include "core/str.h"

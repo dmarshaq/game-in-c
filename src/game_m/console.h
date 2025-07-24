@@ -1,9 +1,9 @@
 #ifndef CONSOLE_H
 #define CONSOLE_H
 
-#include "game/game_meta_.h"
-#include "game/draw_meta_.h"
-#include "game/graphics_meta_.h"
+#include "game/game.h"
+#include "game/draw.h"
+#include "game/graphics.h"
 
 #include "core/structs.h"
 #include "core/str.h"

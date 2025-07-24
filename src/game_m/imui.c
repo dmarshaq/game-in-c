@@ -1,10 +1,10 @@
-#include "game/imui_meta_.h"
+#include "game/imui.h"
 
 #include "core/structs.h"
 
-#include "game/draw_meta_.h"
-#include "game/graphics_meta_.h"
-#include "game/event_meta_.h"
+#include "game/draw.h"
+#include "game/graphics.h"
+#include "game/event.h"
 
 /**
  * User Interface.

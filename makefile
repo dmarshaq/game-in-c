@@ -21,9 +21,9 @@ OBJ_DIR := obj
 BIN_DIR := $(BUILD_DIR)/bin
 SRC_DIR := src
 
-GAME_SRC := $(wildcard $(SRC_DIR)/game/*.c)
-GAME_HEADERS := $(wildcard $(SRC_DIR)/game/*.h)
-META_GAME_SRC := $(wildcard $(SRC_DIR)/game/*_meta_.c)
+GAME_SRC := $(wildcard $(SRC_DIR)/game_m/*.c)
+GAME_HEADERS := $(wildcard $(SRC_DIR)/game_m/*.h)
+META_GAME_SRC := $(wildcard $(SRC_DIR)/game/*.c)
 CORE_SRC :=	$(wildcard $(SRC_DIR)/core/*.c)
 META_SRC := $(wildcard $(SRC_DIR)/meta/*.c)
 META_GENERATED_SRC := $(SRC_DIR)/meta_generated.c
@@ -47,11 +47,11 @@ TARGET_CORE_STATIC = $(BIN_DIR)/libcore.a
 ifeq ($(BUILD),dev)
 all: 
 	$(MAKE) clean libcore meta
-	$(MAKE) main clean_meta
+	$(MAKE) main
 else
 all: 
 	$(MAKE) clean libcore meta 
-	$(MAKE) main clean_meta copy_resources
+	$(MAKE) main copy_resources
 endif
 
 

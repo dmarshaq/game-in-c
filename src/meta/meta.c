@@ -76,21 +76,20 @@ int meta_process_file(char *file_name, FILE *output_c, FILE *output_h) {
     
 
 
-    // Make _meta_ source file.
+    // Make source file.
     s64 name_length = strlen(file_name);
-    if (name_length + 6 >= 128) {
-        printf_err("File name '%s' is too long, can't create _meta_ file.\n", file_name);
+    if (name_length >= 128) {
+        printf_err("File name '%s' is too long, can't create source file.\n", file_name);
         return 1;
     }
 
     char meta_file_name[128];
-    memcpy(meta_file_name, file_name, name_length - 2); // Discarding .c or .h
-    memcpy(meta_file_name + name_length - 2, "_meta_", 6); // Adding _meta_
-    memcpy(meta_file_name + name_length + 4, file_name + name_length - 2, 3); // Adding .c\0 or .h\0
+    memcpy(meta_file_name, "game/", 5);
+    memcpy(meta_file_name + 5, file_name + 6, name_length - 5); // Discarding game_m/ and saving \0 at the end
 
 
     if (write_str_to_file(_content, meta_file_name) != 0) {
-        printf_err("Couldn't create _meta_ file '%s'\n", meta_file_name);
+        printf_err("Couldn't create source file '%s'\n", meta_file_name);
         return 1;
     }
 

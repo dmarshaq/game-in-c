@@ -1,9 +1,9 @@
 #include "core/core.h"
 #include "core/structs.h"
 
-#include "game/game_meta_.h"
-#include "game/graphics_meta_.h"
-#include "game/input_meta_.h"
+#include "game/game.h"
+#include "game/graphics.h"
+#include "game/input.h"
 
 
 

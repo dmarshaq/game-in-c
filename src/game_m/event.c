@@ -1,6 +1,6 @@
-#include "game/event_meta_.h"
-#include "game/input_meta_.h"
-#include "game/graphics_meta_.h"
+#include "game/event.h"
+#include "game/input.h"
+#include "game/graphics.h"
 
 #include "core/type.h"
 #include "core/mathf.h"

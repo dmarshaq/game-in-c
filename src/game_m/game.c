@@ -1,4 +1,4 @@
-#include "game/game_meta_.h"
+#include "game/game.h"
 
 #include "core/core.h"
 #include "core/type.h"
@@ -6,13 +6,13 @@
 #include "core/file.h"
 #include "core/mathf.h"
 
-#include "game/graphics_meta_.h"
-#include "game/input_meta_.h"
-#include "game/draw_meta_.h"
-#include "game/event_meta_.h"
-#include "game/console_meta_.h"
-#include "game/vars_meta_.h"
-#include "game/imui_meta_.h"
+#include "game/graphics.h"
+#include "game/input.h"
+#include "game/draw.h"
+#include "game/event.h"
+#include "game/console.h"
+#include "game/vars.h"
+#include "game/imui.h"
 
 #include <SDL2/SDL_keycode.h>
 #include <SDL2/SDL_keyboard.h>

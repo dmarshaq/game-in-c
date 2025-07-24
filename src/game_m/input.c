@@ -1,4 +1,4 @@
-#include "game/input_meta_.h"
+#include "game/input.h"
 
 #include "core/core.h"
 #include "core/type.h"
