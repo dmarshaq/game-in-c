@@ -1,7 +1,7 @@
 #ifndef EVENT_H
 #define EVENT_H
 
-#include "game/graphics_meta_.h"
+#include "game/graphics.h"
 
 #include "core/core.h"
 #include "core/mathf.h"
