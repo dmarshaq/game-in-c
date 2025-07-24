@@ -71,9 +71,6 @@ void token_print(Token *token) {
         // case (TOKEN_C_NON_TYPE_KEYWORD):
         //     printf("%s\n", "C keyword");
         //     break;
-        case (TOKEN_NEWLINE):
-            printf("%s\n", "new line");
-            break;
     }
 }
 
@@ -166,14 +163,7 @@ bool lexer_consume_spaces(Lexer *l) {
 }
 
 Token lexer_next_token(Lexer *l) {
-    if (lexer_consume_spaces(l)) {
-        return (Token) { 
-            .type = TOKEN_NEWLINE, 
-            .str.data = l->content.data + l->cursor - 1, 
-            .str.length = 1,
-            .line_num = l->line_num,
-        };
-    }
+    lexer_consume_spaces(l);
 
     Token token = {
         .type = TOKEN_UNKNOWN,
@@ -219,7 +209,7 @@ Token lexer_next_token(Lexer *l) {
 
         while (l->cursor < l->content.length) {
 
-            if (l->content.data[l->cursor] == '\n') { 
+            if (lexer_eat_char(l)) { 
                 // If we got '\n'.
                 s64 index_of_last_char = str_find_non_whitespace_right(token.str);
                 if (token.str.data[index_of_last_char] != '\\') { 
@@ -228,7 +218,6 @@ Token lexer_next_token(Lexer *l) {
                 } 
             }
             token.str.length++;
-            l->cursor++;
         }
 
         return token;
@@ -267,11 +256,11 @@ Token lexer_next_token(Lexer *l) {
             l->cursor++;
 
             while (l->cursor < l->content.length) {
-                if (l->content.data[l->cursor] == '\n') {
+
+                if (lexer_eat_char(l)) {
                     break;
                 }
                 token.str.length++;
-                l->cursor++;
             }
 
             return token;
@@ -284,8 +273,9 @@ Token lexer_next_token(Lexer *l) {
             l->cursor++;
 
             while (l->cursor < l->content.length && (l->content.data[l->cursor - 1] != '*' || l->content.data[l->cursor] != '/')) {
+
+                lexer_eat_char(l);
                 token.str.length++;
-                l->cursor++;
             }
 
 

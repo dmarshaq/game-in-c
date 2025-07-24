@@ -13,6 +13,44 @@ const char* debug_meta_str = "\033[34m[META]\033[0m";
 #define meta_log(format, ...)                 (void)fprintf(stderr, "%s " format, debug_meta_str, ##__VA_ARGS__);
 
 
+// Helper methods: meta_tool
+
+
+
+
+/**
+ * Following code until END can be project and task specific.
+ * Add new meta_note_process_*(...) here.
+ *
+ * Template:
+
+int meta_note_process_MyNote(Lexer lexer) {
+
+    return 0;
+}
+
+ */
+
+
+
+int meta_note_process_Introspect(Lexer lexer) {
+    Token next = lexer_next_token(&lexer);
+
+    printf("Introspected next token:\n");
+    token_print(&next);
+    
+    return 0;
+}
+
+
+/**
+ * END
+ */
+
+
+
+
+
 
 
 void meta_replace_with_space(String metanote_str) {
@@ -43,9 +81,9 @@ int meta_process_file(char *file_name, FILE *output_c, FILE *output_h) {
     
     
     
-    // Process _content here.
     Lexer lexer;
-
+    
+    // Process _content here.
     lexer_init(&lexer, _content);
 
     Token next;
@@ -65,13 +103,25 @@ int meta_process_file(char *file_name, FILE *output_c, FILE *output_h) {
                 return 1;
             }
             
-            String metanote_str = STR(metanote.str.length + next.str.length, metanote.str.data);
+            #ifdef LOG
+            printf("       - Found meta note '@%.*s' in file '%s' on line %lld.\n", UNPACK(next.str), file_name, lexer.line_num);
+            #endif
             
-            printf("       - Found meta note '%.*s' on line %lld.\n", UNPACK(metanote_str), lexer.line_num);
 
-            meta_replace_with_space(metanote_str);
+            // Triggering specific metanote.
+            if (str_equals(next.str, CSTR("Introspect"))) {
+                if (meta_note_process_Introspect(lexer) != 0) 
+                    return 1;
+                goto metanote_remove_continue;
+            }
+            
+            printf_err("Unknown meta note: '@%.*s' in file '%s' on line %lld.\n", UNPACK(next.str), file_name, lexer.line_num);
+            return 1;
+
+            metanote_remove_continue:
+            // Removing meta note from final source.
+            meta_replace_with_space(STR(metanote.str.length + next.str.length, metanote.str.data));
         }
-
     }
     
 

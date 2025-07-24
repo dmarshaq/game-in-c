@@ -31,8 +31,6 @@ typedef enum token_type {
     TOKEN_ASTERISK,
     TOKEN_METANOTE,
 
-
-    TOKEN_NEWLINE,
 } Token_Type;
 
 typedef struct token {

@@ -74,7 +74,6 @@ typedef enum game_state {
  * @Todo: Divide plug state even more, and make dynamic global vars loading from some kind of variables file or context. Can be used .json but it probably more reasonable to use straight up basic key value format.
  */
 
-@AddToVars;
 typedef struct state {
     Window_Info window;
     Events_Info events;

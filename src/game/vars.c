@@ -213,14 +213,6 @@ void vars_tree_print_node(Vars_Node *node, s64 depth) {
 
 
 
-          ;
-typedef struct console {
-    s64 speed;
-    float open_percent;
-    float full_open_percent;
-    s64 text_pad;
-} Console; 
-
 static Console console_data;
 
 
