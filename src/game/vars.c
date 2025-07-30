@@ -237,7 +237,7 @@ static Console console_data;
            ;
 Vars_Tree vars_tree_make() {
     // Testing Introspection!
-    print_type_info(TYPE_OF(vars_tree_make));
+    print_type_info(TYPE_OF(Console));
 
 
 

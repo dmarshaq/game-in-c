@@ -36,17 +36,17 @@ typedef struct {
 } Type_Info_Float;
 
 typedef struct {
-    const Type_Info *ptr_to;
+    Type_Info *ptr_to;
 } Type_Info_Pointer;
 
 
 typedef struct {
-    const Type_Info *type;
+    Type_Info *type;
     String name;
 } Type_Info_Function_Argument;
 
 typedef struct {
-    const Type_Info *return_type;
+    Type_Info *return_type;
 
     String name;
 
@@ -56,7 +56,7 @@ typedef struct {
 
 
 typedef struct {
-    const Type_Info *type;
+    Type_Info *type;
     String name;
 } Type_Info_Struct_Member;
 
@@ -68,7 +68,7 @@ typedef struct {
 } Type_Info_Struct;
 
 typedef struct {
-    const Type_Info *element_type;
+    Type_Info *element_type;
     u64 length;
 } Type_Info_Array;
 
@@ -78,7 +78,7 @@ typedef struct {
 } Type_Info_Enum;
 
 typedef struct {
-    const Type_Info *typedef_of;
+    Type_Info *typedef_of;
 } Type_Info_Typedef;
 
 struct type_info {

@@ -859,10 +859,10 @@ int main(int argc, char **argv) {
     fwrite_str(STR_BUFFER("} Meta_Type;\n\n"), meta_generated_h);
 
     // Forward declaring META_TYPE_TABLE
-    fwrite_str(STR_BUFFER("static const Type_Info META_TYPE_TABLE[];\n\n"), meta_generated_h);
+    fwrite_str(STR_BUFFER("static Type_Info META_TYPE_TABLE[];\n\n"), meta_generated_h);
 
     // Generating META_TYPE_FUNCTION_ARGS[]
-    fwrite_str(STR_BUFFER("static const Type_Info_Function_Argument META_TYPE_FUNCTION_ARGS[] = {\n"), meta_generated_h);
+    fwrite_str(STR_BUFFER("static Type_Info_Function_Argument META_TYPE_FUNCTION_ARGS[] = {\n"), meta_generated_h);
     for (u32 i = 0; i < arena_size(&arena_type_info_function_argument) / sizeof(Type_Info_Function_Argument); i++) {
         Type_Info_Function_Argument *arg = ((Type_Info_Function_Argument *)arena_type_info_function_argument.allocation) + i;
         String typename = type_table_get_typename(arg->type);
@@ -874,7 +874,7 @@ int main(int argc, char **argv) {
 
 
     // Generating META_TYPE_STRUCT_MEMBERS[]
-    fwrite_str(STR_BUFFER("static const Type_Info_Struct_Member META_TYPE_STRUCT_MEMBERS[] = {\n"), meta_generated_h);
+    fwrite_str(STR_BUFFER("static Type_Info_Struct_Member META_TYPE_STRUCT_MEMBERS[] = {\n"), meta_generated_h);
     for (u32 i = 0; i < arena_size(&arena_type_info_struct_member) / sizeof(Type_Info_Struct_Member); i++) {
         Type_Info_Struct_Member *member = ((Type_Info_Struct_Member *)arena_type_info_struct_member.allocation) + i;
         String typename = type_table_get_typename(member->type);
@@ -885,7 +885,7 @@ int main(int argc, char **argv) {
     fwrite_str(STR_BUFFER("};\n\n"), meta_generated_h);
 
     // Now generating type table itself
-    fwrite_str(STR_BUFFER("static const Type_Info META_TYPE_TABLE[] = {\n"), meta_generated_h);
+    fwrite_str(STR_BUFFER("static Type_Info META_TYPE_TABLE[] = {\n"), meta_generated_h);
     for (u32 i = 0; i < hash_table_capacity(&type_table); i++) {
         Hash_Table_Slot *slot = _hash_table_get_slot((void **)&type_table, i);
         Type_Info *item;

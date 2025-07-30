@@ -36,12 +36,12 @@ typedef enum meta_type {
     META_TYPE(Vars_Tree),
 } Meta_Type;
 
-static const Type_Info META_TYPE_TABLE[];
+static Type_Info META_TYPE_TABLE[];
 
-static const Type_Info_Function_Argument META_TYPE_FUNCTION_ARGS[] = {
+static Type_Info_Function_Argument META_TYPE_FUNCTION_ARGS[] = {
 };
 
-static const Type_Info_Struct_Member META_TYPE_STRUCT_MEMBERS[] = {
+static Type_Info_Struct_Member META_TYPE_STRUCT_MEMBERS[] = {
     { TYPE_OF(u64), STR_BUFFER("count") },
     { TYPE_OF(Vars_Node_ptr), STR_BUFFER("root") },
     { TYPE_OF(s64), STR_BUFFER("speed") },
@@ -50,7 +50,7 @@ static const Type_Info_Struct_Member META_TYPE_STRUCT_MEMBERS[] = {
     { TYPE_OF(s64), STR_BUFFER("text_pad") },
 };
 
-static const Type_Info META_TYPE_TABLE[] = {
+static Type_Info META_TYPE_TABLE[] = {
     [META_TYPE(vars_tree_make)] = (Type_Info) { FUNCTION, .t_function = { TYPE_OF(Vars_Tree), STR_BUFFER("vars_tree_make"), 0, &META_TYPE_FUNCTION_ARGS[0] } },
     [META_TYPE(bool)] = (Type_Info) { BOOL },
     [META_TYPE(char)] = (Type_Info) { INTEGER, .t_integer = { 8, 0 } },
