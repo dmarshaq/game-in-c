@@ -5,6 +5,79 @@
 #include <ctype.h>
 
 
+void token_print_block(Token *token, bool show_token_type) {
+    if (show_token_type) {
+        switch (token->type) {
+            case (TOKEN_ZERO):
+                printf("LEXING_END(");
+                break;
+            case (TOKEN_UNKNOWN):
+                printf("UNKNOWN_TOKEN(");
+                break;
+            case (TOKEN_SYMBOL):
+                printf("SYMBOL(");
+                break;
+            case (TOKEN_SEMICOLON):
+                printf("SEMICOLON(");
+                break;
+            case (TOKEN_PARAN_OPEN):
+                printf("PARENTHESIS_OPEN(");
+                break;
+            case (TOKEN_PARAN_CLOSE):
+                printf("PARENTHESIS_CLOSE(");
+                break;
+            case (TOKEN_CURLY_OPEN):
+                printf("CURLY_BRACES_OPEN(");
+                break;
+            case (TOKEN_CURLY_CLOSE):
+                printf("CURLY_BRACES_CLOSE(");
+                break;
+            case (TOKEN_SQR_BRACES_OPEN):
+                printf("SQUARE_BRACES_OPEN(");
+                break;
+            case (TOKEN_SQR_BRACES_CLOSE):
+                printf("SQUARE_BRACES_CLOSE(");
+                break;
+            case (TOKEN_STRING):
+                printf("STRING(");
+                break;
+            case (TOKEN_COMMENT):
+                printf("COMMENT(");
+                break;
+            case (TOKEN_PREPROC):
+                printf("PREPROCESSOR(");
+                break;
+            case (TOKEN_NUMBER):
+                printf("NUMBER(");
+                break;
+            case (TOKEN_COMMA):
+                printf("COMMA(");
+                break;
+            case (TOKEN_DOT):
+                printf("DOT(");
+                break;
+            case (TOKEN_ARROW):
+                printf("ARROW(");
+                break;
+            case (TOKEN_ASSIGN):
+                printf("ASSIGNMENT(");
+                break;
+            case (TOKEN_ASTERISK):
+                printf("ASTERISK(");
+                break;
+            case (TOKEN_METANOTE):
+                printf("METANOTE(");
+                break;
+        }
+    }
+    printf("'%.*s'", token->str.length, token->str.data);
+    if (show_token_type) {
+        printf(")");
+    }
+    printf(" ");
+}
+
+
 void token_print(Token *token) {
     printf("%-30.*s", token->str.length, token->str.data);
     switch (token->type) {
@@ -75,6 +148,71 @@ void token_print(Token *token) {
 }
 
 
+void token_type_print(Token_Type token_type) {
+    switch (token_type) {
+        case (TOKEN_ZERO):
+            printf("TOKEN_ZERO");
+            break;
+        case (TOKEN_UNKNOWN):
+            printf("UNKNOWN_TOKEN");
+            break;
+        case (TOKEN_SYMBOL):
+            printf("SYMBOL");
+            break;
+        case (TOKEN_SEMICOLON):
+            printf("SEMICOLON");
+            break;
+        case (TOKEN_PARAN_OPEN):
+            printf("PARENTHESIS_OPEN");
+            break;
+        case (TOKEN_PARAN_CLOSE):
+            printf("PARENTHESIS_CLOSE");
+            break;
+        case (TOKEN_CURLY_OPEN):
+            printf("CURLY_BRACES_OPEN");
+            break;
+        case (TOKEN_CURLY_CLOSE):
+            printf("CURLY_BRACES_CLOSE");
+            break;
+        case (TOKEN_SQR_BRACES_OPEN):
+            printf("SQUARE_BRACES_OPEN");
+            break;
+        case (TOKEN_SQR_BRACES_CLOSE):
+            printf("SQUARE_BRACES_CLOSE");
+            break;
+        case (TOKEN_STRING):
+            printf("STRING");
+            break;
+        case (TOKEN_COMMENT):
+            printf("COMMENT");
+            break;
+        case (TOKEN_PREPROC):
+            printf("PREPROCESSOR");
+            break;
+        case (TOKEN_NUMBER):
+            printf("NUMBER");
+            break;
+        case (TOKEN_COMMA):
+            printf("COMMA");
+            break;
+        case (TOKEN_DOT):
+            printf("DOT");
+            break;
+        case (TOKEN_ARROW):
+            printf("ARROW");
+            break;
+        case (TOKEN_ASSIGN):
+            printf("ASSIGNMENT");
+            break;
+        case (TOKEN_ASTERISK):
+            printf("ASTERISK");
+            break;
+        case (TOKEN_METANOTE):
+            printf("METANOTE");
+            break;
+    }
+    printf(" ");
+}
 
 
 
@@ -105,7 +243,6 @@ static const Literal_Token LITERAL_TOKENS[] = {
     { TOKEN_ARROW,              STR_BUFFER("->") },
     { TOKEN_ASSIGN,             STR_BUFFER("=") },
     { TOKEN_ASTERISK,           STR_BUFFER("*") },
-    { TOKEN_METANOTE,           STR_BUFFER("@") },
 };
 
 
@@ -152,14 +289,12 @@ bool lexer_eat_char(Lexer *l) {
 }
 
 // Returns true if stopped right after after newline character was eaten.
-bool lexer_consume_spaces(Lexer *l) {
+void lexer_consume_spaces(Lexer *l) {
+
     while (l->cursor < l->content.length && isspace(l->content.data[l->cursor])) {
-        if (lexer_eat_char(l)) {
-            return true;
-        }
+        lexer_eat_char(l);
     }
 
-    return false;
 }
 
 Token lexer_next_token(Lexer *l) {
@@ -290,6 +425,18 @@ Token lexer_next_token(Lexer *l) {
     }
 
 
+    if (l->content.data[l->cursor] == '@') {
+        token.type = TOKEN_METANOTE;
+        token.str.length++;
+        l->cursor++;
+
+        while (l->cursor < l->content.length && valid_symbol(l->content.data[l->cursor])) {
+            token.str.length++;
+            l->cursor++;
+        }
+        
+        return token;
+    }
 
     if (valid_symbol_start(l->content.data[l->cursor])) {
         token.type = TOKEN_SYMBOL;

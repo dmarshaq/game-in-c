@@ -521,12 +521,12 @@ void game_draw() {
 
 
     // Get neccessary to draw resource: (Shaders, Fonts, Textures, etc.).
-    Shader *quad_shader = hash_table_get(&state->shader_table, "quad");
-    Shader *grid_shader = hash_table_get(&state->shader_table, "grid");
-    Shader *line_shader = hash_table_get(&state->shader_table, "line");
+    Shader *quad_shader = hash_table_get(&state->shader_table, UNPACK_LITERAL("quad"));
+    Shader *grid_shader = hash_table_get(&state->shader_table, UNPACK_LITERAL("grid"));
+    Shader *line_shader = hash_table_get(&state->shader_table, UNPACK_LITERAL("line"));
 
-    Font_Baked *font_medium = hash_table_get(&state->font_table, "medium");
-    Font_Baked *font_small  = hash_table_get(&state->font_table, "small");
+    Font_Baked *font_medium = hash_table_get(&state->font_table, UNPACK_LITERAL("medium"));
+    Font_Baked *font_small  = hash_table_get(&state->font_table, UNPACK_LITERAL("small"));
 
 
     // Load camera's projection into all shaders to correctly draw elements according to camera view.
@@ -612,7 +612,7 @@ void game_draw() {
     // Get neccessary to draw resource: (Shaders, Fonts, Textures, etc.).
     state->ui.font = font_medium;
 
-    Shader *ui_quad_shader = hash_table_get(&state->shader_table, "ui_quad");
+    Shader *ui_quad_shader = hash_table_get(&state->shader_table, UNPACK_LITERAL("ui_quad"));
 
     projection = screen_calculate_projection(state->window.width, state->window.height);
     shader_update_projection(ui_quad_shader, &projection);
@@ -725,11 +725,11 @@ void menu_draw() {
     glClear(GL_COLOR_BUFFER_BIT);
 
     // Get neccessary to draw resource: (Shaders, Fonts, Textures, etc.).
-    Font_Baked *font_medium = hash_table_get(&state->font_table, "medium");
+    Font_Baked *font_medium = hash_table_get(&state->font_table, UNPACK_LITERAL("medium"));
     state->ui.font = font_medium;
 
-    Shader *ui_quad_shader = hash_table_get(&state->shader_table, "ui_quad");
-    Shader *line_shader = hash_table_get(&state->shader_table, "line");
+    Shader *ui_quad_shader = hash_table_get(&state->shader_table, UNPACK_LITERAL("ui_quad"));
+    Shader *line_shader = hash_table_get(&state->shader_table, UNPACK_LITERAL("line"));
 
     Matrix4f projection = screen_calculate_projection(state->window.width, state->window.height);
     shader_update_projection(ui_quad_shader, &projection);
@@ -901,25 +901,25 @@ void load(State *s) {
     // Shader loading.
     Shader grid_shader = shader_load("res/shader/grid.glsl");
     shader_init_uniforms(&grid_shader);
-    hash_table_put(&state->shader_table, grid_shader, "grid");
+    hash_table_put(&state->shader_table, grid_shader, UNPACK_LITERAL("grid"));
 
     Shader quad_shader = shader_load("res/shader/quad.glsl");
     shader_init_uniforms(&quad_shader);
-    hash_table_put(&state->shader_table, quad_shader, "quad");
+    hash_table_put(&state->shader_table, quad_shader, UNPACK_LITERAL("quad"));
 
     Shader ui_quad_shader = shader_load("res/shader/ui_quad.glsl");
     shader_init_uniforms(&ui_quad_shader);
-    hash_table_put(&state->shader_table, ui_quad_shader, "ui_quad");
+    hash_table_put(&state->shader_table, ui_quad_shader, UNPACK_LITERAL("ui_quad"));
 
     Shader line_shader = shader_load("res/shader/line.glsl");
     shader_init_uniforms(&line_shader);
-    hash_table_put(&state->shader_table, line_shader, "line");
+    hash_table_put(&state->shader_table, line_shader, UNPACK_LITERAL("line"));
 
     // Drawers init.
-    drawer_init(&state->quad_drawer, hash_table_get(&state->shader_table, "quad"));
-    drawer_init(&state->grid_drawer, hash_table_get(&state->shader_table, "grid"));
-    drawer_init(&state->ui_drawer, hash_table_get(&state->shader_table, "ui_quad"));
-    line_drawer_init(&state->line_drawer, hash_table_get(&state->shader_table, "line"));
+    drawer_init(&state->quad_drawer, hash_table_get(&state->shader_table, UNPACK_LITERAL("quad")));
+    drawer_init(&state->grid_drawer, hash_table_get(&state->shader_table, UNPACK_LITERAL("grid")));
+    drawer_init(&state->ui_drawer, hash_table_get(&state->shader_table, UNPACK_LITERAL("ui_quad")));
+    line_drawer_init(&state->line_drawer, hash_table_get(&state->shader_table, UNPACK_LITERAL("line")));
 
 
 
@@ -927,10 +927,10 @@ void load(State *s) {
     u8* font_data = read_file_into_buffer("res/font/font.ttf", NULL, &std_allocator);
 
     Font_Baked font_baked_medium = font_bake(font_data, 20.0f);
-    hash_table_put(&state->font_table, font_baked_medium, "medium");
+    hash_table_put(&state->font_table, font_baked_medium, UNPACK_LITERAL("medium"));
 
     Font_Baked font_baked_small = font_bake(font_data, 16.0f);
-    hash_table_put(&state->font_table, font_baked_small, "small");
+    hash_table_put(&state->font_table, font_baked_small, UNPACK_LITERAL("small"));
 
     free(font_data);
     
@@ -1017,18 +1017,18 @@ void unload(State *s) {
 
     console_free();
 
-    shader_unload(hash_table_get(&state->shader_table, "quad"));
-    shader_unload(hash_table_get(&state->shader_table, "grid"));
-    shader_unload(hash_table_get(&state->shader_table, "ui_quad"));
-    shader_unload(hash_table_get(&state->shader_table, "line"));
+    shader_unload(hash_table_get(&state->shader_table, UNPACK_LITERAL("quad")));
+    shader_unload(hash_table_get(&state->shader_table, UNPACK_LITERAL("grid")));
+    shader_unload(hash_table_get(&state->shader_table, UNPACK_LITERAL("ui_quad")));
+    shader_unload(hash_table_get(&state->shader_table, UNPACK_LITERAL("line")));
     
     drawer_free(&state->quad_drawer);
     drawer_free(&state->grid_drawer);
     drawer_free(&state->ui_drawer);
     line_drawer_free(&state->line_drawer);
     
-    font_free(hash_table_get(&state->font_table, "medium"));
-    font_free(hash_table_get(&state->font_table, "small"));
+    font_free(hash_table_get(&state->font_table, UNPACK_LITERAL("medium")));
+    font_free(hash_table_get(&state->font_table, UNPACK_LITERAL("small")));
 }
 
 

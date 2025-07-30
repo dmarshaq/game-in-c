@@ -96,6 +96,20 @@ int write_str_to_file(String str, char *file_name) {
 }
 
 
+int fwrite_str(String str, FILE *file) {
+    s64 written = fwrite(str.data, 1, str.length, file);
+
+    if (written != str.length) {
+        printf_err("Failed fwrite, %ld bytes written compared to the expected %ld bytes in the string.\n", written, str.length);
+
+        (void)fclose(file);
+        return 1;
+    }
+
+    return 0;
+}
+
+
 
 
 

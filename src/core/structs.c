@@ -230,23 +230,7 @@ void _looped_array_unordered_remove(void *list, u32 index) {
  * Hash Table. 
  */
 
-#define hash_table_header(table_ptr)        ((Hash_Table_Header *)(*(table_ptr) - sizeof(Hash_Table_Header)))
-
-typedef enum hash_table_slot_state : u8 {
-    SLOT_EMPTY      = 0x00,
-    SLOT_OCCUPIED   = 0x01,
-    SLOT_DEPRICATED = 0x02,
-} Hash_Table_Slot_State;
-
-typedef struct hash_table_slot {
-    Hash_Table_Slot_State state;
-    String key;
-} Hash_Table_Slot;
-
-/**
- * Internal function.
- */
-Hash_Table_Slot *hash_table_get_slot(void **table, u32 index) {
+Hash_Table_Slot *_hash_table_get_slot(void **table, u32 index) {
     return *table + hash_table_header(table)->capacity * hash_table_header(table)->item_size + index * sizeof(Hash_Table_Slot);
 }
 
@@ -257,7 +241,7 @@ Hash_Table_Slot *hash_table_get_slot(void **table, u32 index) {
  */
 u32 hash_table_hash_index_of(void **table, void *key, u32 key_size) {
     Hash_Table_Header *header = hash_table_header(table);
-    return header->hash_func(key, key_size) % header->capacity;
+    return header->hash_func(key_size, key) % header->capacity;
 }
 
 /**
@@ -268,7 +252,7 @@ void hash_table_depricate_slots(void **table) {
     u32 cap = hash_table_capacity(table);
     Hash_Table_Slot *slot = NULL;
     for (u32 i = 0; i < cap; i++) {
-        slot = hash_table_get_slot(table, i);
+        slot = _hash_table_get_slot(table, i);
         if (slot->state == SLOT_OCCUPIED) {
             slot->state = SLOT_DEPRICATED;
         }
@@ -304,14 +288,14 @@ void hash_table_print_slot(void *item, u32 item_size, Hash_Table_Slot *slot) {
  */
 bool hash_table_readress(void **table, u32 index) {
     Hash_Table_Header *header = hash_table_header(table);
-    Hash_Table_Slot *target_slot = hash_table_get_slot(table, index);
+    Hash_Table_Slot *target_slot = _hash_table_get_slot(table, index);
 
     u32 new_index = hash_table_hash_index_of(table, target_slot->key.data, target_slot->key.length);
     target_slot->state = SLOT_EMPTY;
 
     Hash_Table_Slot *slot = NULL;
     for (u32 i = 0; i < header->capacity; i++) {
-        slot = hash_table_get_slot(table, (new_index + i) % header->capacity);
+        slot = _hash_table_get_slot(table, (new_index + i) % header->capacity);
         if (slot->state == SLOT_EMPTY) {
             // Copy data to a new slot.
             slot->state = SLOT_OCCUPIED;
@@ -372,7 +356,7 @@ void *_hash_table_make(u32 item_size, u32 capacity, Allocator *allocator) {
 
     // Set slots to SLOT_EMPTY.
     for (u32 i = 0; i < header->capacity; i++) {
-        hash_table_get_slot(&buffer, i)->state = SLOT_EMPTY;
+        _hash_table_get_slot(&buffer, i)->state = SLOT_EMPTY;
     }
     
     // @Important: Because header is of type "Hash_Table_Header *", compiler will automatically translate "header + 1" to "(void *)(header) + sizeof(Hash_Table_Header)".
@@ -458,12 +442,12 @@ void _hash_table_resize_to_fit(void **table, u32 requiered_length) {
 
         // Set new slots to SLOT_EMPTY.
         for (u32 i = header->capacity / capacity_multiplier; i < header->capacity; i++) {
-            hash_table_get_slot(table, i)->state = SLOT_EMPTY;
+            _hash_table_get_slot(table, i)->state = SLOT_EMPTY;
         }
 
         // Readress slots after resizing.
         for (u32 i = 0; i < header->capacity; i++) {
-            if (hash_table_get_slot(table, i)->state == SLOT_DEPRICATED) {
+            if (_hash_table_get_slot(table, i)->state == SLOT_DEPRICATED) {
                 (void)hash_table_readress(table, i);
             }
         }
@@ -474,13 +458,13 @@ void _hash_table_resize_to_fit(void **table, u32 requiered_length) {
     }
 }
 
-u32 _hash_table_push_key(void **table, void *key, u32 key_size) {
+u32 _hash_table_push_key(void **table, u32 key_size, void *key) {
     u32 index = hash_table_hash_index_of(table, key, key_size);
     Hash_Table_Header *header = hash_table_header(table);
 
     Hash_Table_Slot *slot = NULL;
     for (u32 i = 0; i < header->capacity; i++) {
-        slot = hash_table_get_slot(table, (index + i) % header->capacity);
+        slot = _hash_table_get_slot(table, (index + i) % header->capacity);
         if (slot->state == SLOT_EMPTY) {
             // Write all data to hash table by corresponding index.
             slot->state = SLOT_OCCUPIED;
@@ -509,13 +493,13 @@ u32 _hash_table_push_key(void **table, void *key, u32 key_size) {
     return UINT_MAX;
 }
 
-void *_hash_table_get(void **table, void *key, u32 key_size) {
+void *_hash_table_get(void **table, u32 key_size, void *key) {
     u32 index = hash_table_hash_index_of(table, key, key_size);
     Hash_Table_Header *header = hash_table_header(table);
 
     Hash_Table_Slot *slot = NULL;
     for (u32 i = 0; i < header->capacity; i++) {
-        slot = hash_table_get_slot(table, (index + i) % header->capacity);
+        slot = _hash_table_get_slot(table, (index + i) % header->capacity);
         if (slot->state == SLOT_EMPTY) {
             return NULL;
         }
@@ -528,13 +512,13 @@ void *_hash_table_get(void **table, void *key, u32 key_size) {
     return NULL;
 }
 
-void _hash_table_remove(void **table, void *key, u32 key_size) {
+void _hash_table_remove(void **table, u32 key_size, void *key) {
     u32 index = hash_table_hash_index_of(table, key, key_size);
     Hash_Table_Header *header = hash_table_header(table);
 
     Hash_Table_Slot *slot = NULL;
     for (u32 i = 0; i < header->capacity; i++) {
-        slot = hash_table_get_slot(table, (index + i) % header->capacity);
+        slot = _hash_table_get_slot(table, (index + i) % header->capacity);
         if (slot->state == SLOT_EMPTY) {
             return;
         }
@@ -549,7 +533,7 @@ void _hash_table_remove(void **table, void *key, u32 key_size) {
 }
 
 
-u32 hashf(void *key, u32 key_size) {
+u32 hashf(u32 key_size, void *key) {
     if (key == NULL || key_size == 0) {
         printf_err("Couldn't hash a NULL or 0 sized key.\n");
         return 0;
@@ -573,7 +557,7 @@ void hash_table_print(void **table) {
 
     printf("\n--------\tHash Table\t--------\n");
     for (u32 i = 0; i < header->capacity; i++) {
-        hash_table_print_slot(*table + i * header->item_size, header->item_size, hash_table_get_slot(table, i));
+        hash_table_print_slot(*table + i * header->item_size, header->item_size, _hash_table_get_slot(table, i));
     }
 }
 

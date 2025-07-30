@@ -21,7 +21,9 @@ typedef struct string {
 
 #define STR_BUFFER(literal) STR(sizeof(literal) - 1, (char[]){literal})
 
-#define UNPACK(str)         str.length, str.data
+#define UNPACK(str)         (str).length, (str).data
+
+#define UNPACK_LITERAL(literal)     (sizeof(literal) - 1), (literal)
 
 
 
@@ -86,17 +88,10 @@ float str_parse_float(String str);
 s64 str_count_chars(String str, char c);
 
 /**
- * Copies contents of the src string into dest string.
- * Doesn't resize destination string.
- * @Important: dest.length >= src.length must be true!
- */
-void str_copy(String src, String dest);
-
-/**
  * Copies contents of the src string into buffer.
  * @Important: buffer should have enough space to hold src data!
  */
-void str_copy_buffer(String src, void *buffer);
+void* str_copy_to(String str, void *buffer);
 
 
 

@@ -7,6 +7,8 @@
  * Debug.
  */
 
+
+
 #include <stdio.h>
 #include <stdbool.h>
 
@@ -15,7 +17,7 @@ extern const char *debug_warning_str;
 extern const char *debug_ok_str;
 
 
-#define printf_err(format, ...)                 (void)fprintf(stderr, "%s " format, debug_error_str, ##__VA_ARGS__);
+#define printf_err(format, ...)                 (void)fprintf(stderr, "%s " format, debug_error_str, ##__VA_ARGS__)
 
 #ifdef IGNORE_WARNING
 
@@ -23,11 +25,14 @@ extern const char *debug_ok_str;
 
 #else
 
-#define printf_warning(format, ...)             (void)fprintf(stderr, "%s " format, debug_warning_str, ##__VA_ARGS__);
+#define printf_warning(format, ...)             (void)fprintf(stderr, "%s " format, debug_warning_str, ##__VA_ARGS__)
 
 #endif
 
-#define printf_ok(format, ...)                  (void)fprintf(stderr, "%s " format, debug_ok_str, ##__VA_ARGS__);
+#define printf_ok(format, ...)                  (void)fprintf(stderr, "%s " format, debug_ok_str, ##__VA_ARGS__)
+
+
+#define TODO(message)                           printf_err("%s:%d TODO: %s\n", __FILE__, __LINE__, message); exit(1)
 
 
 
@@ -40,6 +45,8 @@ extern const char *debug_ok_str;
 
 
 #include <stdlib.h>
+
+#define KB 1024
 
 typedef struct allocator_header {
     u64 capacity;
@@ -61,12 +68,6 @@ typedef struct allocator {
 
 // Std.
 extern Allocator std_allocator;
-
-// Arena.
-typedef Allocator Arena_Allocator;
-
-Arena_Allocator arena_make(u64 capacity);
-void arena_destroy(Arena_Allocator *arena);
 
 // Allocator interface.
 void *allocator_alloc(Allocator *allocator, u64 size);

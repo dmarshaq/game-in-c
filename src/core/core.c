@@ -55,39 +55,6 @@ Allocator std_allocator = (Allocator) {
 };
 
 
-// Arena.
-void *arena_alloc(Allocator_Header *header, u64 size) {
-    if (header->size_filled + size > header->capacity) {
-        printf_err("Couldn't allocate more memory of size: %lld bytes from the arena, which is filled at %lld out of %lld bytes.\n", size, header->size_filled, header->capacity);
-        return NULL;
-    }
-    void* ptr = (void *)header + sizeof(Allocator_Header) + header->size_filled;
-    header->size_filled += size;
-    return ptr;
-}
-
-Arena_Allocator arena_make(u64 capacity) {
-    void *allocation = malloc(sizeof(Allocator_Header) + capacity);
-    ((Allocator_Header *)allocation)->capacity = capacity;
-    ((Allocator_Header *)allocation)->size_filled = 0;
-
-    if (allocation == NULL) {
-        printf_err("Couldn't allocate.\n");
-    }
-
-    return (Arena_Allocator) {
-        .ptr = allocation,
-        .alc_alloc = arena_alloc,
-        .alc_zero_alloc = NULL,
-        .alc_re_alloc = NULL,
-        .alc_free = NULL,
-    };
-}
-
-void arena_destroy(Arena_Allocator *arena) {
-    allocator_destroy(arena);
-}
-
 // Allocator interface.
 void *allocator_alloc(Allocator *allocator, u64 size) {
     if (allocator->alc_alloc == NULL) {

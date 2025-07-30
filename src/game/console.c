@@ -4,6 +4,7 @@
 #include "game/graphics.h"
 
 #include "core/structs.h"
+#include "core/arena.h"
 #include "core/str.h"
 #include "core/mathf.h"
 #include "core/file.h"
@@ -142,7 +143,7 @@ typedef struct command {
 
 static Command *commands;
 
-static Arena_Allocator commands_arena;
+static Arena commands_arena;
 
 
 
@@ -663,7 +664,7 @@ void print_command(Command *command) {
  * 'min_args' <= 'max_args' must be true.
  */
 void register_command(char *name, void (*ptr)(Command_Argument *, u32), u32 min_args, u32 max_args, Command_Argument *args) {
-    Command_Argument *args_cpy = allocator_alloc(&commands_arena, max_args * sizeof(Command_Argument));
+    Command_Argument *args_cpy = arena_alloc(&commands_arena, max_args * sizeof(Command_Argument));
     memcpy(args_cpy, args, max_args * sizeof(Command_Argument));
 
     array_list_append(&commands, ((Command){ CSTR(name), ptr, min_args, max_args, args_cpy }));

@@ -27,10 +27,20 @@ String read_file_into_str(char *file_name, Allocator *allocator);
 /**
  * Writes contents of string into the file specified by the file_name.
  * It will overwrite file if it already exists.
- * Returns exit code 0 on success.
+ * Returns 0 on success.
  * Will return any other value and won't write to file if failed.
  */
 int write_str_to_file(String str, char *file_name);
+
+/**
+ * Perfoms fwrite() of the string contents to the the specified file.
+ * Returns 0 on success.
+ * Will return any other value and won't write to file if failed.
+ */
+int fwrite_str(String str, FILE *file);
+
+
+
 
 
 #endif

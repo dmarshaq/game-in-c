@@ -51,7 +51,11 @@ typedef struct lexer {
     String content;
 } Lexer;
 
+void token_print_block(Token *token, bool show_token_type);
+
 void token_print(Token *token);
+
+void token_type_print(Token_Type token_type);
 
 void lexer_init(Lexer *lexer, String content);
 

@@ -250,12 +250,8 @@ s64 str_count_chars(String str, char c) {
     return count;
 }
 
-void str_copy(String src, String dest) {
-    (void)memcpy(src.data, dest.data, src.length);
-}
-
-void str_copy_buffer(String src, void *buffer) {
-    (void)memcpy(src.data, buffer, src.length);
+void *str_copy_to(String str, void *buffer) {
+    return memcpy(buffer, str.data, str.length);
 }
 
 

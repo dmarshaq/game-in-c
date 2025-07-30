@@ -4,3 +4,72 @@
  * It will contain auto generated code that then is appended to the main compilation.
  * Do not modify any code, it will be overwritten.
  */
+#ifndef META_GENERATED_H
+#define META_GENERATED_H
+
+#include "core/typeinfo.h"
+
+#define META_TYPE(type) META_TYPE_##type
+
+#define TYPE_OF(type) (&META_TYPE_TABLE[META_TYPE(type)])
+
+typedef enum meta_type {
+    META_TYPE(vars_tree_make),
+    META_TYPE(bool),
+    META_TYPE(char),
+    META_TYPE(console),
+    META_TYPE(Console),
+    META_TYPE(float),
+    META_TYPE(int),
+    META_TYPE(s8),
+    META_TYPE(s16),
+    META_TYPE(u8),
+    META_TYPE(void),
+    META_TYPE(u16),
+    META_TYPE(s32),
+    META_TYPE(u32),
+    META_TYPE(s64),
+    META_TYPE(u64),
+    META_TYPE(vars_tree),
+    META_TYPE(Vars_Node),
+    META_TYPE(Vars_Node_ptr),
+    META_TYPE(Vars_Tree),
+} Meta_Type;
+
+static const Type_Info META_TYPE_TABLE[];
+
+static const Type_Info_Function_Argument META_TYPE_FUNCTION_ARGS[] = {
+};
+
+static const Type_Info_Struct_Member META_TYPE_STRUCT_MEMBERS[] = {
+    { TYPE_OF(u64), STR_BUFFER("count") },
+    { TYPE_OF(Vars_Node_ptr), STR_BUFFER("root") },
+    { TYPE_OF(s64), STR_BUFFER("speed") },
+    { TYPE_OF(float), STR_BUFFER("open_percent") },
+    { TYPE_OF(float), STR_BUFFER("full_open_percent") },
+    { TYPE_OF(s64), STR_BUFFER("text_pad") },
+};
+
+static const Type_Info META_TYPE_TABLE[] = {
+    [META_TYPE(vars_tree_make)] = (Type_Info) { FUNCTION, .t_function = { TYPE_OF(Vars_Tree), STR_BUFFER("vars_tree_make"), 0, &META_TYPE_FUNCTION_ARGS[0] } },
+    [META_TYPE(bool)] = (Type_Info) { BOOL },
+    [META_TYPE(char)] = (Type_Info) { INTEGER, .t_integer = { 8, 0 } },
+    [META_TYPE(console)] = (Type_Info) { STRUCT, .t_struct = { STR_BUFFER("console"), 4, &META_TYPE_STRUCT_MEMBERS[2] } },
+    [META_TYPE(Console)] = (Type_Info) { TYPEDEF, .t_typedef = { TYPE_OF(console) } },
+    [META_TYPE(float)] = (Type_Info) { FLOAT, .t_float = { 32 } },
+    [META_TYPE(int)] = (Type_Info) { INTEGER, .t_integer = { 32, 1 } },
+    [META_TYPE(s8)] = (Type_Info) { INTEGER, .t_integer = { 8, 1 } },
+    [META_TYPE(s16)] = (Type_Info) { INTEGER, .t_integer = { 16, 1 } },
+    [META_TYPE(u8)] = (Type_Info) { INTEGER, .t_integer = { 8, 0 } },
+    [META_TYPE(void)] = (Type_Info) { VOID },
+    [META_TYPE(u16)] = (Type_Info) { INTEGER, .t_integer = { 16, 0 } },
+    [META_TYPE(s32)] = (Type_Info) { INTEGER, .t_integer = { 32, 1 } },
+    [META_TYPE(u32)] = (Type_Info) { INTEGER, .t_integer = { 32, 0 } },
+    [META_TYPE(s64)] = (Type_Info) { INTEGER, .t_integer = { 64, 1 } },
+    [META_TYPE(u64)] = (Type_Info) { INTEGER, .t_integer = { 64, 0 } },
+    [META_TYPE(vars_tree)] = (Type_Info) { STRUCT, .t_struct = { STR_BUFFER("vars_tree"), 2, &META_TYPE_STRUCT_MEMBERS[0] } },
+    [META_TYPE(Vars_Node)] = (Type_Info) { UNKNOWN },
+    [META_TYPE(Vars_Node_ptr)] = (Type_Info) { POINTER, .t_pointer = { TYPE_OF(Vars_Node) } },
+    [META_TYPE(Vars_Tree)] = (Type_Info) { TYPEDEF, .t_typedef = { TYPE_OF(vars_tree) } },
+};
+#endif

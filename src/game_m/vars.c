@@ -1,5 +1,7 @@
 #include "game/vars.h"
 
+#include "meta_generated.h"
+
 #include "game/game.h"
 
 #include "core/core.h"
@@ -23,8 +25,9 @@ typedef struct vars_node {
     u32 children_count;
 } Vars_Node;
 
+@Introspect;
 typedef struct vars_tree {
-    u64 count; // Count of nodes, including the root.
+    u64 count;
     Vars_Node *root;
 } Vars_Tree;
 
@@ -212,6 +215,13 @@ void vars_tree_print_node(Vars_Node *node, s64 depth) {
 
 
 
+@Introspect;
+typedef struct console {
+    s64 speed;
+    float open_percent;
+    float full_open_percent;
+    s64 text_pad;
+} Console;
 
 static Console console_data;
 
@@ -224,8 +234,16 @@ static Console console_data;
 
 #define VT_BUILDER_FIELD(builder_ptr, str, field_ptr)   vars_tree_builder_add_field(builder_ptr, str, field_ptr)
 
-
+@Introspect;
 Vars_Tree vars_tree_make() {
+    // Testing Introspection!
+    print_type_info(TYPE_OF(vars_tree_make));
+
+
+
+
+
+
     Vars_Tree_Builder builder = vars_tree_builder_make(8, &std_allocator);
 
     // Build vars tree here.

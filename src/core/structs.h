@@ -2,6 +2,7 @@
 #define STRUCTS_H
 
 #include "core/core.h"
+#include "core/str.h"
 #include "core/type.h"
 
 /**
@@ -90,12 +91,12 @@ void  _looped_array_free(void **list);
 #define hash_table_capacity(ptr_list)                               _hash_table_capacity((void *)*ptr_list)
 #define hash_table_item_size(ptr_list)                              _hash_table_item_size((void *)*ptr_list)
 
-#define hash_table_put(ptr_table, item, ptr_key)          _hash_table_resize_to_fit((void **)(ptr_table), hash_table_count(ptr_table) + 1); (*ptr_table)[_hash_table_push_key((void **)(ptr_table), ptr_key, strlen(ptr_key))] = item
-#define hash_table_get(ptr_table, ptr_key)                _hash_table_get((void **)(ptr_table), ptr_key, strlen(ptr_key))
-#define hash_table_remove(ptr_table, ptr_key)             _hash_table_remove((void **)(ptr_table), ptr_key, strlen(ptr_key)) 
+#define hash_table_put(ptr_table, item, ...)          _hash_table_resize_to_fit((void **)(ptr_table), hash_table_count(ptr_table) + 1); (*ptr_table)[_hash_table_push_key((void **)(ptr_table), __VA_ARGS__)] = item
+#define hash_table_get(ptr_table, ...)                _hash_table_get((void **)(ptr_table), __VA_ARGS__)
+#define hash_table_remove(ptr_table, ...)             _hash_table_remove((void **)(ptr_table), __VA_ARGS__) 
 #define hash_table_free(ptr_table)                                  _hash_table_free((void **)(ptr_table))
 
-typedef u32 (*Hashfunc)(void *, u32);
+typedef u32 (*Hashfunc)(u32, void *);
 
 typedef struct hash_table_header {
     u32 capacity;
@@ -105,17 +106,33 @@ typedef struct hash_table_header {
     u8 *keys;
 } Hash_Table_Header;
 
+
+#define hash_table_header(table_ptr)        ((Hash_Table_Header *)(*(table_ptr) - sizeof(Hash_Table_Header)))
+
+typedef enum hash_table_slot_state : u8 {
+    SLOT_EMPTY      = 0x00,
+    SLOT_OCCUPIED   = 0x01,
+    SLOT_DEPRICATED = 0x02,
+} Hash_Table_Slot_State;
+
+typedef struct hash_table_slot {
+    Hash_Table_Slot_State state;
+    String key;
+} Hash_Table_Slot;
+
+
 void *_hash_table_make(u32 item_size, u32 initial_capacity, Allocator *allocator);
 u32   _hash_table_count(void *table);
 u32   _hash_table_capacity(void *table);
 u32   _hash_table_item_size(void *table);
 void  _hash_table_resize_to_fit(void **table, u32 requiered_length);
-u32   _hash_table_push_key(void **table, void *key, u32 key_size);
-void *_hash_table_get(void **table, void *key, u32 key_size);
-void  _hash_table_remove(void **table, void *key, u32 key_size);
+u32   _hash_table_push_key(void **table, u32 key_size, void *key);
+void *_hash_table_get(void **table, u32 key_size, void *key);
+void  _hash_table_remove(void **table, u32 key_size, void *key);
 void  _hash_table_free(void **table);
+Hash_Table_Slot *_hash_table_get_slot(void **table, u32 index);
 
-u32 hashf(void *key, u32 key_size);
+u32 hashf(u32 key_size, void *key);
 
 void hash_table_print(void **table);
 
