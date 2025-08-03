@@ -57,7 +57,10 @@ typedef struct {
 
 typedef struct {
     Type_Info *type;
+
     String name;
+
+    u32 offset;
 } Type_Info_Struct_Member;
 
 typedef struct {
@@ -65,6 +68,7 @@ typedef struct {
 
     u32 members_length;
     Type_Info_Struct_Member *members;
+
 } Type_Info_Struct;
 
 typedef struct {
@@ -83,6 +87,8 @@ typedef struct {
 
 struct type_info {
     Type_Info_Kind type;
+    u32 size;
+    u32 align;
     
     union {
         Type_Info_Integer   t_integer;
@@ -97,6 +103,7 @@ struct type_info {
 };
 
 static void print_type_info(Type_Info *type) {
+    printf("size: %u, align: %u ,", type->size, type->align);
     switch (type->type) {
         case INTEGER:
             printf("INTEGER: size_bits: %d, %s\n", type->t_integer.size_bits, type->t_integer.is_signed ? "signed" : "unsigned");
@@ -142,6 +149,14 @@ static void print_type_info(Type_Info *type) {
             printf("UNKNOWN\n");
             break;
     }
+}
+
+static Type_Info *get_base_of_typedef(Type_Info *type) {
+    while (type->type == TYPEDEF) {
+        type = type->t_typedef.typedef_of;
+    }
+
+    return type;
 }
 
 #endif

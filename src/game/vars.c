@@ -52,7 +52,6 @@ Vars_Tree_Builder vars_tree_builder_make(u64 initial_capacity, Allocator *alloca
     Vars_Node *level = array_list_make(Vars_Node, 4, builder.allocator);
     array_list_append(&builder.data, level);
 
-
     return builder;
 }
 
@@ -212,13 +211,20 @@ void vars_tree_print_node(Vars_Node *node, s64 depth) {
 
 
 
-
-
+           ;
+typedef struct color {
+    float red;
+    float green;
+    float blue;
+    float alpha;
+} Color;
 
            ;
 typedef struct console {
     s64 speed;
     float open_percent;
+    Color bg;
+    Color text_input;
     float full_open_percent;
     s64 text_pad;
 } Console;
@@ -234,43 +240,68 @@ static Console console_data;
 
 #define VT_BUILDER_FIELD(builder_ptr, str, field_ptr)   vars_tree_builder_add_field(builder_ptr, str, field_ptr)
 
-           ;
-Vars_Tree vars_tree_make() {
-    // Testing Introspection!
-    print_type_info(TYPE_OF(Console));
 
 
 
 
+/**
+ * @Recursion: Adds all of the struct fields, including nested structs that where properly introspected.
+ */
+void vars_tree_builder_add_struct(Vars_Tree_Builder *builder, Type_Info *type, u8 *data, String var_name) {
+    if (type->type != STRUCT) {
+        printf_err("Can't add non STRUCT type to vars.\n");
+        return;
+    }
 
 
-    Vars_Tree_Builder builder = vars_tree_builder_make(8, &std_allocator);
+    vars_tree_builder_struct_begin(builder, var_name, (void *)data);
 
-    // Build vars tree here.
+    for (u32 i = 0; i < type->t_struct.members_length; i++) {
+        // Wrapping around get_base_of_typedef() because it properly sanitizes the member type in case if it is a typedef in other case it just returns the original member type.
+        Type_Info *member_type = get_base_of_typedef(type->t_struct.members[i].type);
 
-    VT_BUILDER_STRUCT(&builder, CSTR("console_data"), &console_data,
+        // Handling nested struct case.
+        if (member_type->type == STRUCT) {
+            vars_tree_builder_add_struct(builder, member_type, data + type->t_struct.members[i].offset, type->t_struct.members[i].name);
+            continue;
+        }
+        
+        // If not struct we just assume it is a properly defined field.
+        vars_tree_builder_add_field(builder, type->t_struct.members[i].name, data + type->t_struct.members[i].offset);
+    }
 
-            VT_BUILDER_FIELD(&builder, CSTR("speed"),               &console_data.speed);
-            VT_BUILDER_FIELD(&builder, CSTR("open_percent"),        &console_data.open_percent);
-            VT_BUILDER_FIELD(&builder, CSTR("full_open_percent"),   &console_data.full_open_percent);
-            VT_BUILDER_FIELD(&builder, CSTR("text_pad"),            &console_data.text_pad);
-
-            );
-
-
-
-    return vars_tree_builder_build(&builder, &std_allocator);
+    vars_tree_builder_struct_end(builder);
 }
 
 
 
 
+
 void load_globals() {
-    Vars_Tree tree = vars_tree_make();
+
+    Vars_Tree_Builder builder = vars_tree_builder_make(8, &std_allocator);
+
+    // Build vars tree here.
+    vars_tree_builder_add_struct(&builder, TYPE_OF(console), (u8 *)&console_data, CSTR("console_data"));
+
+    // VT_BUILDER_STRUCT(&builder, CSTR("console_data"), &console_data,
+
+    //         VT_BUILDER_FIELD(&builder, CSTR("speed"),               &console_data.speed);
+    //         VT_BUILDER_FIELD(&builder, CSTR("open_percent"),        &console_data.open_percent);
+    //         VT_BUILDER_FIELD(&builder, CSTR("full_open_percent"),   &console_data.full_open_percent);
+    //         VT_BUILDER_FIELD(&builder, CSTR("text_pad"),            &console_data.text_pad);
+
+    //         );
+
+
+
+    Vars_Tree tree = vars_tree_builder_build(&builder, &std_allocator);
 
     // Displaying tree.
     printf("Tree nodes count: %d\n", tree.count);
     vars_tree_print_node(tree.root, 0);
+
+
 
 
 
@@ -421,4 +452,18 @@ void load_globals() {
     printf("open_percent = %f\n", console_data.open_percent);
     printf("full_open_percent = %f\n", console_data.full_open_percent);
     printf("text_pad = %d\n", console_data.text_pad);
+
+
+    printf("console_data.text_input from code:\n");
+    printf("red     = %f\n", console_data.text_input.red);
+    printf("green   = %f\n", console_data.text_input.green);
+    printf("blue    = %f\n", console_data.text_input.blue);
+    printf("alpha   = %f\n", console_data.text_input.alpha);
+
+
+    printf("console_data.bg from code:\n");
+    printf("red     = %f\n", console_data.bg.red);
+    printf("green   = %f\n", console_data.bg.green);
+    printf("blue    = %f\n", console_data.bg.blue);
+    printf("alpha   = %f\n", console_data.bg.alpha);
 }
