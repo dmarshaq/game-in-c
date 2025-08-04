@@ -31,10 +31,6 @@ typedef enum meta_type {
     META_TYPE(u32),
     META_TYPE(s64),
     META_TYPE(u64),
-    META_TYPE(vars_tree),
-    META_TYPE(Vars_Node),
-    META_TYPE(Vars_Node_ptr),
-    META_TYPE(Vars_Tree),
 } Meta_Type;
 
 static Type_Info META_TYPE_TABLE[];
@@ -43,8 +39,6 @@ static Type_Info_Function_Argument META_TYPE_FUNCTION_ARGS[] = {
 };
 
 static Type_Info_Struct_Member META_TYPE_STRUCT_MEMBERS[] = {
-    { TYPE_OF(u64), STR_BUFFER("count"), 0 },
-    { TYPE_OF(Vars_Node_ptr), STR_BUFFER("root"), 8 },
     { TYPE_OF(float), STR_BUFFER("red"), 0 },
     { TYPE_OF(float), STR_BUFFER("green"), 4 },
     { TYPE_OF(float), STR_BUFFER("blue"), 8 },
@@ -60,10 +54,10 @@ static Type_Info_Struct_Member META_TYPE_STRUCT_MEMBERS[] = {
 static Type_Info META_TYPE_TABLE[] = {
     [META_TYPE(bool)] = (Type_Info) { BOOL, 1, 1 },
     [META_TYPE(char)] = (Type_Info) { INTEGER, 1, 1, .t_integer = { 8, 0 } },
-    [META_TYPE(color)] = (Type_Info) { STRUCT, 16, 4, .t_struct = { STR_BUFFER("color"), 4, &META_TYPE_STRUCT_MEMBERS[2] } },
+    [META_TYPE(color)] = (Type_Info) { STRUCT, 16, 4, .t_struct = { STR_BUFFER("color"), 4, &META_TYPE_STRUCT_MEMBERS[0] } },
     [META_TYPE(Color)] = (Type_Info) { TYPEDEF, 16, 4, .t_typedef = { TYPE_OF(color) } },
     [META_TYPE(float)] = (Type_Info) { FLOAT, 4, 4,.t_float = { 32 } },
-    [META_TYPE(console)] = (Type_Info) { STRUCT, 56, 8, .t_struct = { STR_BUFFER("console"), 6, &META_TYPE_STRUCT_MEMBERS[6] } },
+    [META_TYPE(console)] = (Type_Info) { STRUCT, 56, 8, .t_struct = { STR_BUFFER("console"), 6, &META_TYPE_STRUCT_MEMBERS[4] } },
     [META_TYPE(Console)] = (Type_Info) { TYPEDEF, 56, 8, .t_typedef = { TYPE_OF(console) } },
     [META_TYPE(int)] = (Type_Info) { INTEGER, 4, 4, .t_integer = { 32, 1 } },
     [META_TYPE(s8)] = (Type_Info) { INTEGER, 1, 1, .t_integer = { 8, 1 } },
@@ -75,9 +69,5 @@ static Type_Info META_TYPE_TABLE[] = {
     [META_TYPE(u32)] = (Type_Info) { INTEGER, 4, 4, .t_integer = { 32, 0 } },
     [META_TYPE(s64)] = (Type_Info) { INTEGER, 8, 8, .t_integer = { 64, 1 } },
     [META_TYPE(u64)] = (Type_Info) { INTEGER, 8, 8, .t_integer = { 64, 0 } },
-    [META_TYPE(vars_tree)] = (Type_Info) { STRUCT, 16, 8, .t_struct = { STR_BUFFER("vars_tree"), 2, &META_TYPE_STRUCT_MEMBERS[0] } },
-    [META_TYPE(Vars_Node)] = (Type_Info) { UNKNOWN, 0, 0 },
-    [META_TYPE(Vars_Node_ptr)] = (Type_Info) { POINTER, 8, 8, .t_pointer = { TYPE_OF(Vars_Node) } },
-    [META_TYPE(Vars_Tree)] = (Type_Info) { TYPEDEF, 16, 8, .t_typedef = { TYPE_OF(vars_tree) } },
 };
 #endif

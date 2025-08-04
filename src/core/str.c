@@ -126,6 +126,26 @@ String str_get_until_space(String str) {
     return STR(i, str.data);
 }
 
+bool str_is_symbol(String str) {
+    if (str.length <= 0) {
+        return false;
+    }
+
+    s64 i = 0;
+
+    if (!isalpha(str.data[i]) && str.data[i] != '_') {
+        return false;
+    }
+    
+    while(i < str.length) {
+        if (!isalnum(str.data[i]) && str.data[i] != '_') {
+            return false;
+        }
+        i++;
+    }
+
+    return true;
+}
 
 bool str_is_int(String str) {
     if (str.length <= 0) {

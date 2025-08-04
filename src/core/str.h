@@ -74,6 +74,8 @@ String str_eat_until_space(String str);
 
 String str_get_until_space(String str);
 
+bool str_is_symbol(String str);
+
 bool str_is_int(String str);
 
 bool str_is_float(String str);

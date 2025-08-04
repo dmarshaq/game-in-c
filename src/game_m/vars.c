@@ -1,27 +1,3 @@
-
-/**
- * @Todo:
- *
- * Add the Type_Info *type for each vars node, in order to let programm know the type and
- *      let it know if the it is correctly parsign value from the .vars file, 
- *      example INTEGER vs. FLOAT.
- *
- * Preserve the builder_tree -> tree pattern, but abstract it away for now, since ideally the
- *      dev (me) should only call one command like vars_tree_add_struct(...) to add the introspected struct to the vars tree.
- *
- *  
- *
- *
- */
-
-
-
-
-
-
-
-
-
 #include "game/vars.h"
 
 #include "meta_generated.h"
@@ -35,25 +11,6 @@
 
 #include <stddef.h>
 
-// Since C doesn't have built in metaprogramming capabilities that would allow automatica tree generation from the in project structures it has to be done manually :( .
-
-
-// This is incomplete and should be refactored cause tree building will be a little more complicated than that.
-typedef struct vars_node {
-    String name;
-    void *data;
-    union {
-        s32 children_rptr; // Relative pointer. The actual pointer type is Node *. Used in actual tree.
-        u32 children_index; // Children index is the index in the array list of children that specifies where node's children begin. Used only in tree builder.
-    };
-    u32 children_count;
-} Vars_Node;
-
-@Introspect;
-typedef struct vars_tree {
-    u64 count;
-    Vars_Node *root;
-} Vars_Tree;
 
 typedef struct vars_tree_builder {
     Vars_Node **data; // Dynamic array that holds references to dynamic arrays, to easily build trees.
@@ -61,9 +18,6 @@ typedef struct vars_tree_builder {
     Allocator *allocator;
 } Vars_Tree_Builder;
 
-
-#define ABS2REL_32(rel_loc, abs_ptr)    rel_loc = ((s32)((u8 *)(abs_ptr) - (u8 *)&(rel_loc)))
-#define REL2ABS_32(rel_loc)             ((void *)((u8 *)&(rel_loc) + rel_loc))
 
 Vars_Tree_Builder vars_tree_builder_make(u64 initial_capacity, Allocator *allocator) {
     Vars_Tree_Builder builder = {
@@ -80,9 +34,10 @@ Vars_Tree_Builder vars_tree_builder_make(u64 initial_capacity, Allocator *alloca
 }
 
 
-void vars_tree_builder_add_field(Vars_Tree_Builder *builder, String name, void *field_ptr) {
+void vars_tree_builder_add_field(Vars_Tree_Builder *builder, String name, Type_Info *type, void *field_ptr) {
     array_list_append(&(builder->data[builder->current_tree_level]), ((Vars_Node) {
                 .name = name,
+                .type = type,
                 .data = field_ptr,
                 .children_index = 0,
                 .children_count = 0,
@@ -95,8 +50,8 @@ void vars_tree_builder_add_field(Vars_Tree_Builder *builder, String name, void *
     }
 }
 
-void vars_tree_builder_struct_begin(Vars_Tree_Builder *builder, String name, void *struct_ptr) {
-    vars_tree_builder_add_field(builder, name, struct_ptr);
+void vars_tree_builder_struct_begin(Vars_Tree_Builder *builder, String name, Type_Info *type, void *struct_ptr) {
+    vars_tree_builder_add_field(builder, name, type, struct_ptr);
 
     Vars_Node *struct_node = builder->data[builder->current_tree_level] + array_list_length(&builder->data[builder->current_tree_level]) - 1; // Getting struct node that was just created.
 
@@ -210,22 +165,48 @@ void vars_tree_free(Vars_Tree *tree, Allocator *allocator) {
     allocator_free(allocator, tree->root);
 }
 
-
-void vars_tree_print_node(Vars_Node *node, s64 depth) {
-    for (s64 i = 0; i < depth; i++) {
-        printf("  "); // Indent 2 spaces per level
+/**
+ * @Recursion: Adds all of the struct fields, including nested structs that where properly introspected.
+ */
+void vars_tree_builder_add_struct(Vars_Tree_Builder *builder, Type_Info *type, u8 *data, String var_name) {
+    if (type->type != STRUCT) {
+        printf_err("Can't add non STRUCT type to vars.\n");
+        return;
     }
 
-    if (node->name.length > 0) {
-        printf("| %.*s\n", UNPACK(node->name));
-    } else {
-        printf("| (null)\n");
+
+    vars_tree_builder_struct_begin(builder, var_name, type, (void *)data);
+
+    for (u32 i = 0; i < type->t_struct.members_length; i++) {
+        // Wrapping around get_base_of_typedef() because it properly sanitizes the member type in case if it is a typedef in other case it just returns the original member type.
+        Type_Info *member_type = get_base_of_typedef(type->t_struct.members[i].type);
+
+        // Handling nested struct case.
+        if (member_type->type == STRUCT) {
+            vars_tree_builder_add_struct(builder, member_type, data + type->t_struct.members[i].offset, type->t_struct.members[i].name);
+            continue;
+        }
+        
+        // If not struct we just assume it is a properly defined field.
+        vars_tree_builder_add_field(builder, type->t_struct.members[i].name, member_type, data + type->t_struct.members[i].offset);
     }
 
-    for (s64 i = 0; i < node->children_count; i++) {
-        vars_tree_print_node((Vars_Node *)REL2ABS_32(node->children_rptr) + i, depth + 1);
-    }
+    vars_tree_builder_struct_end(builder);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -257,88 +238,51 @@ static Console console_data;
 
 
 
-#define VT_BUILDER_STRUCT(builder_ptr, str, struct_ptr, code)\
-    vars_tree_builder_struct_begin(builder_ptr, str, struct_ptr);\
-    code\
-    vars_tree_builder_struct_end(builder_ptr)
-
-#define VT_BUILDER_FIELD(builder_ptr, str, field_ptr)   vars_tree_builder_add_field(builder_ptr, str, field_ptr)
 
 
 
+static Vars_Tree_Builder vt_builder;
 
 
-/**
- * @Recursion: Adds all of the struct fields, including nested structs that where properly introspected.
- */
-void vars_tree_builder_add_struct(Vars_Tree_Builder *builder, Type_Info *type, u8 *data, String var_name) {
-    if (type->type != STRUCT) {
-        printf_err("Can't add non STRUCT type to vars.\n");
-        return;
+void vars_tree_begin() {
+    vt_builder = vars_tree_builder_make(8, &std_allocator);
+}
+
+void vars_tree_add(Type_Info *type, u8 *data, String var_name) {
+    vars_tree_builder_add_struct(&vt_builder, type, data, var_name);
+}
+
+Vars_Tree vars_tree_build() {
+    return vars_tree_builder_build(&vt_builder, &std_allocator);
+}
+
+void vars_tree_print_node(Vars_Node *node, s64 depth) {
+    for (s64 i = 0; i < depth; i++) {
+        printf("  "); // Indent 2 spaces per level
     }
 
-
-    vars_tree_builder_struct_begin(builder, var_name, (void *)data);
-
-    for (u32 i = 0; i < type->t_struct.members_length; i++) {
-        // Wrapping around get_base_of_typedef() because it properly sanitizes the member type in case if it is a typedef in other case it just returns the original member type.
-        Type_Info *member_type = get_base_of_typedef(type->t_struct.members[i].type);
-
-        // Handling nested struct case.
-        if (member_type->type == STRUCT) {
-            vars_tree_builder_add_struct(builder, member_type, data + type->t_struct.members[i].offset, type->t_struct.members[i].name);
-            continue;
-        }
-        
-        // If not struct we just assume it is a properly defined field.
-        vars_tree_builder_add_field(builder, type->t_struct.members[i].name, data + type->t_struct.members[i].offset);
+    if (node->name.length > 0) {
+        printf("| %.*s\n", UNPACK(node->name));
+    } else {
+        printf("| (null)\n");
     }
 
-    vars_tree_builder_struct_end(builder);
+    for (s64 i = 0; i < node->children_count; i++) {
+        vars_tree_print_node((Vars_Node *)REL2ABS_32(node->children_rptr) + i, depth + 1);
+    }
 }
 
 
 
 
-
-void load_globals() {
-
-    Vars_Tree_Builder builder = vars_tree_builder_make(8, &std_allocator);
-
-    // Build vars tree here.
-    vars_tree_builder_add_struct(&builder, TYPE_OF(console), (u8 *)&console_data, CSTR("console_data"));
-
-    // VT_BUILDER_STRUCT(&builder, CSTR("console_data"), &console_data,
-
-    //         VT_BUILDER_FIELD(&builder, CSTR("speed"),               &console_data.speed);
-    //         VT_BUILDER_FIELD(&builder, CSTR("open_percent"),        &console_data.open_percent);
-    //         VT_BUILDER_FIELD(&builder, CSTR("full_open_percent"),   &console_data.full_open_percent);
-    //         VT_BUILDER_FIELD(&builder, CSTR("text_pad"),            &console_data.text_pad);
-
-    //         );
-
-
-
-    Vars_Tree tree = vars_tree_builder_build(&builder, &std_allocator);
-
-    // Displaying tree.
-    printf("Tree nodes count: %d\n", tree.count);
-    vars_tree_print_node(tree.root, 0);
-
-
-
-
-
-
-    String _content = read_file_into_str("res/globals.vars", &std_allocator);
-
+void load_vars_file(char *file_name, Vars_Tree *tree) {
+    String _content = read_file_into_str(file_name, &std_allocator);
 
     String content = _content;
 
-    Vars_Node *current_node = tree.root;
+    Vars_Node *current_node = tree->root;
+    Vars_Node *current_key = NULL;
     
-    String found_field = {0};
-
     while (true) {
         // Eat until literal. Not including newline symbols.
         content = str_eat_spaces(content);
@@ -361,8 +305,8 @@ void load_globals() {
 
             s64 end_of_path = str_find_char_left(content, ']');
             if (end_of_path == -1) {
-                printf_err("Couldn't parse '%s': Missing ']'.\n", "res/globals.vars");
-                exit(1);
+                printf_err("Couldn't parse '%s': Missing ']'.\n", file_name);
+                return;
             }
             
             String path = str_substring(content, 1, end_of_path);
@@ -371,7 +315,7 @@ void load_globals() {
             content = str_eat_chars(content, path.length + 2);
             
             // Parsing path.
-            current_node = tree.root;
+            current_node = tree->root;
             while (true) {
                 if (path.length <= 0) break;
 
@@ -391,8 +335,8 @@ void load_globals() {
                     }
 
                     if (i + 1 == current_node->children_count) {
-                        printf_err("Couldn't parse '%s': No vars node named: '%.*s'.\n", "res/globals.vars", UNPACK(node_name));
-                        exit(1);
+                        printf_err("Couldn't parse '%s': No vars node named: '%.*s'.\n", file_name, UNPACK(node_name));
+                        return;
                     }
                 }
                 
@@ -410,64 +354,95 @@ void load_globals() {
 
         content = str_eat_chars(content, literal.length);
 
-        if (found_field.length == 0 ) {
-            if (!str_is_int(literal) && !str_is_float(literal)) {
-                found_field = literal; // Basically any new literal which is not a number could be counted as a new field if other field was not found before.
-                printf("%-10s:    %.*s\n", "Key", UNPACK(literal));
-            }
+        // Check if literal is a key.
+        if (current_key == NULL) {
+            if (str_is_symbol(literal)) {
 
-        }
-        else {
-            if (str_is_int(literal)) {
-                
                 // Searching node in the tree.
                 Vars_Node *children = REL2ABS_32(current_node->children_rptr);
                 for (u32 i = 0; i < current_node->children_count; i++) {
-                    if (str_equals(children[i].name, found_field)) {
-                        *(s64 *)children[i].data = str_parse_int(literal);
+                    if (str_equals(children[i].name, literal)) {
+                        current_key = children + i;
                         break;
                     }
 
                     if (i + 1 == current_node->children_count) {
-                        printf_err("Couldn't parse '%s': No field node named: '%.*s'.\n", "res/globals.vars", UNPACK(found_field));
-                        exit(1);
+                        printf_err("Couldn't parse '%s': No field node named: '%.*s'.\n", file_name, UNPACK(literal));
+                        return;
                     }
                 }
 
-                found_field = (String){0};
+                printf("%-10s:    %.*s\n", "Key", UNPACK(literal));
+
+                continue;
+            }
+
+            printf_err("Couldn't parse '%s': File has no key specified for the literal: '%.*s'.\n", file_name, UNPACK(literal));
+            return;
+        }
+
+
+        // Parsing by type.
+        Type_Info *type = current_key->type;
+        switch (type->type) {
+            case INTEGER:
+                if (!str_is_int(literal)) {
+                    printf_err("Couldn't parse '%s': Expected literal '%.*s' to be INTEGER.\n", file_name, UNPACK(literal));
+                    return;
+                }
+
+                
+                // Check if it is a valid integer type.
+                if (type->t_integer.size_bits != 64 || !type->t_integer.is_signed) {
+                    printf_err("Error '%s': Expected '%.*s' field node to be signed 64 bit integer.\n", file_name, UNPACK(literal));
+                    return;
+                }
 
                 printf("%-10s:    %.*s\n", "Integer", UNPACK(literal));
-                continue;
-            }
 
-            if (str_is_float(literal)) {
+                *(s64 *)current_key->data = str_parse_int(literal);
 
-                Vars_Node *children = REL2ABS_32(current_node->children_rptr);
-                for (u32 i = 0; i < current_node->children_count; i++) {
-                    if (str_equals(children[i].name, found_field)) {
-                        *(float *)children[i].data = str_parse_float(literal);
-                        break;
-                    }
-
-                    if (i + 1 == current_node->children_count) {
-                        printf_err("Couldn't parse '%s': No field node named: '%.*s'.\n", "res/globals.vars", UNPACK(found_field));
-                        exit(1);
-                    }
+                current_key = NULL;
+                break;
+            case FLOAT:
+                if (!str_is_float(literal)) {
+                    printf_err("Couldn't parse '%s': Expected literal '%.*s' to be FLOAT.\n", file_name, UNPACK(literal));
+                    return;
                 }
 
-                found_field = (String){0};
-
                 printf("%-10s:    %.*s\n", "Float", UNPACK(literal));
-                continue;
-            }
-            
-            printf_err("Couldn't parse '%s': '%.*s' is not a valid field value.\n", "res/globals.vars", UNPACK(literal));
-            exit(1);
+                
+                *(float *)current_key->data = str_parse_float(literal);
+
+                current_key = NULL;
+
+                break;
+            case BOOL:
+
+                current_key = NULL;
+                break;
         }
     }
 
 
     allocator_free(&std_allocator, _content.data);
+}
+
+void load_globals() {
+
+    vars_tree_begin();
+
+    vars_tree_add(TYPE_OF(console), (u8 *)&console_data, CSTR("console_data"));
+
+    Vars_Tree tree = vars_tree_build();
+
+    // Displaying tree.
+    printf("Tree nodes count: %d\n", tree.count);
+    vars_tree_print_node(tree.root, 0);
+
+
+
+    load_vars_file("res/globals.vars", &tree);
 
 
 
