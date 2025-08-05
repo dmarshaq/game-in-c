@@ -1,6 +1,15 @@
 #ifndef CORE_H
 #define CORE_H
 
+#define WINDOWS 1
+#define LINUX   2
+
+#ifndef OS
+#define OS WINDOWS
+#endif
+
+
+
 #include "core/type.h"
 
 /**

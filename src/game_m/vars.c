@@ -3,6 +3,7 @@
 #include "meta_generated.h"
 
 #include "game/game.h"
+#include "game/asset.h"
 
 #include "core/core.h"
 #include "core/str.h"
@@ -428,41 +429,43 @@ void load_vars_file(char *file_name, Vars_Tree *tree) {
     allocator_free(&std_allocator, _content.data);
 }
 
-void load_globals() {
-
-    vars_tree_begin();
-
-    vars_tree_add(TYPE_OF(console), (u8 *)&console_data, CSTR("console_data"));
-
-    Vars_Tree tree = vars_tree_build();
-
-    // Displaying tree.
-    printf("Tree nodes count: %d\n", tree.count);
-    vars_tree_print_node(tree.root, 0);
 
 
 
-    load_vars_file("res/globals.vars", &tree);
+void vars_listen_to_changes() {
+    u32 count;
+    const Asset_Change *changes;
+
+    if (view_asset_changes(&count, &changes)) {
+        for (u32 i = 0; i < count; i++) {
+            printf("Vars listened to an Asset Change: '%.*s'\n", changes[i].file_name);
+        }
+    }
 
 
 
-    printf("console_data from code:\n");
-    printf("speed = %d\n", console_data.speed);
-    printf("open_percent = %f\n", console_data.open_percent);
-    printf("full_open_percent = %f\n", console_data.full_open_percent);
-    printf("text_pad = %d\n", console_data.text_pad);
 
 
-    printf("console_data.text_input from code:\n");
-    printf("red     = %f\n", console_data.text_input.red);
-    printf("green   = %f\n", console_data.text_input.green);
-    printf("blue    = %f\n", console_data.text_input.blue);
-    printf("alpha   = %f\n", console_data.text_input.alpha);
 
 
-    printf("console_data.bg from code:\n");
-    printf("red     = %f\n", console_data.bg.red);
-    printf("green   = %f\n", console_data.bg.green);
-    printf("blue    = %f\n", console_data.bg.blue);
-    printf("alpha   = %f\n", console_data.bg.alpha);
+
+    // printf("console_data from code:\n");
+    // printf("speed = %d\n", console_data.speed);
+    // printf("open_percent = %f\n", console_data.open_percent);
+    // printf("full_open_percent = %f\n", console_data.full_open_percent);
+    // printf("text_pad = %d\n", console_data.text_pad);
+
+
+    // printf("console_data.text_input from code:\n");
+    // printf("red     = %f\n", console_data.text_input.red);
+    // printf("green   = %f\n", console_data.text_input.green);
+    // printf("blue    = %f\n", console_data.text_input.blue);
+    // printf("alpha   = %f\n", console_data.text_input.alpha);
+
+
+    // printf("console_data.bg from code:\n");
+    // printf("red     = %f\n", console_data.bg.red);
+    // printf("green   = %f\n", console_data.bg.green);
+    // printf("blue    = %f\n", console_data.bg.blue);
+    // printf("alpha   = %f\n", console_data.bg.alpha);
 }

@@ -46,8 +46,8 @@ void vars_tree_print_node(Vars_Node *node, s64 depth);
 void load_vars_file(char *file_name, Vars_Tree *tree);
 
 /**
- * @Temporary: Perfoms a full load of a 'res/globals.vars' into an actual struct variables.
+ * This function insures .vars files are listened to and properly loaded once any of those files are changed.
  */
-void load_globals();
+void vars_listen_to_changes();
 
 #endif

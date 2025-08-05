@@ -13,6 +13,7 @@
 #include "game/console.h"
 #include "game/vars.h"
 #include "game/imui.h"
+#include "game/asset.h"
 
 #include <SDL2/SDL_keycode.h>
 #include <SDL2/SDL_keyboard.h>
@@ -802,6 +803,14 @@ void init(State *s) {
 
 
 
+    // Init assets observer.
+    if (asset_observer_init("res") != 0) {
+        printf_err("Couldn't init Asset Observer.\n");
+        exit(1);
+    }
+
+
+
     // Init SDL and GL.
     if (init_sdl_gl()) {
         fprintf(stderr, "%s Couldn't init SDL and GL.\n", debug_error_str);
@@ -824,7 +833,7 @@ void init(State *s) {
     }
 
 
-                        ;
+
 
 
     // Keyboard init.
@@ -884,13 +893,9 @@ void init(State *s) {
     spawn_player(VEC2F_ORIGIN, vec4f_make(0.0f, 1.0f, 0.0f, 0.2f));
 }
 
-             ;
 
 void load(State *s) {
     state = s;
-
-    // Loading globals.
-    load_globals();
 
 
     state->clear_color = vec4f_make(0.1f, 0.1f, 0.4f, 1.0f);
@@ -956,6 +961,16 @@ static s32 load_counter = 5;
  */
 void update(State *s) {
     state = s;
+
+    // Polling any asset changes.
+    if (asset_observer_poll_changes() != 0) {
+        printf_err("Couldn't poll asset changes.\n");
+        exit(1);
+    }
+
+
+    // Listen to any vars files changed.
+    vars_listen_to_changes();
     
     // Handling events
     handle_events(&state->events, &state->window, &state->t);
