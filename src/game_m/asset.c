@@ -189,6 +189,10 @@ int asset_observer_poll_changes() {
 
 
         switch (info->Action) {
+            case FILE_ACTION_ADDED:
+                break;
+            case FILE_ACTION_REMOVED:
+                break;
             case FILE_ACTION_MODIFIED:
                 array_list_append(&asset_changes_list, ((Asset_Change) { 
                     .full_path      = full_path,
@@ -196,8 +200,12 @@ int asset_observer_poll_changes() {
                     .file_format    = file_format,
                             }));
                 break;
+            case FILE_ACTION_RENAMED_OLD_NAME:
+                break;
+            case FILE_ACTION_RENAMED_NEW_NAME:
+                break;
             default:
-                printf_err("Asset unknown change. %.*s\n", UNPACK(full_path)); 
+                printf_err("Asset unknown change. '%.*s', action change code: %d\n", UNPACK(full_path), info->Action); 
                 break;
         }
 

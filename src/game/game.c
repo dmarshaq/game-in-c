@@ -5,6 +5,7 @@
 #include "core/structs.h"
 #include "core/file.h"
 #include "core/mathf.h"
+#include "core/typeinfo.h"
 
 #include "game/graphics.h"
 #include "game/input.h"
@@ -799,8 +800,13 @@ const char* APP_NAME = "Game in C";
 
 
 void init(State *s) {
+    // Setting random seed.
+    srand((u32)time(NULL));
+
     state = s;
 
+    // Init vars.
+    vars_tree_begin();
 
 
     // Init assets observer.
@@ -848,8 +854,6 @@ void init(State *s) {
     // Initing events.
     init_events_handler(&state->events);
 
-    // Setting random seed.
-    srand((u32)time(NULL));
 
 
     // Debug verticies buffer allocation.
@@ -863,42 +867,12 @@ void init(State *s) {
      */
     state->shader_table = hash_table_make(Shader, 8, &std_allocator);
     state->font_table = hash_table_make(Font_Baked, 8, &std_allocator);
-    
 
 
 
-    // Allocating space for phys boxes.
-    state->phys_boxes = array_list_make(Phys_Box *, 8, &std_allocator);
-
-
-
-    state->boxes = malloc(MAX_BOXES * sizeof(Box)); // @Leak.
-    if (state->boxes == NULL)
-        printf_err("Couldn't allocate boxes array.\n");
-    
-    // Small init of boxes for other algorithms to work properly.
-    for (u32 i = 0; i < MAX_BOXES; i++) {
-        state->boxes[i].destroyed = true;
-    }
-
-    // Set game state.
-    s->gs = PLAY;
-
-
-
-    spawn_rect(vec2f_make(-8.0f, -5.0f), vec2f_make(8.0f, -6.0f), vec4f_make(randf(), randf(), randf(), 0.4f));
-    spawn_obstacle(vec2f_make(4.0f, -1.0f), 6.0f, 1.0f, vec4f_make(randf(), randf(), randf(), 0.4f), PI / 6);
-    spawn_obstacle(vec2f_make(-4.0f, 1.5f), 6.0f, 1.0f, vec4f_make(randf(), randf(), randf(), 0.4f), -PI / 6);
-
-    spawn_player(VEC2F_ORIGIN, vec4f_make(0.0f, 1.0f, 0.0f, 0.2f));
-}
-
-
-void load(State *s) {
-    state = s;
-
-
+    // Setting clear color.
     state->clear_color = vec4f_make(0.1f, 0.1f, 0.4f, 1.0f);
+
 
     // Main camera init.
     state->main_camera = camera_make(VEC2F_ORIGIN, 48);
@@ -946,8 +920,47 @@ void load(State *s) {
     // Init ui.
     ui_init(&state->ui, &state->events.mouse_input);
 
+
+    // Allocating space for phys boxes.
+    state->phys_boxes = array_list_make(Phys_Box *, 8, &std_allocator);
+
+
+
+    state->boxes = malloc(MAX_BOXES * sizeof(Box)); // @Leak.
+    if (state->boxes == NULL)
+        printf_err("Couldn't allocate boxes array.\n");
+    
+    // Small init of boxes for other algorithms to work properly.
+    for (u32 i = 0; i < MAX_BOXES; i++) {
+        state->boxes[i].destroyed = true;
+    }
+
+    // Set game state.
+    s->gs = PLAY;
+
+
+
+    spawn_rect(vec2f_make(-8.0f, -5.0f), vec2f_make(8.0f, -6.0f), vec4f_make(randf(), randf(), randf(), 0.4f));
+    spawn_obstacle(vec2f_make(4.0f, -1.0f), 6.0f, 1.0f, vec4f_make(randf(), randf(), randf(), 0.4f), PI / 6);
+    spawn_obstacle(vec2f_make(-4.0f, 1.5f), 6.0f, 1.0f, vec4f_make(randf(), randf(), randf(), 0.4f), -PI / 6);
+
+    spawn_player(VEC2F_ORIGIN, vec4f_make(0.0f, 1.0f, 0.0f, 0.2f));
+
     // Player loading.
     state->player.speed = 5.0f;
+
+
+
+    // Finishing vars tree.
+    state->vars_tree = vars_tree_build();
+}
+
+
+
+void load(State *s) {
+    state = s;
+
+
 
 }
 
@@ -970,7 +983,7 @@ void update(State *s) {
 
 
     // Listen to any vars files changed.
-    vars_listen_to_changes();
+    vars_listen_to_changes(state->vars_tree);
     
     // Handling events
     handle_events(&state->events, &state->window, &state->t);

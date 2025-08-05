@@ -10,7 +10,7 @@
 #include "meta/lexer.h"
 
 
-#define LOG
+// #define LOG
 
 
 const char* debug_meta_str = "\033[34m[META]\033[0m";

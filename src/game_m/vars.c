@@ -4,6 +4,7 @@
 
 #include "game/game.h"
 #include "game/asset.h"
+#include "game/console.h"
 
 #include "core/core.h"
 #include "core/str.h"
@@ -82,14 +83,12 @@ Vars_Tree vars_tree_builder_build(Vars_Tree_Builder *builder, Allocator *allocat
         }
     }
 
-    printf("BUILDER: Counted nodes: %lld, %lld.\n", count, string_data_buffer_length);
 
     Vars_Tree tree = {
         .count = count,
         .root = allocator_alloc(allocator, count * sizeof(Vars_Node) + string_data_buffer_length),
     };
 
-    printf("BUILDER: Allocated tree.\n");
 
     // Pointers to the begginnings of the data segments.
     Vars_Node *tree_nodes = tree.root + 1; // + 1 because compiler knows tha tree.root is of underlying type Vars_Node, so it adds sizeof(Vars_Node) automatically.
@@ -97,7 +96,6 @@ Vars_Tree vars_tree_builder_build(Vars_Tree_Builder *builder, Allocator *allocat
     char *names_data = (char *)(tree.root + tree.count);
 
 
-    printf("BUILDER: Got data pointers.\n");
 
     // Making tree root node here.
     tree.root[0].name = (String){0};
@@ -110,7 +108,6 @@ Vars_Tree vars_tree_builder_build(Vars_Tree_Builder *builder, Allocator *allocat
     else
         tree.root[0].children_count = 0;
 
-    printf("BUILDER: Made root.\n");
 
 
 
@@ -122,12 +119,10 @@ Vars_Tree vars_tree_builder_build(Vars_Tree_Builder *builder, Allocator *allocat
             // u32 counter_x = builder->data[i][j].children_count;
             // tree_nodes[count].name = builder->data[i][j].name;
             tree_nodes[count] = builder->data[i][j];
-            printf("BUILDER: Copied node from array list.\n");
 
 
             
             if (tree_nodes[count].children_count > 0) {
-                printf("BUILDER: Detected children nodes...");
 // This comment is hard to read...
                 // '(count + (array_list_length(&builder->data[i]) - j))' this expression should calculate where next layer ("children tree layer") should start, and from that we can just add
                 // 'builder->data[i][j].children_index' to find the first node of the children array assigned to the current node copied.
@@ -136,28 +131,21 @@ Vars_Tree vars_tree_builder_build(Vars_Tree_Builder *builder, Allocator *allocat
                 // Encoding this absolute pointer to relative pointer.
                 ABS2REL_32(tree_nodes[count].children_rptr, children_abs_ptr);
 
-                printf(" OK.\n");
             }
 
-            printf("BUILDER: Copying string name...");
             // Copying names data.
             memcpy(names_data + names_data_write_index, builder->data[i][j].name.data, builder->data[i][j].name.length);
             tree_nodes[count].name.data = names_data + names_data_write_index;
             names_data_write_index += builder->data[i][j].name.length;
-            printf(" OK.\n");
 
             count++;
         }
 
         array_list_free(&(builder->data[i]));
-        printf("BUILDER: Freed arraylist layer.\n");
     }
-    printf("BUILDER: Exited copy node loop.\n");
     array_list_free(&builder->data);
-    printf("BUILDER: Freed arraylist for tree.\n");
 
 
-    printf("BUILDER: Finished copying nodes.\n");
 
     return tree;
 }
@@ -217,25 +205,6 @@ void vars_tree_builder_add_struct(Vars_Tree_Builder *builder, Type_Info *type, u
 
 
 
-@Introspect;
-typedef struct color {
-    float red;
-    float green;
-    float blue;
-    float alpha;
-} Color;
-
-@Introspect;
-typedef struct console {
-    s64 speed;
-    float open_percent;
-    Color bg;
-    Color text_input;
-    float full_open_percent;
-    s64 text_pad;
-} Console;
-
-static Console console_data;
 
 
 
@@ -276,8 +245,14 @@ void vars_tree_print_node(Vars_Node *node, s64 depth) {
 
 
 
-void load_vars_file(char *file_name, Vars_Tree *tree) {
-    String _content = read_file_into_str(file_name, &std_allocator);
+void load_vars_file(String file_path, Vars_Tree *tree) {
+    // Making string be null terminated.
+    char _buffer[file_path.length + 1]; 
+    str_copy_to(file_path, _buffer);
+    _buffer[file_path.length] = '\0';
+
+
+    String _content = read_file_into_str(_buffer, &std_allocator);
 
     String content = _content;
 
@@ -294,7 +269,6 @@ void load_vars_file(char *file_name, Vars_Tree *tree) {
             s64 newline = str_find_char_left(content, '\n');
             
             String comment = str_substring(content, 0, newline);
-            printf("%-10s:    %.*s\n", "Comment", UNPACK(comment));
 
             content = str_eat_chars(content, comment.length);
             continue;
@@ -306,12 +280,11 @@ void load_vars_file(char *file_name, Vars_Tree *tree) {
 
             s64 end_of_path = str_find_char_left(content, ']');
             if (end_of_path == -1) {
-                printf_err("Couldn't parse '%s': Missing ']'.\n", file_name);
+                printf_err("Couldn't parse '%s': Missing ']'.\n", file_path);
                 return;
             }
             
             String path = str_substring(content, 1, end_of_path);
-            printf("%-10s:    %.*s\n", "Path", UNPACK(path));
 
             content = str_eat_chars(content, path.length + 2);
             
@@ -325,7 +298,6 @@ void load_vars_file(char *file_name, Vars_Tree *tree) {
                     end_of_node_name = path.length;
 
                 String node_name = str_substring(path, 0, end_of_node_name);
-                printf("    %-10s:    %.*s\n", "Node name", UNPACK(node_name));
 
                 // Searching node in the tree.
                 Vars_Node *children = REL2ABS_32(current_node->children_rptr);
@@ -336,7 +308,7 @@ void load_vars_file(char *file_name, Vars_Tree *tree) {
                     }
 
                     if (i + 1 == current_node->children_count) {
-                        printf_err("Couldn't parse '%s': No vars node named: '%.*s'.\n", file_name, UNPACK(node_name));
+                        printf_err("Couldn't parse '%s': No vars node named: '%.*s'.\n", file_path, UNPACK(node_name));
                         return;
                     }
                 }
@@ -368,17 +340,15 @@ void load_vars_file(char *file_name, Vars_Tree *tree) {
                     }
 
                     if (i + 1 == current_node->children_count) {
-                        printf_err("Couldn't parse '%s': No field node named: '%.*s'.\n", file_name, UNPACK(literal));
+                        printf_err("Couldn't parse '%s': No field node named: '%.*s'.\n", file_path, UNPACK(literal));
                         return;
                     }
                 }
 
-                printf("%-10s:    %.*s\n", "Key", UNPACK(literal));
-
                 continue;
             }
 
-            printf_err("Couldn't parse '%s': File has no key specified for the literal: '%.*s'.\n", file_name, UNPACK(literal));
+            printf_err("Couldn't parse '%s': File has no key specified for the literal: '%.*s'.\n", file_path, UNPACK(literal));
             return;
         }
 
@@ -388,18 +358,16 @@ void load_vars_file(char *file_name, Vars_Tree *tree) {
         switch (type->type) {
             case INTEGER:
                 if (!str_is_int(literal)) {
-                    printf_err("Couldn't parse '%s': Expected literal '%.*s' to be INTEGER.\n", file_name, UNPACK(literal));
+                    printf_err("Couldn't parse '%s': Expected literal '%.*s' to be INTEGER.\n", file_path, UNPACK(literal));
                     return;
                 }
 
                 
                 // Check if it is a valid integer type.
                 if (type->t_integer.size_bits != 64 || !type->t_integer.is_signed) {
-                    printf_err("Error '%s': Expected '%.*s' field node to be signed 64 bit integer.\n", file_name, UNPACK(literal));
+                    printf_err("Error '%s': Expected '%.*s' field node to be signed 64 bit integer.\n", file_path, UNPACK(literal));
                     return;
                 }
-
-                printf("%-10s:    %.*s\n", "Integer", UNPACK(literal));
 
                 *(s64 *)current_key->data = str_parse_int(literal);
 
@@ -407,12 +375,10 @@ void load_vars_file(char *file_name, Vars_Tree *tree) {
                 break;
             case FLOAT:
                 if (!str_is_float(literal)) {
-                    printf_err("Couldn't parse '%s': Expected literal '%.*s' to be FLOAT.\n", file_name, UNPACK(literal));
+                    printf_err("Couldn't parse '%s': Expected literal '%.*s' to be FLOAT.\n", file_path, UNPACK(literal));
                     return;
                 }
 
-                printf("%-10s:    %.*s\n", "Float", UNPACK(literal));
-                
                 *(float *)current_key->data = str_parse_float(literal);
 
                 current_key = NULL;
@@ -431,41 +397,19 @@ void load_vars_file(char *file_name, Vars_Tree *tree) {
 
 
 
+static const String VARS_FILE_FORMAT = STR_BUFFER("vars");
 
-void vars_listen_to_changes() {
+
+void vars_listen_to_changes(Vars_Tree *tree) {
     u32 count;
     const Asset_Change *changes;
 
     if (view_asset_changes(&count, &changes)) {
         for (u32 i = 0; i < count; i++) {
-            printf("Vars listened to an Asset Change: '%.*s'\n", UNPACK(changes[i].file_name));
+            if (str_equals(changes[i].file_format, VARS_FILE_FORMAT)) {
+                console_log("Vars detected Asset Change: '%.*s'\n", UNPACK(changes[i].full_path));
+                load_vars_file(changes[i].full_path, tree);
+            }
         }
     }
-
-
-
-
-
-
-
-
-    // printf("console_data from code:\n");
-    // printf("speed = %d\n", console_data.speed);
-    // printf("open_percent = %f\n", console_data.open_percent);
-    // printf("full_open_percent = %f\n", console_data.full_open_percent);
-    // printf("text_pad = %d\n", console_data.text_pad);
-
-
-    // printf("console_data.text_input from code:\n");
-    // printf("red     = %f\n", console_data.text_input.red);
-    // printf("green   = %f\n", console_data.text_input.green);
-    // printf("blue    = %f\n", console_data.text_input.blue);
-    // printf("alpha   = %f\n", console_data.text_input.alpha);
-
-
-    // printf("console_data.bg from code:\n");
-    // printf("red     = %f\n", console_data.bg.red);
-    // printf("green   = %f\n", console_data.bg.green);
-    // printf("blue    = %f\n", console_data.bg.blue);
-    // printf("alpha   = %f\n", console_data.bg.alpha);
 }

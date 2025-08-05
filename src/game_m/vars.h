@@ -43,7 +43,7 @@ Vars_Tree vars_tree_build();
 void vars_tree_print_node(Vars_Node *node, s64 depth);
 
 
-void load_vars_file(char *file_name, Vars_Tree *tree);
+void load_vars_file(String file_path, Vars_Tree *tree);
 
 /**
  * This function insures .vars files are listened to and properly loaded once any of those files are changed.

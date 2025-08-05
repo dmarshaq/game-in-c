@@ -1,13 +1,18 @@
 #include "game/console.h"
+
+#include "meta_generated.h"
+
 #include "game/game.h"
 #include "game/draw.h"
 #include "game/graphics.h"
+#include "game/vars.h"
 
 #include "core/structs.h"
 #include "core/arena.h"
 #include "core/str.h"
 #include "core/mathf.h"
 #include "core/file.h"
+#include "core/typeinfo.h"
 
 #include <SDL2/SDL_keyboard.h>
 #include <SDL2/SDL_keycode.h>
@@ -21,10 +26,19 @@ static Font_Baked font_output;
 
 static Matrix4f projection;
 
-static const float SPEED = 100;
-static const float OPEN_PERCENT = 0.4f;
-static const float FULL_OPEN_PERCENT = 0.8f;
-static const float TEXT_PAD = 10;
+
+@Introspect;
+typedef struct console {
+    s64 speed;
+    float open_percent;
+    float full_open_percent;
+    s64 text_pad;
+} Console;
+
+static Console console;
+
+
+
 static const s64 HISTORY_BUFFER_SIZE = 8192;
 static const s64 HISTORY_MAX_MESSAGES = 256;
 
@@ -114,15 +128,15 @@ static Console_Openness console_state;
 
 // Commands.
 typedef enum type {
-    INTEGER,
-    FLOAT,
-    STRING,
+    T_INTEGER,
+    T_FLOAT,
+    T_STRING,
 } Type;
 
 
-#define arg_int(value)      ((Command_Argument){ INTEGER, .int_value = value })
-#define arg_float(value)    ((Command_Argument){ FLOAT,   .float_value = value })
-#define arg_str(value)      ((Command_Argument){ STRING,  .str_value = CSTR(value) })
+#define arg_int(value)      ((Command_Argument){ T_INTEGER, .int_value = value })
+#define arg_float(value)    ((Command_Argument){ T_FLOAT,   .float_value = value })
+#define arg_str(value)      ((Command_Argument){ T_STRING,  .str_value = CSTR(value) })
 
 typedef struct command_argument {
     Type type;
@@ -154,7 +168,7 @@ static Arena commands_arena;
 
 
 float console_max_height(Window_Info *window){
-    return window->height * FULL_OPEN_PERCENT; 
+    return window->height * console.full_open_percent; 
 }
 
 void console_start_input_if_not(Text_Input *text_i) {
@@ -319,6 +333,21 @@ void init_console(State *state) {
     init_console_commands();
 
 
+
+    // ------ Tweak vars default values.
+    console.speed               = 100;
+    console.open_percent        = 0.4f;
+    console.full_open_percent   = 0.8f;
+    console.text_pad            = 10;
+    
+    vars_tree_add(TYPE_OF(console), (u8 *)&console, CSTR("console"));
+
+
+
+
+
+    // ------ Internal vars.
+
     // Get resources.
     drawer = &state->quad_drawer;
 
@@ -410,10 +439,10 @@ void console_update(Window_Info *window, Events_Info *events, Time_Info *t) {
             c_y0_target = window->height;
             break;
         case OPEN:
-            c_y0_target = window->height * (1.0f - OPEN_PERCENT);
+            c_y0_target = window->height * (1.0f - console.open_percent);
             break;
         case FULLY_OPEN:
-            c_y0_target = window->height * (1.0f - FULL_OPEN_PERCENT);
+            c_y0_target = window->height * (1.0f - console.full_open_percent);
             break;
         default:
             printf_err("Unknown console state.\n");
@@ -556,7 +585,7 @@ void console_draw(Window_Info *window) {
     draw_quad(vec2f_make(c_x0, c_y0), vec2f_make(c_x1, c_y0 + input_height), vec4f_make(0.18f, 0.18f, 0.35f, 0.98f), NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
     
     // Draw text of the history.
-    Vec2f history_draw_origin = vec2f_make(c_x0 + TEXT_PAD, c_y0 + input_height);
+    Vec2f history_draw_origin = vec2f_make(c_x0 + console.text_pad, c_y0 + input_height);
     s64 lines_drawen = 0;
     History_Message *msg;
     s64 msg_line_count;
@@ -597,16 +626,16 @@ void console_draw(Window_Info *window) {
             width = 2;
         }
 
-        draw_quad(vec2f_make(c_x0 + TEXT_PAD + input_cursor_index * input_block_width, c_y0 + font_input.line_gap), vec2f_make(c_x0 + TEXT_PAD + input_cursor_index * input_block_width + width, c_y0 + input_height - input_font_top_pad * 0.5f), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
+        draw_quad(vec2f_make(c_x0 + console.text_pad + input_cursor_index * input_block_width, c_y0 + font_input.line_gap), vec2f_make(c_x0 + console.text_pad + input_cursor_index * input_block_width + width, c_y0 + input_height - input_font_top_pad * 0.5f), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
     }
 
 
     // Draw input text.
     if (user_input_peeked_message_index != -1) {
         User_Input_Handle handle = user_input_history[user_input_peeked_message_index];
-        draw_text(STR(handle.length, &user_input_history_buffer[handle.index]), vec2f_make(c_x0 + TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_YELLOW, &font_input, 1, NULL);
+        draw_text(STR(handle.length, &user_input_history_buffer[handle.index]), vec2f_make(c_x0 + console.text_pad, c_y0 + input_height - input_font_top_pad), VEC4F_YELLOW, &font_input, 1, NULL);
     } else {
-        draw_text(STR(input_length, input), vec2f_make(c_x0 + TEXT_PAD, c_y0 + input_height - input_font_top_pad), VEC4F_CYAN, &font_input, 1, NULL);
+        draw_text(STR(input_length, input), vec2f_make(c_x0 + console.text_pad, c_y0 + input_height - input_font_top_pad), VEC4F_CYAN, &font_input, 1, NULL);
     }
 
     draw_end();
@@ -629,13 +658,13 @@ void console_free() {
 
 void print_argument(Command_Argument *argument) {
     switch (argument->type) {
-        case INTEGER:
+        case T_INTEGER:
             console_log("Type: Integer       Default value: %-4d\n", argument->int_value);
             break;
-        case FLOAT:
+        case T_FLOAT:
             console_log("Type: Float         Default value: %4.2f\n", argument->float_value);
             break;
-        case STRING:
+        case T_STRING:
             console_log("Type: String        Default value: %-10.*s\n", UNPACK(argument->str_value));
             break;
         default:
@@ -796,7 +825,7 @@ void console_exec_command(String command) {
                 // cprintf("Argument [%d]: '%.*s'.\n", args_count - 1, UNPACK(arg));
 
                 switch(commands[i].args[args_count - 1].type) {
-                    case INTEGER:
+                    case T_INTEGER:
                         if (!str_is_int(arg)) {
                             console_log("%.*s: Argument [%d]: '%.*s' type mismatch, expected 'Integer'.\n", UNPACK(command_name), args_count - 1, UNPACK(arg));
                             return;
@@ -804,7 +833,7 @@ void console_exec_command(String command) {
                         parsed_args[args_count - 1] = arg_int(str_parse_int(arg));
 
                         break;
-                    case FLOAT:
+                    case T_FLOAT:
                         if (!str_is_float(arg)) {
                             console_log("%.*s: Argument [%d]: '%.*s' type mismatch, expected 'Float'.\n", UNPACK(command_name), args_count - 1, UNPACK(arg));
                             return;
@@ -812,8 +841,8 @@ void console_exec_command(String command) {
                         parsed_args[args_count - 1] = arg_float(str_parse_float(arg));
 
                         break;
-                    case STRING:
-                        parsed_args[args_count - 1] = (Command_Argument){ STRING, .str_value = arg };
+                    case T_STRING:
+                        parsed_args[args_count - 1] = (Command_Argument){ T_STRING, .str_value = arg };
 
                         break;
                 }

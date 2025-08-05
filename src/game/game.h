@@ -9,6 +9,7 @@
 #include "game/event.h"
 #include "game/physics.h"
 #include "game/imui.h"
+#include "game/vars.h"
 
 
 /**
@@ -79,8 +80,9 @@ typedef struct state {
     Events_Info events;
     Time_Info t;
 
-
     UI_State ui;
+
+    Vars_Tree vars_tree;
 
 
     /**

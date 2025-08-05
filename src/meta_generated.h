@@ -16,11 +16,9 @@
 typedef enum meta_type {
     META_TYPE(bool),
     META_TYPE(char),
-    META_TYPE(color),
-    META_TYPE(Color),
-    META_TYPE(float),
     META_TYPE(console),
     META_TYPE(Console),
+    META_TYPE(float),
     META_TYPE(int),
     META_TYPE(s8),
     META_TYPE(s16),
@@ -39,26 +37,18 @@ static Type_Info_Function_Argument META_TYPE_FUNCTION_ARGS[] = {
 };
 
 static Type_Info_Struct_Member META_TYPE_STRUCT_MEMBERS[] = {
-    { TYPE_OF(float), STR_BUFFER("red"), 0 },
-    { TYPE_OF(float), STR_BUFFER("green"), 4 },
-    { TYPE_OF(float), STR_BUFFER("blue"), 8 },
-    { TYPE_OF(float), STR_BUFFER("alpha"), 12 },
     { TYPE_OF(s64), STR_BUFFER("speed"), 0 },
     { TYPE_OF(float), STR_BUFFER("open_percent"), 8 },
-    { TYPE_OF(Color), STR_BUFFER("bg"), 12 },
-    { TYPE_OF(Color), STR_BUFFER("text_input"), 28 },
-    { TYPE_OF(float), STR_BUFFER("full_open_percent"), 44 },
-    { TYPE_OF(s64), STR_BUFFER("text_pad"), 48 },
+    { TYPE_OF(float), STR_BUFFER("full_open_percent"), 12 },
+    { TYPE_OF(s64), STR_BUFFER("text_pad"), 16 },
 };
 
 static Type_Info META_TYPE_TABLE[] = {
     [META_TYPE(bool)] = (Type_Info) { BOOL, 1, 1 },
     [META_TYPE(char)] = (Type_Info) { INTEGER, 1, 1, .t_integer = { 8, 0 } },
-    [META_TYPE(color)] = (Type_Info) { STRUCT, 16, 4, .t_struct = { STR_BUFFER("color"), 4, &META_TYPE_STRUCT_MEMBERS[0] } },
-    [META_TYPE(Color)] = (Type_Info) { TYPEDEF, 16, 4, .t_typedef = { TYPE_OF(color) } },
+    [META_TYPE(console)] = (Type_Info) { STRUCT, 24, 8, .t_struct = { STR_BUFFER("console"), 4, &META_TYPE_STRUCT_MEMBERS[0] } },
+    [META_TYPE(Console)] = (Type_Info) { TYPEDEF, 24, 8, .t_typedef = { TYPE_OF(console) } },
     [META_TYPE(float)] = (Type_Info) { FLOAT, 4, 4,.t_float = { 32 } },
-    [META_TYPE(console)] = (Type_Info) { STRUCT, 56, 8, .t_struct = { STR_BUFFER("console"), 6, &META_TYPE_STRUCT_MEMBERS[4] } },
-    [META_TYPE(Console)] = (Type_Info) { TYPEDEF, 56, 8, .t_typedef = { TYPE_OF(console) } },
     [META_TYPE(int)] = (Type_Info) { INTEGER, 4, 4, .t_integer = { 32, 1 } },
     [META_TYPE(s8)] = (Type_Info) { INTEGER, 1, 1, .t_integer = { 8, 1 } },
     [META_TYPE(s16)] = (Type_Info) { INTEGER, 2, 2, .t_integer = { 16, 1 } },
