@@ -6,7 +6,9 @@
 
 
 typedef struct asset_change {
-    String file_name;
+    String full_path;           // Ex: 'res/context/some_file.txt'
+    String file_name;           // Ex: 'some_file.txt'
+    String file_format;         // Ex: 'txt'
 } Asset_Change;
 
 

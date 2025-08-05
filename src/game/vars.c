@@ -438,7 +438,7 @@ void vars_listen_to_changes() {
 
     if (view_asset_changes(&count, &changes)) {
         for (u32 i = 0; i < count; i++) {
-            printf("Vars listened to an Asset Change: '%.*s'\n", changes[i].file_name);
+            printf("Vars listened to an Asset Change: '%.*s'\n", UNPACK(changes[i].file_name));
         }
     }
 
