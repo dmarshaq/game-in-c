@@ -816,6 +816,12 @@ void init(State *s) {
         exit(1);
     }
 
+    // Force load asset changes.
+    if (asset_observer_force_changes() != 0) {
+        printf_err("Couldn't force load asset changes.\n");
+        exit(1);
+    }
+
 
 
     // Init SDL and GL.

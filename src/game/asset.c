@@ -14,7 +14,10 @@ static Asset_Change *asset_changes_list;
 int asset_observer_init(char *directory) {
     asset_changes_list = array_list_make(Asset_Change, 8, &std_allocator);
 
-    asset_observer_start_watching(directory);
+    // Is not inlined because it is more readable this way.
+    if (asset_observer_start_watching(directory) != 0) {
+        return 1;
+    }
 
     return 0;
 }
@@ -122,6 +125,41 @@ int asset_observer_start_watching(char *directory) {
     return 0;
 }
 
+// @Recursion.
+int asset_observer_force_changes_directory(String directory) {
+
+    // Making string be null terminated and have wildcard '*' at the end.
+    char _buffer[directory.length + 3]; 
+    str_copy_to(directory, _buffer);
+    _buffer[directory.length - 2] = '/';
+    _buffer[directory.length - 1] = '*';
+    _buffer[directory.length]     = '\0';
+
+
+
+    HANDLE found_file_handle;
+    WIN32_FIND_DATA found_file_data;
+    found_file_handle = FindFirstFile(_buffer, &found_file_data);
+
+    if (found_file_handle == INVALID_HANDLE_VALUE) {
+        printf_err("Couldn't get handle to the found file in the directory '%.*s'.\n", UNPACK(directory));
+        return -1;
+    }
+
+    do {
+        printf("Found file: '%s'\n", found_file_data.cFileName);
+    } while (FindNextFile(found_file_handle, &found_file_data) != 0);
+
+    return 0;
+}
+
+int asset_observer_force_changes() {
+    array_list_clear(&asset_changes_list);
+    arena_clear(&filenames_arena);
+
+    return asset_observer_force_changes_directory(dir_path);
+}
+
 int asset_observer_poll_changes() {
     array_list_clear(&asset_changes_list);
     arena_clear(&filenames_arena);
@@ -166,7 +204,7 @@ int asset_observer_poll_changes() {
         // Copying and converting notification file name from UTF-16 to UTF-8.
         int written = WideCharToMultiByte(CP_UTF8, 0, info->FileName, utf8_notification_file_name_length, filenames_arena.ptr, filenames_arena.capacity - arena_size(&filenames_arena), NULL, NULL); // This allows to freerly use rest of the arena space to properly copy path.
         
-        // Checking if written is correctly executed.
+        // Checking if WideCharToMultiByte is correctly executed.
         if (written <= 0) {
             printf_err("Couldn't write to notification file path to arena.\n");
             return -1;
