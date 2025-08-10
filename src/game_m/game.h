@@ -55,7 +55,13 @@ typedef struct box {
 } Box;
 
 // For console test function must be available for other files scopes.
+
+@Introspect;
+@RegisterCommand;
 void spawn_box(Vec2f position, Vec4f color);
+
+@Introspect;
+@RegisterCommand;
 void quit();
 
 typedef enum game_state {

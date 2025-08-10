@@ -5,6 +5,7 @@
 #include "game/game.h"
 #include "game/draw.h"
 #include "game/graphics.h"
+#include "game/command.h"
 #include "game/vars.h"
 
 #include "core/structs.h"
@@ -122,42 +123,6 @@ typedef enum console_openness {
 } Console_Openness;
 
 static Console_Openness console_state;
-
-
-
-
-// Commands.
-typedef enum type {
-    T_INTEGER,
-    T_FLOAT,
-    T_STRING,
-} Type;
-
-
-#define arg_int(value)      ((Command_Argument){ T_INTEGER, .int_value = value })
-#define arg_float(value)    ((Command_Argument){ T_FLOAT,   .float_value = value })
-#define arg_str(value)      ((Command_Argument){ T_STRING,  .str_value = CSTR(value) })
-
-typedef struct command_argument {
-    Type type;
-    union {
-        s64 int_value;
-        float float_value;
-        String str_value;
-    };
-} Command_Argument;
-
-typedef struct command {
-    String name;
-    void (*func)(Command_Argument *, u32);
-    u32 min_args;
-    u32 max_args;
-    Command_Argument *args;
-} Command;
-
-static Command *commands;
-
-static Arena commands_arena;
 
 
 
@@ -329,8 +294,6 @@ void console_error(char *format, ...) {
 
 
 void init_console(State *state) {
-    // Init commands.
-    init_console_commands();
 
 
 
@@ -537,7 +500,7 @@ void console_update(Window_Info *window, Events_Info *events, Time_Info *t) {
 
             // Add a new line symbol and flush input if return key was pressed.
             cprintf(MESSAGE_USER, "%.*s\n", input_length, input);
-            console_exec_command(STR(input_length, input));
+            command_run(STR(input_length, input));
 
             // Clearing text input buffer.
             input[0] = '\0';
@@ -656,227 +619,15 @@ void console_free() {
 
 
 
-void print_argument(Command_Argument *argument) {
-    switch (argument->type) {
-        case T_INTEGER:
-            console_log("Type: Integer       Default value: %-4d\n", argument->int_value);
-            break;
-        case T_FLOAT:
-            console_log("Type: Float         Default value: %4.2f\n", argument->float_value);
-            break;
-        case T_STRING:
-            console_log("Type: String        Default value: %-10.*s\n", UNPACK(argument->str_value));
-            break;
-        default:
-            console_log("Type: Unknown\n");
-            break;
-    }
-}
-
-void print_command(Command *command) {
-    console_log("\n\nName: %-10.*s    Minimum args: %2d    Maximum args: %2d\n", UNPACK(command->name), command->min_args, command->max_args);
-    
-    console_log("----------------------------------------------------------------\n");
-    for (u32 i = 0; i < command->max_args; i++) {
-        console_log("    Argument [%d]:   ", i);
-        print_argument(command->args + i);
-    }
-}
-
-
-
-
-
-
-
-/**
- * 'min_args' <= 'max_args' must be true.
- */
-void register_command(char *name, void (*ptr)(Command_Argument *, u32), u32 min_args, u32 max_args, Command_Argument *args) {
-    Command_Argument *args_cpy = arena_alloc(&commands_arena, max_args * sizeof(Command_Argument));
-    memcpy(args_cpy, args, max_args * sizeof(Command_Argument));
-
-    array_list_append(&commands, ((Command){ CSTR(name), ptr, min_args, max_args, args_cpy }));
-}
-
-
-
-
-
 
 // Example function that we want to register (doesn't have to be in this file).
 s64 add(s64 a, s64 b) {
     return a + b;
 }
 
-//////// CONSOLE WRAPPER COMMANDS GO HERE
-
-#define COMMAND_PREFIX(name)    _command_##name
-
-void COMMAND_PREFIX(help)(Command_Argument *args, u32 args_length) {
-    if (args[0].str_value.length > 0) {
-        console_log("Finding '%.*s' command . . .", UNPACK(args[0].str_value));
-        for (u32 i = 0; i < array_list_length(&commands); i++) {
-            if (str_equals(args[0].str_value, commands[i].name)) {
-                console_log(" ok\n");
-                print_command(commands + i);
-                return;
-            }
-        }
-
-        console_log(" x\n'%.*s' is not a command.\n", UNPACK(args[0].str_value));
-        return;
-    }
-
-    console_log("Listing all available commands:\n");
-    for (u32 i = 0; i < array_list_length(&commands); i++) {
-        print_command(commands + i);
-    }
-}
-
-void COMMAND_PREFIX(clear)(Command_Argument *args, u32 args_length) {
+void clear() {
     looped_array_clear(&history);
 }
-
-void COMMAND_PREFIX(quit)(Command_Argument *args, u32 args_length) {
-    quit();
-}
-
-void COMMAND_PREFIX(add)(Command_Argument *args, u32 args_length) {
-    s64 result = add(args[0].int_value, args[1].int_value);
-    console_log("%d + %d = %d\n", args[0].int_value, args[1].int_value, result);
-}
-
-void COMMAND_PREFIX(for)(Command_Argument *args, u32 args_length) {
-    for (s64 i = args[0].int_value; i < args[1].int_value; i++) {
-        console_log("%d\n", i);
-    }
-}
-
-void COMMAND_PREFIX(spawn_box)(Command_Argument *args, u32 args_length) {
-    spawn_box(vec2f_make(args[0].float_value, args[1].float_value), VEC4F_GREEN);
-}
-
-/////// MAKE COMMANDS ABOVE.
-
-void init_console_commands() {
-    commands = array_list_make(Command, 8, &std_allocator); // @Leak.
-    commands_arena = arena_make(256); // @Leak.
-                    
-    // Register commands here.
-    register_command("help",        COMMAND_PREFIX(help),       0, 1, (Command_Argument[1]) { arg_str("") });
-    register_command("clear",       COMMAND_PREFIX(clear),      0, 0, (Command_Argument[0]) {  });
-    register_command("quit",        COMMAND_PREFIX(quit),       0, 0, (Command_Argument[0]) {  });
-    register_command("add",         COMMAND_PREFIX(add),        1, 2, (Command_Argument[2]) { arg_int(0), arg_int(0) } );
-    register_command("for",         COMMAND_PREFIX(for),        2, 2, (Command_Argument[2]) { arg_int(0), arg_int(1) } );
-    register_command("spawn_box",   COMMAND_PREFIX(spawn_box),  0, 2, (Command_Argument[2]) { arg_float(0), arg_float(0) } );
-}
-
-
-
-
-/**
- * @Speed: When list of commands grows it will be benificial to store them in a hash table.
- */
-void console_exec_command(String command) {
-    String str = command;
-
-    str = str_eat_spaces(str);
-    if (str.length == 0) {
-        console_log("Command name is not specified.\n");
-        return;
-    }
-
-    
-    String command_name = str_get_until_space(str);
-    str.data += command_name.length;
-    str.length -= command_name.length;
-
-    for (s64 i = 0; i < array_list_length(&commands); i++) {
-        if (str_equals(command_name, commands[i].name)) {
-            
-
-            // Scanning for arguments.
-            Command_Argument parsed_args[commands[i].max_args];
-            u32 args_count = 0;
-            String arg;
-
-            while (true) {
-                str = str_eat_spaces(str);
-                if (str.length == 0) {
-                    break;
-                }
-
-                args_count++;
-                if (args_count > commands[i].max_args) {
-                    if (commands[i].max_args == 1)
-                        console_log("%.*s: Expected no more than '%d' argument for '%.*s' command.\n", UNPACK(command_name), commands[i].max_args, UNPACK(commands[i].name));
-                    else
-                        console_log("%.*s: Expected no more than '%d' arguments for '%.*s' command.\n", UNPACK(command_name), commands[i].max_args, UNPACK(commands[i].name));
-                    return;
-                }
-
-                // Getting arg string and moving str to the index after.
-                arg = str_get_until_space(str);
-                str.data += arg.length;
-                str.length -= arg.length;
-
-                // Parsing arg string into actual Command_Argument.
-                // cprintf("Argument [%d]: '%.*s'.\n", args_count - 1, UNPACK(arg));
-
-                switch(commands[i].args[args_count - 1].type) {
-                    case T_INTEGER:
-                        if (!str_is_int(arg)) {
-                            console_log("%.*s: Argument [%d]: '%.*s' type mismatch, expected 'Integer'.\n", UNPACK(command_name), args_count - 1, UNPACK(arg));
-                            return;
-                        }
-                        parsed_args[args_count - 1] = arg_int(str_parse_int(arg));
-
-                        break;
-                    case T_FLOAT:
-                        if (!str_is_float(arg)) {
-                            console_log("%.*s: Argument [%d]: '%.*s' type mismatch, expected 'Float'.\n", UNPACK(command_name), args_count - 1, UNPACK(arg));
-                            return;
-                        }
-                        parsed_args[args_count - 1] = arg_float(str_parse_float(arg));
-
-                        break;
-                    case T_STRING:
-                        parsed_args[args_count - 1] = (Command_Argument){ T_STRING, .str_value = arg };
-
-                        break;
-                }
-
-            }
-
-            if (args_count < commands[i].min_args) {
-                if (commands[i].min_args == 1)
-                    console_log("%.*s: Expected at least '%d' argument for '%.*s' command.\n", UNPACK(command_name), commands[i].min_args, UNPACK(commands[i].name));
-                else
-                    console_log("%.*s: Expected at least '%d' arguments for '%.*s' command.\n", UNPACK(command_name), commands[i].min_args, UNPACK(commands[i].name));
-                return;
-            }
-
-            // Adding default args if not all args were filled.
-            for (u32 j = args_count; j < commands[i].max_args; j++) {
-                parsed_args[j] = commands[i].args[j];
-            }
-
-
-
-            // cprintf("Found command: '%.*s'.\n", UNPACK(commands[i].name));
-            // print_command(commands + i);
-
-            // This is default case for every command if no other args were specified.
-            // Maybe...
-            commands[i].func(parsed_args, commands[i].max_args);
-            return;
-        }
-    }
-
-    console_log("%.*s: Is not a command.\n", UNPACK(command_name));
-}
-
 
 
 

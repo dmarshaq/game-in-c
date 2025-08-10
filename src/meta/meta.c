@@ -20,13 +20,18 @@ const char* debug_meta_str = "\033[34m[META]\033[0m";
 
 
 
+
+
+// Type table / introspcetion vars.
 static const s64 POINTER_SIZE = 8;
 
+static const String TYPE_PTR_POSTFIX = STR_BUFFER("_ptr");
 
+static const String TYPEDEF_STR    = STR_BUFFER("typedef");
+static const String STRUCT_STR     = STR_BUFFER("struct");
+static const String UNION_STR      = STR_BUFFER("union");
+static const String ENUM_STR       = STR_BUFFER("enum");
 
-
-
-// Hash table that will be converted into meta_type_table above.
 
 static Arena arena_strings; //@Leak.
 static Arena arena_type_info; // @Leak.
@@ -37,7 +42,19 @@ static Type_Info **type_table; // @Leak.
 
 
 
-const String TYPE_PTR_POSTFIX = STR_BUFFER("_ptr");
+// Maybe move current state of meta processing to a separate struct that might contain all of the info like current_file_name, etc.
+static char *current_file_name = NULL;
+
+
+
+
+// RegisterCommand vars.
+static Type_Info **registered_functions; // @Leak.
+static String *registered_functions_headers; // @Leak.
+
+
+// @Important: We take responsability, of preserving all important strings even after contents of the file are disposed, it means all important typenames are copied into 'arena_strings'
+#define SAVE_STRING(str) (str).data = str_copy_to((str), arena_alloc(&arena_strings, (str).length))
 
 
 
@@ -87,29 +104,62 @@ bool type_table_exists(String typename) {
  * Returns enum ready typename of the pointer.
  */
 String type_table_add_pointer(String base_typename, s64 asterisk_count) {
-    Type_Info *base_type = *(Type_Info **)(hash_table_get(&type_table, UNPACK(base_typename)));
 
     // Making typename be enum ready, substituting '*' with '_ptr'.
-    char *buffer = arena_alloc(&arena_strings, base_typename.length + asterisk_count * TYPE_PTR_POSTFIX.length); // @Leak.
+    // Buffer will contain both actual typename and enum ready typename:
+    // For example: "char***" and "char_ptr_ptr_ptr"     *sigh* . . . 
+    // Yes this is stupid but it works well.
+    char *buffer = arena_alloc(&arena_strings,  (base_typename.length + asterisk_count)+ (base_typename.length + asterisk_count * TYPE_PTR_POSTFIX.length));
 
-    str_copy_to(base_typename, buffer);
+    char *ptr_typename      = str_copy_to(base_typename, buffer);
+    char *ptr_enum_typename = str_copy_to(base_typename, buffer + base_typename.length + asterisk_count);
+
+    String typename         = STR(base_typename.length, ptr_typename);
+    String enum_typename    = STR(base_typename.length, ptr_enum_typename);
+
     for (s64 i = 0; i < asterisk_count; i++) {
-        str_copy_to(TYPE_PTR_POSTFIX, buffer + base_typename.length + i * TYPE_PTR_POSTFIX.length);
+        Type_Info *base_type = *(Type_Info **)(hash_table_get(&type_table, UNPACK(enum_typename)));
+        ptr_typename[base_typename.length + i] = '*';
+        str_copy_to(TYPE_PTR_POSTFIX, ptr_enum_typename + base_typename.length + i * TYPE_PTR_POSTFIX.length);
+        
+        typename      = STR(base_typename.length + (i + 1), ptr_typename);
+        enum_typename = STR(base_typename.length + (i + 1) * TYPE_PTR_POSTFIX.length, ptr_enum_typename);
+
+
+
+        printf(" [DEB] PTR ADDING typename: '%.*s', with enum_typename: '%.*s'\n", UNPACK(typename), UNPACK(enum_typename));
+
+
+        // Type check, if already exists, since pointer types are unique because the base type is unique, it's not the reason to error.
+        if (type_table_exists(enum_typename)) {
+            continue;
+        }
+
+        // Putting pointer.
+        Type_Info *item = arena_alloc(&arena_type_info, sizeof(Type_Info));
+        *item = ((Type_Info) { POINTER, typename, POINTER_SIZE, POINTER_SIZE, .t_pointer = { base_type } });
+        hash_table_put(&type_table, item, UNPACK(enum_typename));
     }
 
-    String typename = STR(base_typename.length + asterisk_count * TYPE_PTR_POSTFIX.length, buffer);
 
-    // Type check, if already exists, since pointer types are unique because the base type is unique, it's not the reason to error.
-    if (type_table_exists(typename)) {
-        return typename;
-    }
+    return enum_typename;
+    // Filling in actual typename.
+    // Example: " char*** "
+    // str_copy_to(base_typename, buffer);
+    // for (s64 i = 0; i < asterisk_count; i++) {
+    //     buffer[base_typename.length + i] = '*';
+    // }
 
-    // Putting pointer.
-    Type_Info *item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { POINTER, POINTER_SIZE, POINTER_SIZE, .t_pointer = { base_type } });
-    hash_table_put(&type_table, item, UNPACK(typename) );
 
-    return typename;
+
+
+
+
+
+    // String typename = STR(base_typename.length + asterisk_count * TYPE_PTR_POSTFIX.length, buffer);
+
+
+    // return typename;
 }
 
 /**
@@ -126,7 +176,7 @@ int type_table_add_typedef(String typename, String typedef_typename) {
 
     // Putting typedef.
     Type_Info *item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { TYPEDEF, 0, 0, .t_typedef = { typedef_of } });
+    *item = ((Type_Info) { TYPEDEF, typedef_typename, 0, 0, .t_typedef = { typedef_of } });
     hash_table_put(&type_table, item, UNPACK(typedef_typename) );
 
     return 0;
@@ -134,7 +184,7 @@ int type_table_add_typedef(String typename, String typedef_typename) {
 
 void type_table_add_unknown(String typename) {
     Type_Info *item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { UNKNOWN, 0, 0 });
+    *item = ((Type_Info) { UNKNOWN, typename, 0, 0 });
 
     hash_table_put(&type_table, item, UNPACK(typename));
 }
@@ -142,7 +192,7 @@ void type_table_add_unknown(String typename) {
 
 Type_Info* type_table_add_struct(String typename) {
     Type_Info *item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { STRUCT, 0, 0, .t_struct = { typename, 0, arena_type_info_struct_member.ptr } });
+    *item = ((Type_Info) { STRUCT, typename, 0, 0, .t_struct = { 0, arena_type_info_struct_member.ptr } });
     hash_table_put(&type_table, item, UNPACK(typename));
     return item;
 }
@@ -159,8 +209,30 @@ void type_table_add_struct_member(Type_Info *struct_type, String member_typename
 
 
 Type_Info* type_table_add_function(Type_Info *return_type, String typename) {
+    // @Perfomance: Maybe move this on a higher level to reduce total amount of the strings saved, and simply save one string per file processed.
+    String definition_file = CSTR(current_file_name);
+
+    // Remove 'src/' from the beginning.
+    definition_file = str_eat_chars(definition_file, 4);
+    
+    // @Temporary, maybe move such cutting functionality to the 'str.h'.
+    // Remove '_m' from the path name, and save string.
+    s64 index_of__m = str_find(definition_file, STR_BUFFER("_m"));
+
+    if (index_of__m != -1) {
+        char *file_path = arena_alloc(&arena_strings, definition_file.length - 2);
+        memcpy(file_path, definition_file.data, index_of__m);
+        memcpy(file_path + index_of__m, definition_file.data + index_of__m + 2, definition_file.length - 2 - index_of__m);
+        definition_file.data = file_path;
+        definition_file.length = definition_file.length - 2;
+    }
+    else {
+        SAVE_STRING(definition_file);
+    }
+
+
     Type_Info *item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { FUNCTION, 0, 0, .t_function = { return_type, typename, 0, arena_type_info_function_argument.ptr } });
+    *item = ((Type_Info) { FUNCTION, typename, 0, 0, .t_function = { return_type, 0, arena_type_info_function_argument.ptr, definition_file } });
     hash_table_put(&type_table, item, UNPACK(typename));
     return item;
 }
@@ -261,6 +333,10 @@ int type_table_calculate_sizes() {
 
 
 
+void registered_functions_init() {
+    registered_functions = array_list_make(Type_Info *, 8, &std_allocator);
+    registered_functions_headers = array_list_make(String, 8, &std_allocator);
+}
 
 
 void type_table_init() {
@@ -275,59 +351,59 @@ void type_table_init() {
 
     // Most basic C types
     item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { INTEGER, 4, 4, .t_integer = { 32, true } });
+    *item = ((Type_Info) { INTEGER, CSTR("int"), 4, 4, .t_integer = { 32, true } });
     hash_table_put(&type_table, item, UNPACK_LITERAL("int") );
 
     item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { INTEGER, 1, 1, .t_integer = { 8, false } });
+    *item = ((Type_Info) { INTEGER, CSTR("char"), 1, 1, .t_integer = { 8, false } });
     hash_table_put(&type_table, item, UNPACK_LITERAL("char") );
 
     item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { FLOAT, 4, 4, .t_float = { 32 } });
+    *item = ((Type_Info) { FLOAT, CSTR("float"), 4, 4, .t_float = { 32 } });
     hash_table_put(&type_table, item, UNPACK_LITERAL("float") );
 
     item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { BOOL, 1, 1 });
+    *item = ((Type_Info) { BOOL, CSTR("bool"), 1, 1 });
     hash_table_put(&type_table, item, UNPACK_LITERAL("bool") );
 
     item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { VOID, 0, 0 });
+    *item = ((Type_Info) { VOID, CSTR("void"), 0, 0 });
     hash_table_put(&type_table, item, UNPACK_LITERAL("void") );
 
     // Custom int typedefs that are commonly used, making them as actual int meta types for simplicity.
     item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { INTEGER, 1, 1, .t_integer = { 8, true } });
+    *item = ((Type_Info) { INTEGER, CSTR("s8"), 1, 1, .t_integer = { 8, true } });
     hash_table_put(&type_table, item, UNPACK_LITERAL("s8") );
 
     item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { INTEGER, 1, 1, .t_integer = { 8, false } });
+    *item = ((Type_Info) { INTEGER, CSTR("u8"), 1, 1, .t_integer = { 8, false } });
     hash_table_put(&type_table, item, UNPACK_LITERAL("u8") );
 
 
     item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { INTEGER, 2, 2, .t_integer = { 16, true } });
+    *item = ((Type_Info) { INTEGER, CSTR("s16"), 2, 2, .t_integer = { 16, true } });
     hash_table_put(&type_table, item, UNPACK_LITERAL("s16") );
 
     item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { INTEGER, 2, 2, .t_integer = { 16, false } });
+    *item = ((Type_Info) { INTEGER, CSTR("u16"), 2, 2, .t_integer = { 16, false } });
     hash_table_put(&type_table, item, UNPACK_LITERAL("u16") );
 
 
     item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { INTEGER, 4, 4, .t_integer = { 32, true } });
+    *item = ((Type_Info) { INTEGER, CSTR("s32"), 4, 4, .t_integer = { 32, true } });
     hash_table_put(&type_table, item, UNPACK_LITERAL("s32") );
 
     item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { INTEGER, 4, 4, .t_integer = { 32, false } });
+    *item = ((Type_Info) { INTEGER, CSTR("u32"), 4, 4, .t_integer = { 32, false } });
     hash_table_put(&type_table, item, UNPACK_LITERAL("u32") );
 
 
     item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { INTEGER, 8, 8, .t_integer = { 64, true } });
+    *item = ((Type_Info) { INTEGER, CSTR("s64"), 8, 8, .t_integer = { 64, true } });
     hash_table_put(&type_table, item, UNPACK_LITERAL("s64") );
 
     item = arena_alloc(&arena_type_info, sizeof(Type_Info));
-    *item = ((Type_Info) { INTEGER, 8, 8, .t_integer = { 64, false } });
+    *item = ((Type_Info) { INTEGER, CSTR("u64"), 8, 8, .t_integer = { 64, false } });
     hash_table_put(&type_table, item, UNPACK_LITERAL("u64") );
 }
 
@@ -340,15 +416,6 @@ void type_table_init() {
 
 
 
-// Helpers.
-
-const String TYPEDEF_STR    = STR_BUFFER("typedef");
-const String STRUCT_STR     = STR_BUFFER("struct");
-const String UNION_STR      = STR_BUFFER("union");
-const String ENUM_STR       = STR_BUFFER("enum");
-
-
-static char *current_file_name = NULL;
 
 /**
  * This is just an abstraction of checking token with expected type.
@@ -387,6 +454,7 @@ Token parser_peek_next(Lexer lexer) {
  */
 String parser_parse_pointer_asterisks(Lexer *lexer, Token *token) {
     String base_typename = token->str;
+    s64 asterisk_count = 0;
 
     while (true) {
         *token = parser_peek_next(*lexer);
@@ -395,18 +463,16 @@ String parser_parse_pointer_asterisks(Lexer *lexer, Token *token) {
         }
 
         lexer_next_token(lexer);
+        asterisk_count++;
 #ifdef LOG
         printf("Identified a pointer.\n");
 #endif
-        
-        base_typename = type_table_add_pointer(base_typename, 1);
     }
+    base_typename = type_table_add_pointer(base_typename, asterisk_count);
 
     return base_typename;
 }
 
-// @Important: We take responsability, of preserving all important strings even after contents of the file are disposed, it means all important typenames are copied into 'arena_strings'
-#define SAVE_STRING(str) (str).data = str_copy_to((str), arena_alloc(&arena_strings, (str).length))
 
 
 /**
@@ -650,6 +716,7 @@ typedef_alias_end:
         Type_Info *return_type = *(Type_Info **)(hash_table_get(&type_table, UNPACK(return_typename)));
         Type_Info *function_type = type_table_add_function(return_type, typename);
         
+        
 #ifdef LOG 
         printf("    - Identified function typename: '%.*s'\n", UNPACK(typename)); 
 #endif
@@ -706,17 +773,11 @@ typedef_alias_end:
             type_table_add_function_argument(function_type, arg_typename, arg_name);
 
 
-            // Checking if [','] is present, it doens't really impact parsing at least for now.
+            // Checking if [','] is present, if it is, eat it.
             next = parser_peek_next(lexer);
-            if (next.type != TOKEN_COMMA) {
-                next = parser_peek_next(lexer);
-                if (next.type != TOKEN_PARAN_CLOSE) {
-                    next = lexer_next_token(&lexer);
-                    printf_err("%s:%lld @Introspect: Expected ',' after the argument definition.\n", current_file_name, next.line_num);
-                    return 1;
-                }
+            if (next.type == TOKEN_COMMA) {
+                next = lexer_next_token(&lexer);
             }
-
         }
 
         // Semicolon or '{' check.
@@ -733,7 +794,7 @@ typedef_alias_end:
 
 
 
-int meta_note_process_AddToVars(Lexer lexer) {
+int meta_note_process_RegisterCommand(Lexer lexer, FILE *output_c, FILE *output_h) {
     Token next;
     
     // Lexing until SYMBOL token.
@@ -745,28 +806,55 @@ int meta_note_process_AddToVars(Lexer lexer) {
         if (next.type == TOKEN_SYMBOL) break;
     }
 
-    // Variable for typename.
-    String struct_typename = {0};
-
-    if (!str_equals(next.str, TYPEDEF_STR)) {
-        printf_err("%s:lld @AddToVars: Expected '%.*s'.\n", current_file_name, next.line_num, UNPACK(TYPEDEF_STR));
+    // Parsing [SYMBOL return typename] [optional '*'] [SYMBOL typename] 
+    if (parser_expect_token_type(&next, TOKEN_SYMBOL) != 0) {
         return 1;
     }
 
-    if (parser_get_and_expect_token(&lexer, &next, TOKEN_SYMBOL) != 0) return 1;
-        
-    if (!str_equals(next.str, STRUCT_STR)) {
-        printf_err("%s:lld @AddToVars: Expected '%.*s'.\n", current_file_name, next.line_num, UNPACK(STRUCT_STR));
+    // Parsing [optional '*'].
+    parser_parse_pointer_asterisks(&lexer, &next);
+
+    // Getting to the typename of the function.
+    if (parser_get_and_expect_token(&lexer, &next, TOKEN_SYMBOL) != 0) {
         return 1;
     }
 
-    if (parser_get_and_expect_token(&lexer, &next, TOKEN_SYMBOL) != 0) return 1;
-
+    // Checking if type exists.
     if (!type_table_defined(next.str)) {
-        printf_err("%s:lld @AddToVars: Expected struct '%.*s' to be introspected.\n", current_file_name, next.line_num, UNPACK(next.str));
+        printf_err("%s:lld @RegisterCommand: Expected function '%.*s' to be introspected.\n", current_file_name, next.line_num, UNPACK(next.str));
         return 1;
     }
 
+    String typename = next.str;
+
+    Type_Info *type = *(Type_Info **)hash_table_get(&type_table, UNPACK(typename));
+
+
+    // Extra check to see if the type is truly a function.
+    if (type->type != FUNCTION) {
+        printf_err("%s:lld @RegisterCommand: Expected '%.*s' to be a function.\n", current_file_name, next.line_num, UNPACK(typename));
+        return 1;
+    }
+
+    // Appending function.
+    array_list_append(&registered_functions, type);
+    
+
+    // Appending it's definition_file if its unique and if it is .h.
+    if (str_find(type->t_function.definition_file, STR_BUFFER(".h")) != -1) {
+        u32 i = -1; // @Carefull: Very dangerous overflowing is here.
+        do  {
+            i++;
+
+            // If no elements left.
+            if (i == array_list_length(&registered_functions_headers)) {
+                array_list_append(&registered_functions_headers, type->t_function.definition_file);
+                break;
+            }
+
+        } while (!str_equals(registered_functions_headers[i], type->t_function.definition_file));
+
+    }
 
 
     return 0;
@@ -850,8 +938,8 @@ int meta_process_file(char *file_name, FILE *output_c, FILE *output_h) {
                 goto metanote_remove_continue;
             }
 
-            if (str_equals(next.str, CSTR("@AddToVars"))) {
-                if (meta_note_process_AddToVars(lexer) != 0) 
+            if (str_equals(next.str, CSTR("@RegisterCommand"))) {
+                if (meta_note_process_RegisterCommand(lexer, output_c, output_h) != 0) 
                     return 1;
                 goto metanote_remove_continue;
             }
@@ -956,7 +1044,10 @@ int main(int argc, char **argv) {
     printf("\n");
 #endif
 
+    registered_functions_init();
     type_table_init();
+
+
     // Preparing meta generated files.
     FILE *meta_generated_c = meta_generate("src/meta_generated.c");
     FILE *meta_generated_h = meta_generate("src/meta_generated.h");
@@ -995,7 +1086,8 @@ int main(int argc, char **argv) {
      */
 
     // Include
-    fwrite_str(STR_BUFFER("#include \"core/typeinfo.h\"\n\n"), meta_generated_h);
+    fwrite_str(STR_BUFFER("#include \"core/typeinfo.h\"\n"), meta_generated_h);
+    fwrite_str(STR_BUFFER("#include \"game/command.h\"\n\n"), meta_generated_h);
 
     // Tool defines.
     fwrite_str(STR_BUFFER("#define META_TYPE(type) META_TYPE_##type\n\n"), meta_generated_h);
@@ -1051,13 +1143,13 @@ int main(int argc, char **argv) {
             // Switching between type groups.
             switch(item->type) {
                 case INTEGER:
-                    fprintf(meta_generated_h, "INTEGER, %u, %u, .t_integer = { %d, %d }", item->size, item->align, item->t_integer.size_bits, item->t_integer.is_signed);
+                    fprintf(meta_generated_h, "INTEGER, STR_BUFFER(\"%.*s\"), %u, %u, .t_integer = { %d, %d }", UNPACK(item->name), item->size, item->align, item->t_integer.size_bits, item->t_integer.is_signed);
                     break;
                 case FLOAT:
-                    fprintf(meta_generated_h, "FLOAT, %u, %u,.t_float = { %d }", item->size, item->align, item->t_float.size_bits);
+                    fprintf(meta_generated_h, "FLOAT, STR_BUFFER(\"%.*s\"), %u, %u, .t_float = { %d }", UNPACK(item->name), item->size, item->align, item->t_float.size_bits);
                     break;
                 case BOOL:
-                    fprintf(meta_generated_h, "BOOL, %u, %u", item->size, item->align);
+                    fprintf(meta_generated_h, "BOOL, STR_BUFFER(\"%.*s\"), %u, %u", UNPACK(item->name), item->size, item->align);
                     break;
                 case POINTER:
                     /**
@@ -1066,21 +1158,22 @@ int main(int argc, char **argv) {
                     String ptr_to_typename = slot->key;
                     ptr_to_typename.length -= TYPE_PTR_POSTFIX.length;
                    
-                    fprintf(meta_generated_h, "POINTER, %u, %u, .t_pointer = { TYPE_OF(%.*s) }", item->size, item->align, UNPACK(ptr_to_typename));
+                    fprintf(meta_generated_h, "POINTER, STR_BUFFER(\"%.*s\"), %u, %u, .t_pointer = { TYPE_OF(%.*s) }", UNPACK(item->name), item->size, item->align, UNPACK(ptr_to_typename));
                     break;
                 case FUNCTION:
                     String return_typename = type_table_get_typename(item->t_function.return_type);
+
                     u64 function_arg_index = item->t_function.arguments - (Type_Info_Function_Argument *)arena_type_info_function_argument.allocation; 
                     
-                    fprintf(meta_generated_h, "FUNCTION, %u, %u, .t_function = { TYPE_OF(%.*s), STR_BUFFER(\"%.*s\"), %u, &META_TYPE_FUNCTION_ARGS[%llu] }", item->size, item->align, UNPACK(return_typename), UNPACK(item->t_function.name), item->t_function.arguments_length, function_arg_index);
+                    fprintf(meta_generated_h, "FUNCTION, STR_BUFFER(\"%.*s\"), %u, %u, .t_function = { TYPE_OF(%.*s), %u, &META_TYPE_FUNCTION_ARGS[%llu], STR_BUFFER(\"%.*s\") }", UNPACK(item->name), item->size, item->align, UNPACK(return_typename), item->t_function.arguments_length, function_arg_index, UNPACK(item->t_function.definition_file));
                     break;
                 case VOID:
-                    fprintf(meta_generated_h, "VOID, %u, %u", item->size, item->align);
+                    fprintf(meta_generated_h, "VOID, STR_BUFFER(\"%.*s\"), %u, %u", UNPACK(item->name), item->size, item->align);
                     break;
                 case STRUCT:
                     u64 struct_member_index = item->t_struct.members - (Type_Info_Struct_Member *)arena_type_info_struct_member.allocation; 
                     
-                    fprintf(meta_generated_h, "STRUCT, %u, %u, .t_struct = { STR_BUFFER(\"%.*s\"), %u, &META_TYPE_STRUCT_MEMBERS[%llu] }", item->size, item->align, UNPACK(item->t_struct.name), item->t_struct.members_length, struct_member_index);
+                    fprintf(meta_generated_h, "STRUCT, STR_BUFFER(\"%.*s\"), %u, %u, .t_struct = { %u, &META_TYPE_STRUCT_MEMBERS[%llu] }", UNPACK(item->name), item->size, item->align, item->t_struct.members_length, struct_member_index);
                     break;
                 case ARRAY:
                     TODO("Array meta generation.");
@@ -1096,10 +1189,10 @@ int main(int argc, char **argv) {
                     break;
                 case TYPEDEF:
                     String typedef_of_typename = type_table_get_typename(item->t_typedef.typedef_of);
-                    fprintf(meta_generated_h, "TYPEDEF, %u, %u, .t_typedef = { TYPE_OF(%.*s) }", item->size, item->align, UNPACK(typedef_of_typename));
+                    fprintf(meta_generated_h, "TYPEDEF, STR_BUFFER(\"%.*s\"), %u, %u, .t_typedef = { TYPE_OF(%.*s) }", UNPACK(item->name), item->size, item->align, UNPACK(typedef_of_typename));
                     break;
                 case UNKNOWN:
-                    fprintf(meta_generated_h, "UNKNOWN, %u, %u", item->size, item->align);
+                    fprintf(meta_generated_h, "UNKNOWN, STR_BUFFER(\"%.*s\"), %u, %u", UNPACK(item->name), item->size, item->align);
                     break;
             }
            
@@ -1109,6 +1202,71 @@ int main(int argc, char **argv) {
         }
     }
     fwrite_str(STR_BUFFER("};\n"), meta_generated_h);
+
+
+
+
+
+    /**
+     * Generating registered functions code.
+     */
+
+    fprintf(meta_generated_h, "\n\n");
+
+    // H files included.
+    for (u32 i = 0; i < array_list_length(&registered_functions_headers); i++) {
+        fprintf(meta_generated_h, "#include \"%.*s\"\n", UNPACK(registered_functions_headers[i]));
+    }
+
+    // H file output.
+    for (u32 i = 0; i < array_list_length(&registered_functions); i++) {
+        Type_Info *item = registered_functions[i];
+
+
+        fprintf(meta_generated_h, "\nstatic void COMMAND_PREFIX(%.*s)(Any *args, u32 args_length) {\n", UNPACK(item->name));
+        
+
+        Type_Info *return_type = get_base_of_typedef(item->t_function.return_type);
+        if (return_type->type != VOID) {
+            fprintf(meta_generated_h, "    %.*s _rvalue = %.*s(", UNPACK(return_type->name), UNPACK(item->name));
+        } 
+        else {
+            fprintf(meta_generated_h, "    %.*s(", UNPACK(item->name));
+        }
+
+        for (u32 j = 0; j < item->t_function.arguments_length; j++) {
+            fprintf(meta_generated_h, "*(%.*s*)args[%u].data", UNPACK(item->t_function.arguments[j].type->name), j);
+
+            if (j + 1 < item->t_function.arguments_length)
+                fprintf(meta_generated_h, ", ");
+        }
+        fprintf(meta_generated_h, ");\n\n");
+
+        
+        if (return_type->type != VOID) {
+            fprintf(meta_generated_h, "    args[0].type = TYPE_OF(%.*s);\n", UNPACK(return_type->name));
+            fprintf(meta_generated_h, "    *(%.*s*)args[0].data = _rvalue;\n", UNPACK(return_type->name));
+        }
+
+        fprintf(meta_generated_h, "}\n");
+    }
+
+    fprintf(meta_generated_h, "\nstatic void register_all_commands() {\n");
+    for (u32 i = 0; i < array_list_length(&registered_functions); i++) {
+        Type_Info *item = registered_functions[i];
+
+        fprintf(meta_generated_h, "    command_register(TYPE_OF(%.*s), COMMAND_PREFIX(%.*s));\n", UNPACK(item->name), UNPACK(item->name));
+
+
+    }
+    fprintf(meta_generated_h, "}\n\n");
+
+
+
+
+
+
+
 
 
     // Ending header file.

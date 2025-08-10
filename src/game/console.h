@@ -32,13 +32,14 @@ void console_log(char *format, ...);
  */
 void console_error(char *format, ...);
 
-/**
- * This function parses console command given in a string form and immidiately executes it.
- */
-void console_exec_command(String str);
 
-void init_console_commands();
+           ;
+                ;
+s64 add(s64 a, s64 b);
 
+           ;
+                ;
+void clear();
 
 
 #endif

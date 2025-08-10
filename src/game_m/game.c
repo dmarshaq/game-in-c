@@ -12,6 +12,7 @@
 #include "game/draw.h"
 #include "game/event.h"
 #include "game/console.h"
+#include "game/command.h"
 #include "game/vars.h"
 #include "game/imui.h"
 #include "game/asset.h"
@@ -914,8 +915,12 @@ void init(State *s) {
     free(font_data);
     
 
+    // Init commands.
+    command_init();
+
     // Init console.
     init_console(state);
+
 
     // Init ui.
     ui_init(&state->ui, &state->events.mouse_input);

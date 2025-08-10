@@ -42,16 +42,17 @@ typedef struct {
 
 typedef struct {
     Type_Info *type;
+
     String name;
 } Type_Info_Function_Argument;
 
 typedef struct {
     Type_Info *return_type;
 
-    String name;
-
     u32 arguments_length;
     Type_Info_Function_Argument *arguments;
+
+    String definition_file; // Where the function was defined. Can be a header or c file, depends on where @Introspect is placed.
 } Type_Info_Function;
 
 
@@ -64,11 +65,8 @@ typedef struct {
 } Type_Info_Struct_Member;
 
 typedef struct {
-    String name;
-
     u32 members_length;
     Type_Info_Struct_Member *members;
-
 } Type_Info_Struct;
 
 typedef struct {
@@ -87,6 +85,9 @@ typedef struct {
 
 struct type_info {
     Type_Info_Kind type;
+
+    String name;
+
     u32 size;
     u32 align;
     
@@ -102,8 +103,101 @@ struct type_info {
     };
 };
 
+
+typedef struct any {
+    Type_Info *type;
+    void *data;
+} Any;
+
+/**
+ * 'buffer' should be big enough to hold info about 'any'.
+ *  Returns a string that corresponds to the formatted 'any'.
+ */
+static String format_any(Any any, String buffer) {
+    s64 written = 0;
+    switch (any.type->type) {
+        case INTEGER:
+            if (any.type->t_integer.is_signed) {
+                switch(any.type->size) {
+                    case 1:
+                        written += snprintf(buffer.data, buffer.length, "%d", *(s8 *)any.data);
+                        break;
+                    case 2:
+                        written += snprintf(buffer.data, buffer.length, "%d", *(s16 *)any.data);
+                        break;
+                    case 4:
+                        written += snprintf(buffer.data, buffer.length, "%d", *(s32 *)any.data);
+                        break;
+                    case 8:
+                        written += snprintf(buffer.data, buffer.length, "%lld", *(s64 *)any.data);
+                        break;
+                }
+            }
+            else {
+                switch(any.type->size) {
+                    case 1:
+                        written += snprintf(buffer.data, buffer.length, "%u", *(u8 *)any.data);
+                        break;
+                    case 2:
+                        written += snprintf(buffer.data, buffer.length, "%u", *(u16 *)any.data);
+                        break;
+                    case 4:
+                        written += snprintf(buffer.data, buffer.length, "%u", *(u32 *)any.data);
+                        break;
+                    case 8:
+                        written += snprintf(buffer.data, buffer.length, "%llu", *(u64 *)any.data);
+                        break;
+                }
+            }
+            break;
+        case FLOAT:
+            switch(any.type->size) {
+                case 4:
+                    written += snprintf(buffer.data, buffer.length, "%f", *(float *)any.data);
+                    break;
+            }
+            break;
+        case BOOL:
+            written += snprintf(buffer.data, buffer.length, "%s", *(bool *)any.data ? "true" : "false");
+            break;
+        case POINTER:
+            written += format_any(any, buffer).length;
+            written += snprintf(buffer.data + written, buffer.length - written, "*");
+            break;
+        case FUNCTION:
+            TODO("Function formatting ANY.");
+            break;
+        case VOID:
+            written += snprintf(buffer.data, buffer.length, "void"); // Should not generally happen.
+            break;
+        case STRUCT:
+            TODO("Struct formatting ANY.");
+            break;
+        case ARRAY:
+            TODO("Array formatting ANY.");
+            break;
+        case ENUM:
+            TODO("Enum formatting ANY.");
+            break;
+        case TYPEDEF:
+            break;
+        case UNKNOWN:
+            written += snprintf(buffer.data, buffer.length, "unknown");
+            break;
+        default:
+            written += snprintf(buffer.data, buffer.length, "undefined");
+            break;
+    }
+
+    return STR(written, buffer.data);
+}
+
+
+
+
+
 static void print_type_info(Type_Info *type) {
-    printf("size: %u, align: %u ,", type->size, type->align);
+    printf("type: '%.*s', size: %u, align: %u -> ", UNPACK(type->name), type->size, type->align);
     switch (type->type) {
         case INTEGER:
             printf("INTEGER: size_bits: %d, %s\n", type->t_integer.size_bits, type->t_integer.is_signed ? "signed" : "unsigned");
@@ -119,7 +213,7 @@ static void print_type_info(Type_Info *type) {
             print_type_info(type->t_pointer.ptr_to);
             break;
         case FUNCTION:
-            printf("FUNCTION: '%.*s'\n", UNPACK(type->t_function.name));
+            printf("FUNCTION\n");
             for (u32 i = 0; i < type->t_function.arguments_length; i++) {
                 printf("    arg[%u] '%.*s': ", i, UNPACK(type->t_function.arguments[i].name));
                 print_type_info(type->t_function.arguments[i].type);
@@ -131,7 +225,7 @@ static void print_type_info(Type_Info *type) {
             printf("VOID\n");
             break;
         case STRUCT:
-            printf("STRUCT: '%.*s'\n", UNPACK(type->t_struct.name));
+            printf("STRUCT\n");
             for (u32 i = 0; i < type->t_struct.members_length; i++) {
                 printf("    field[%u] '%.*s': ", i, UNPACK(type->t_struct.members[i].name));
                 print_type_info(type->t_struct.members[i].type);
@@ -148,6 +242,9 @@ static void print_type_info(Type_Info *type) {
         case UNKNOWN:
             printf("UNKNOWN\n");
             break;
+        default:
+            printf("UNDEFINED TYPE\n");
+            break;
     }
 }
 
@@ -158,5 +255,9 @@ static Type_Info *get_base_of_typedef(Type_Info *type) {
 
     return type;
 }
+
+
+
+
 
 #endif
