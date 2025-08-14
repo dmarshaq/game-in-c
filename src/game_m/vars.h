@@ -6,6 +6,7 @@
 #include "core/str.h"
 
 
+static const String VARS_FILE_FORMAT = STR_BUFFER("vars");
 
 typedef struct vars_node {
     String name;
@@ -36,14 +37,26 @@ typedef struct vars_tree {
  */
 void vars_tree_begin();
 
+/**
+ * Adds specified in code variable to the tree building.
+ */
 void vars_tree_add(Type_Info *type, u8 *data, String var_name);
 
+/**
+ * Builds the tree itself.
+ */
 Vars_Tree vars_tree_build();
 
+/**
+ * Prints the node and it's children recursivly in the vars tree.
+ */
 void vars_tree_print_node(Vars_Node *node, s64 depth);
 
-
-void load_vars_file(String file_path, Vars_Tree *tree);
+/**
+ * Loads vars file directly into Vars_Tree provided.
+ * Note: Vars tree should be built before using this function.
+ */
+void vars_load_file(String file_path, Vars_Tree *tree);
 
 /**
  * This function insures .vars files are listened to and properly loaded once any of those files are changed.

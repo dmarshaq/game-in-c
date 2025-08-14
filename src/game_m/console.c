@@ -293,7 +293,7 @@ void console_error(char *format, ...) {
 
 
 
-void init_console(State *state) {
+void console_init(State *state) {
 
 
 
@@ -314,10 +314,12 @@ void init_console(State *state) {
     // Get resources.
     drawer = &state->quad_drawer;
 
-    // Load needed font.
+    // Load needed font... Hard coded...
     u8* font_data = read_file_into_buffer("res/font/Consolas-Regular.ttf", NULL, &std_allocator);
+
     font_input = font_bake(font_data, 18.0f);
     font_output = font_bake(font_data, 16.0f);
+
     free(font_data);
 
     // @Important: For metrics we assume that fonts are monospaced!

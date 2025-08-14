@@ -29,9 +29,16 @@ typedef struct events_info {
     Text_Input text_input;
 } Events_Info;
 
-void init_events_handler(Events_Info *events);
 
-void handle_events(Events_Info *events, Window_Info *window, Time_Info *t);
+/**
+ * Inits event handler, should be called one time, before event_handle(...).
+ */
+void event_init_handler(Events_Info *events);
+
+/**
+ * Handles SDL events recieved.
+ */
+void event_handle(Events_Info *events, Window_Info *window, Time_Info *t);
 
 
 /**
@@ -41,5 +48,7 @@ void handle_events(Events_Info *events, Window_Info *window, Time_Info *t);
  * It will return the amount of bytes inserted.
  */
 s64 insert_input_text(char *buffer, s64 capacity, s64 length, s64 write_index, Text_Input *text_input);
+
+
 
 #endif

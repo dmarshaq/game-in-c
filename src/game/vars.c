@@ -245,7 +245,7 @@ void vars_tree_print_node(Vars_Node *node, s64 depth) {
 
 
 
-void load_vars_file(String file_path, Vars_Tree *tree) {
+void vars_load_file(String file_path, Vars_Tree *tree) {
     // Making string be null terminated.
     char _buffer[file_path.length + 1]; 
     str_copy_to(file_path, _buffer);
@@ -397,18 +397,17 @@ void load_vars_file(String file_path, Vars_Tree *tree) {
 
 
 
-static const String VARS_FILE_FORMAT = STR_BUFFER("vars");
 
 
 void vars_listen_to_changes(Vars_Tree *tree) {
     u32 count;
     const Asset_Change *changes;
 
-    if (view_asset_changes(&count, &changes)) {
+    if (asset_view_changes(&count, &changes)) {
         for (u32 i = 0; i < count; i++) {
             if (str_equals(changes[i].file_format, VARS_FILE_FORMAT)) {
                 console_log("Vars detected Asset Change: '%.*s'\n", UNPACK(changes[i].full_path));
-                load_vars_file(changes[i].full_path, tree);
+                vars_load_file(changes[i].full_path, tree);
             }
         }
     }

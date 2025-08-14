@@ -9,13 +9,6 @@
 
 
 
-// int main(int argc, char **argv) {
-//     printf("Hello world!\n");
-// 
-//     return 0;
-// }
-
-
 
 static State *state;
 
@@ -28,9 +21,12 @@ int main(int argc, char **argv) {
     state->t.last_update_time = 0; 
     state->t.update_step_time = 10; // Milliseconds per one update time
 
-    init(state);
-    load(state);
 
+    // Initting game.
+    game_init(state);
+
+
+    // Entering frame loop.
     while (!state->events.should_quit) {
         // Time management.
         state->t.current_time = SDL_GetTicks();
@@ -45,12 +41,16 @@ int main(int argc, char **argv) {
         state->t.delta_time = (float)(state->t.delta_time_milliseconds) / 1000.0f;
         state->t.accumilated_time = state->t.accumilated_time % state->t.update_step_time;
 
-        
-        update(state);
-
+        // Updating game.
+        game_update(state);
     }
 
-    unload(state);
+    // Free's all allocated memory before exitting.
+    // @Important: It is not super neccessary since program exits immediately after this anyway.
+    // But the idea here is to understand and track any allocations to avoid unneccessary memory leaks.
+    game_free(state);
+
+
 
     return 0;
 }

@@ -18,7 +18,7 @@ static T_Interpolator key_timer = ti_make(450);
 static T_Interpolator key_repeat_timer = ti_make(30);
 static SDL_Event event;
 
-void init_events_handler(Events_Info *events) {
+void event_init_handler(Events_Info *events) {
     events->should_quit = false;
 
     events->mouse_input = (Mouse_Input) {
@@ -229,7 +229,7 @@ void init_events_handler(Events_Info *events) {
 // }
 
 
-void handle_events(Events_Info *events, Window_Info *window, Time_Info *t) {
+void event_handle(Events_Info *events, Window_Info *window, Time_Info *t) {
 
     // printf("Unknown Error debug 1.\n");
     // Clear inputs.

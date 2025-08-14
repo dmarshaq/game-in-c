@@ -13,13 +13,24 @@
 #include <SDL2/SDL_keycode.h>
 
 
+/**
+ * Should be called one time, inits console.
+ */
+void console_init(State *state);
 
-void init_console(State *state);
-
+/**
+ * Updates console, should be called every frame after console was initted.
+ */
 void console_update(Window_Info *window, Events_Info *events, Time_Info *t);
 
+/**
+ * Draws console to the screen, should be called at the end of every frame.
+ */
 void console_draw(Window_Info *window);
 
+/**
+ * Frees memory allocated for the console.
+ */
 void console_free();
 
 /**
@@ -33,10 +44,16 @@ void console_log(char *format, ...);
 void console_error(char *format, ...);
 
 
+/**
+ * Adds two integers, returns the result.
+ */
            ;
                 ;
 s64 add(s64 a, s64 b);
 
+/**
+ * Clears console's history.
+ */
            ;
                 ;
 void clear();

@@ -7,9 +7,11 @@
 
 // Interfacing for internal function.
 int asset_observer_start_watching(char *directory);
+int asset_recursivly_force_changes(String directory);
 
 
 static Asset_Change *asset_changes_list;
+static Arena filenames_arena;
 
 int asset_observer_init(char *directory) {
     asset_changes_list = array_list_make(Asset_Change, 8, &std_allocator);
@@ -24,7 +26,7 @@ int asset_observer_init(char *directory) {
 
 
 
-bool view_asset_changes(u32 *count, const Asset_Change **changes) {
+bool asset_view_changes(u32 *count, const Asset_Change **changes) {
     *count = array_list_length(&asset_changes_list);
 
     if (count > 0) {
@@ -34,6 +36,17 @@ bool view_asset_changes(u32 *count, const Asset_Change **changes) {
 
     *changes = NULL;
     return false;
+}
+
+int asset_force_changes(char *directory) {
+    array_list_clear(&asset_changes_list);
+    arena_clear(&filenames_arena);
+
+    return asset_recursivly_force_changes(CSTR(directory));
+}
+
+void asset_remove_change(u32 index) {
+    array_list_unordered_remove(&asset_changes_list, index);
 }
 
 
@@ -47,7 +60,114 @@ bool view_asset_changes(u32 *count, const Asset_Change **changes) {
 #include <windows.h>
 
 
-static Arena filenames_arena;
+
+
+
+
+
+
+// @Recursion.
+int asset_recursivly_force_changes(String directory) {
+    // Making string be null terminated and have wildcard '*' at the end.
+    char _buffer[directory.length + 3]; 
+    str_copy_to(directory, _buffer);
+    _buffer[directory.length]     = '/';
+    _buffer[directory.length + 1] = '*';
+    _buffer[directory.length + 2] = '\0';
+
+
+    // Convert UTF-8 path to wide string.
+    u16 *path = filenames_arena.ptr;
+    int written = MultiByteToWideChar(CP_UTF8, 0, _buffer, -1, path, filenames_arena.capacity - arena_size(&filenames_arena));
+    
+    if (written <= 0) {
+        printf_err("Couldn't multiply UTF8 directory path to fit UTF16 path format when starting asset watching.\n");
+        return -1;
+    }
+
+    arena_alloc(&filenames_arena, written);
+
+    // Finding file.
+    HANDLE found_file_handle;
+    WIN32_FIND_DATAW found_file_data;
+    found_file_handle = FindFirstFileW(path, &found_file_data);
+
+    if (found_file_handle == INVALID_HANDLE_VALUE) {
+        printf_err("Couldn't get handle to the found file in the directory '%.*s'.\n", UNPACK(directory));
+        return -1;
+    }
+
+    do {
+        // Skipping Windows extra dirs.
+        if (wcscmp(found_file_data.cFileName, L".") == 0 || wcscmp(found_file_data.cFileName, L"..") == 0) {
+
+            continue;
+        }
+        
+
+
+        // Translate UTF-16 to UTF-8 :3
+        s64 utf16_name_code_units_count = lstrlenW(found_file_data.cFileName);
+
+        // Building full_path for Asset Change struct.
+        String full_path = {
+            .length = directory.length, // Length is increased later.
+            .data = arena_alloc(&filenames_arena, directory.length),
+        };
+        
+        // Copying directory.
+        str_copy_to(directory, full_path.data);
+
+        // Adding '/'.
+        char *slash_char_p = arena_alloc(&filenames_arena, 1);
+        *slash_char_p = '/';
+        full_path.length += 1;
+
+
+        // Copying and converting notification file name from UTF-16 to UTF-8.
+        written = WideCharToMultiByte(CP_UTF8, 0, found_file_data.cFileName, utf16_name_code_units_count, filenames_arena.ptr, filenames_arena.capacity - arena_size(&filenames_arena), NULL, NULL); // This allows to freerly use rest of the arena space to properly copy path.
+        
+        // Checking if WideCharToMultiByte is correctly executed.
+        if (written <= 0) {
+            printf_err("Couldn't write to notification file path to arena.\n");
+            return -1;
+        }
+
+        
+        arena_alloc(&filenames_arena, written);
+        full_path.length += written;
+
+        // Checking if it is a directory.
+        if (found_file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            if (asset_recursivly_force_changes(full_path) != 0) {
+                return -1;
+            }
+            continue;
+        }
+
+
+        // Adding Asset Change struct here.
+        String file_name = str_substring(full_path, str_find_char_right(full_path, '/') + 1, full_path.length);
+
+        String file_format = str_substring(full_path, str_find_char_right(full_path, '.') + 1, full_path.length);
+
+
+
+        array_list_append(&asset_changes_list, ((Asset_Change) { 
+                    .full_path      = full_path,
+                    .file_name      = file_name,
+                    .file_format    = file_format,
+                    }));
+
+
+    } while (FindNextFileW(found_file_handle, &found_file_data) != 0);
+
+    return 0;
+}
+
+
+
+
 
 
 static HANDLE handle;
@@ -125,41 +245,6 @@ int asset_observer_start_watching(char *directory) {
     return 0;
 }
 
-// @Recursion.
-int asset_observer_force_changes_directory(String directory) {
-
-    // Making string be null terminated and have wildcard '*' at the end.
-    char _buffer[directory.length + 3]; 
-    str_copy_to(directory, _buffer);
-    _buffer[directory.length - 2] = '/';
-    _buffer[directory.length - 1] = '*';
-    _buffer[directory.length]     = '\0';
-
-
-
-    HANDLE found_file_handle;
-    WIN32_FIND_DATA found_file_data;
-    found_file_handle = FindFirstFile(_buffer, &found_file_data);
-
-    if (found_file_handle == INVALID_HANDLE_VALUE) {
-        printf_err("Couldn't get handle to the found file in the directory '%.*s'.\n", UNPACK(directory));
-        return -1;
-    }
-
-    do {
-        printf("Found file: '%s'\n", found_file_data.cFileName);
-    } while (FindNextFile(found_file_handle, &found_file_data) != 0);
-
-    return 0;
-}
-
-int asset_observer_force_changes() {
-    array_list_clear(&asset_changes_list);
-    arena_clear(&filenames_arena);
-
-    return asset_observer_force_changes_directory(dir_path);
-}
-
 int asset_observer_poll_changes() {
     array_list_clear(&asset_changes_list);
     arena_clear(&filenames_arena);
@@ -181,10 +266,9 @@ int asset_observer_poll_changes() {
     }
 
     // Parse notifications
-
     FILE_NOTIFY_INFORMATION* info = (FILE_NOTIFY_INFORMATION*)buffer;
     while (true) {
-        s64 utf8_notification_file_name_length = info->FileNameLength / sizeof(u16);
+        s64 utf16_name_code_units_count = info->FileNameLength / sizeof(u16);
 
         // Building full_path for Asset Change struct.
         String full_path = {
@@ -202,7 +286,7 @@ int asset_observer_poll_changes() {
 
 
         // Copying and converting notification file name from UTF-16 to UTF-8.
-        int written = WideCharToMultiByte(CP_UTF8, 0, info->FileName, utf8_notification_file_name_length, filenames_arena.ptr, filenames_arena.capacity - arena_size(&filenames_arena), NULL, NULL); // This allows to freerly use rest of the arena space to properly copy path.
+        int written = WideCharToMultiByte(CP_UTF8, 0, info->FileName, utf16_name_code_units_count, filenames_arena.ptr, filenames_arena.capacity - arena_size(&filenames_arena), NULL, NULL); // This allows to freerly use rest of the arena space to properly copy path.
         
         // Checking if WideCharToMultiByte is correctly executed.
         if (written <= 0) {

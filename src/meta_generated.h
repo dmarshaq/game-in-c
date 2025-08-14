@@ -33,9 +33,6 @@ typedef enum meta_type {
     META_TYPE(u32),
     META_TYPE(s64),
     META_TYPE(u64),
-    META_TYPE(spawn_box),
-    META_TYPE(Vec2f),
-    META_TYPE(Vec4f),
 } Meta_Type;
 
 static Type_Info META_TYPE_TABLE[];
@@ -43,8 +40,6 @@ static Type_Info META_TYPE_TABLE[];
 static Type_Info_Function_Argument META_TYPE_FUNCTION_ARGS[] = {
     { TYPE_OF(s64), STR_BUFFER("a") },
     { TYPE_OF(s64), STR_BUFFER("b") },
-    { TYPE_OF(Vec2f), STR_BUFFER("position") },
-    { TYPE_OF(Vec4f), STR_BUFFER("color") },
 };
 
 static Type_Info_Struct_Member META_TYPE_STRUCT_MEMBERS[] = {
@@ -63,7 +58,7 @@ static Type_Info META_TYPE_TABLE[] = {
     [META_TYPE(float)] = (Type_Info) { FLOAT, STR_BUFFER("float"), 4, 4, .t_float = { 32 } },
     [META_TYPE(clear)] = (Type_Info) { FUNCTION, STR_BUFFER("clear"), 0, 0, .t_function = { TYPE_OF(void), 0, &META_TYPE_FUNCTION_ARGS[2], STR_BUFFER("game/console.h") } },
     [META_TYPE(int)] = (Type_Info) { INTEGER, STR_BUFFER("int"), 4, 4, .t_integer = { 32, 1 } },
-    [META_TYPE(quit)] = (Type_Info) { FUNCTION, STR_BUFFER("quit"), 0, 0, .t_function = { TYPE_OF(void), 0, &META_TYPE_FUNCTION_ARGS[4], STR_BUFFER("game/game.h") } },
+    [META_TYPE(quit)] = (Type_Info) { FUNCTION, STR_BUFFER("quit"), 0, 0, .t_function = { TYPE_OF(void), 0, &META_TYPE_FUNCTION_ARGS[2], STR_BUFFER("game/game.h") } },
     [META_TYPE(s8)] = (Type_Info) { INTEGER, STR_BUFFER("s8"), 1, 1, .t_integer = { 8, 1 } },
     [META_TYPE(s16)] = (Type_Info) { INTEGER, STR_BUFFER("s16"), 2, 2, .t_integer = { 16, 1 } },
     [META_TYPE(u8)] = (Type_Info) { INTEGER, STR_BUFFER("u8"), 1, 1, .t_integer = { 8, 0 } },
@@ -73,9 +68,6 @@ static Type_Info META_TYPE_TABLE[] = {
     [META_TYPE(u32)] = (Type_Info) { INTEGER, STR_BUFFER("u32"), 4, 4, .t_integer = { 32, 0 } },
     [META_TYPE(s64)] = (Type_Info) { INTEGER, STR_BUFFER("s64"), 8, 8, .t_integer = { 64, 1 } },
     [META_TYPE(u64)] = (Type_Info) { INTEGER, STR_BUFFER("u64"), 8, 8, .t_integer = { 64, 0 } },
-    [META_TYPE(spawn_box)] = (Type_Info) { FUNCTION, STR_BUFFER("spawn_box"), 0, 0, .t_function = { TYPE_OF(void), 2, &META_TYPE_FUNCTION_ARGS[2], STR_BUFFER("game/game.h") } },
-    [META_TYPE(Vec2f)] = (Type_Info) { UNKNOWN, STR_BUFFER("Vec2f"), 0, 0 },
-    [META_TYPE(Vec4f)] = (Type_Info) { UNKNOWN, STR_BUFFER("Vec4f"), 0, 0 },
 };
 
 
@@ -94,11 +86,6 @@ static void COMMAND_PREFIX(clear)(Any *args, u32 args_length) {
 
 }
 
-static void COMMAND_PREFIX(spawn_box)(Any *args, u32 args_length) {
-    spawn_box(*(Vec2f*)args[0].data, *(Vec4f*)args[1].data);
-
-}
-
 static void COMMAND_PREFIX(quit)(Any *args, u32 args_length) {
     quit();
 
@@ -107,7 +94,6 @@ static void COMMAND_PREFIX(quit)(Any *args, u32 args_length) {
 static void register_all_commands() {
     command_register(TYPE_OF(add), COMMAND_PREFIX(add));
     command_register(TYPE_OF(clear), COMMAND_PREFIX(clear));
-    command_register(TYPE_OF(spawn_box), COMMAND_PREFIX(spawn_box));
     command_register(TYPE_OF(quit), COMMAND_PREFIX(quit));
 }
 
