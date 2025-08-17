@@ -30,7 +30,6 @@ typedef struct state {
     Font_Baked *font;
 
     Quad_Drawer quad_drawer;
-
 } State;
 
 
@@ -43,12 +42,12 @@ void game_init(State *state);
  * Updates game, should be called one time a frame.
  * @Important: There is no divide between drawing and updating here, cause this function literally represents a whole frame in the game, no more, no less.
  */
-void game_update(State *state);
+void game_update();
 
 /**
  * Simply frees all initted game memory.
  */
-void game_free(State *state);
+void game_free();
 
 /**
  * This function will notify app to quit at the end of the next frame.

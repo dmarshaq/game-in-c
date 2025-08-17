@@ -42,13 +42,13 @@ int main(int argc, char **argv) {
         state->t.accumilated_time = state->t.accumilated_time % state->t.update_step_time;
 
         // Updating game.
-        game_update(state);
+        game_update();
     }
 
     // Free's all allocated memory before exitting.
     // @Important: It is not super neccessary since program exits immediately after this anyway.
     // But the idea here is to understand and track any allocations to avoid unneccessary memory leaks.
-    game_free(state);
+    game_free();
 
 
 

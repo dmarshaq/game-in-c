@@ -32,25 +32,23 @@
 
 
 
-// Global state.
+/**
+ * Global state.
+ *
+ * @Important: Address of state structure doesn't change no matter what.
+ * It exists through out the game execution and it's data changes accordingly to the current game state.
+ */
 static State *state;
 
 
 
 // Keybinds (Simple).
+// @Temporary: Will be replaced with meta program + keybinds config solution.
 #define BIND_PRESSED(keybind)   (!SDL_IsTextInputActive() && pressed(keybind))
 #define BIND_HOLD(keybind)      (!SDL_IsTextInputActive() && hold(keybind))
 #define BIND_UNPRESSED(keybind) (!SDL_IsTextInputActive() && unpressed(keybind))
 
 
-/**
- * Global state functions.
- */
-
-
-void quit() {
-    state->events.should_quit = true;
-}
 
 
 
@@ -66,15 +64,17 @@ static const String FONT_FILE_FORMAT    = STR_BUFFER("ttf");
 
 
 
+void game_init(State *global_state) {
+    /**
+     * The pointer to global state is copied only once and stored internally in this file.
+     * @Important: It assumes, that this address will remain the same through ou the game and will not change no matter what.
+     */
+    state = global_state;
 
-#define WINDOW_WIDTH 1280
-#define WINDOW_HEIGHT 700
-
-void game_init(State *s) {
-    state = s;
 
     // Setting random seed.
     srand((u32)time(NULL));
+
 
     // Init vars.
     vars_tree_begin();
@@ -103,7 +103,6 @@ void game_init(State *s) {
 
 
 
-
     // Init SDL and GL.
     if (init_sdl_gl()) {
         fprintf(stderr, "%s Couldn't init SDL and GL.\n", debug_error_str);
@@ -118,7 +117,7 @@ void game_init(State *s) {
 
 
     // Create window.
-    state->window = create_gl_window("prototype", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT);
+    state->window = create_gl_window("Game", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 700);
 
     if (state->window.ptr == NULL) {
         fprintf(stderr, "%s Couldn't create window.\n", debug_error_str);
@@ -220,22 +219,17 @@ void game_init(State *s) {
 
 
 
-    // Logging hello world to the console and then openning it.
+    // Logging hello world to the console.
     console_log("Hello world!\n");
     
 }
-
-
-
 
 /**
  * @Important: In game update loops the order of procedures is: Updating -> Drawing.
  * Where in updating all logic of the game loop is contained including inputs, sound and so on.
  * Drawing part is only responsible for putting pixels accrodingly with calculated data in "Updating" part.
  */
-void game_update(State *s) {
-    state = s;
-
+void game_update() {
     // Polling any asset changes.
     if (asset_observer_poll_changes() != 0) {
         printf_err("Couldn't poll asset changes.\n");
@@ -248,9 +242,12 @@ void game_update(State *s) {
     // Handling events
     event_handle(&state->events, &state->window, &state->t);
 
-
     // Clearin screen.
     glClear(GL_COLOR_BUFFER_BIT);
+    
+
+
+
     
 
 
@@ -276,14 +273,16 @@ void game_update(State *s) {
     keyboard_state_old_update();
 }
 
-void game_free(State *s) {
+void game_free() {
     console_free();
 
-    shader_unload(hash_table_get(&s->shader_table, UNPACK_LITERAL("quad")));
-    drawer_free(&s->quad_drawer);
+    shader_unload(hash_table_get(&state->shader_table, UNPACK_LITERAL("quad")));
+    drawer_free(&state->quad_drawer);
 }
 
-
+void quit() {
+    state->events.should_quit = true;
+}
 
 
 
