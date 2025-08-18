@@ -28,7 +28,7 @@ static Font_Baked font_output;
 static Matrix4f projection;
 
 
-           ;
+@Introspect;
 typedef struct console {
     s64 speed;
     float open_percent;

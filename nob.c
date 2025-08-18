@@ -15,14 +15,13 @@
 
 
 // Defining project paths.
-#define SRC_DIR "src"
-#define OBJ_DIR "obj"
-#define BIN_DIR "bin"
+#define BIN_DIR     "bin"
+#define BUILD_DIR   "build"
+#define SRC_DIR     "src"
 
-#define CORE_SRC_DIR SRC_DIR"/core"
-#define META_SRC_DIR SRC_DIR"/meta"
-#define GAME_SRC_DIR SRC_DIR"/game"
-#define GAME_M_SRC_DIR SRC_DIR"/game_m"
+
+
+
 
 
 // Defining includes path.
@@ -94,47 +93,57 @@ bool nob_cmd_append_all_in_dir(Nob_Cmd *cmd, const char *directory, const char *
 
 
 /**
- * @Important: Assumes directory path starts with 'src'.
+ * Compiles all .c files inside directory into .o files.
  */
-bool nob_cc_compile_objs(Nob_Cmd *cmd, const char *directory) {
-    // Finding specific paths variables.
+bool nob_cc_compile_objs(Nob_Cmd *cmd, const char *source, const char *output) {
+
+    Nob_String_Builder src_dir_builder = {0};
+
+    Nob_String_Builder obj_dir_builder = {0};
+
     Nob_File_Paths paths = {0};
-    char file_path_buffer[strlen(directory) + 1 + 128];
-
-    strcpy(file_path_buffer, directory);
-    strcat(file_path_buffer, "/");
-
-
-    char obj_out_path_buffer[strlen(file_path_buffer) - 3 + strlen(OBJ_DIR) + 128];
-
-    strcpy(obj_out_path_buffer, OBJ_DIR);
-    strcat(obj_out_path_buffer, file_path_buffer + 3);
-
-
-    if (!nob_read_entire_dir(directory, &paths)) return false;
+    if (!nob_read_entire_dir(source, &paths)) return false;
 
     for (size_t i = 0; i < paths.count; i++) {
-        // Everytime I am doing null terminated strings I want to jump off a bridge... into the ocean water...
-        strncat(file_path_buffer,    paths.items[i], 128);
+        if (strcmp(paths.items[i], ".") == 0) continue;
+        if (strcmp(paths.items[i], "..") == 0) continue;
 
-        // Taking only .c files.
-        if (nob_get_file_type(file_path_buffer) == NOB_FILE_REGULAR && strcmp(strrchr(file_path_buffer, '.'), ".c") == 0) {
-            
-            strncat(obj_out_path_buffer, paths.items[i], 128);
-            obj_out_path_buffer[strlen(obj_out_path_buffer) - 1] = 'o';
+        // Building path for source.
+        nob_sb_append_cstr(&src_dir_builder, source);
+        nob_sb_append_cstr(&src_dir_builder, "/");
+        nob_sb_append_cstr(&src_dir_builder, paths.items[i]);
+        nob_sb_append_null(&src_dir_builder);
+
+        // Taking only .c source files.
+        if (nob_get_file_type(src_dir_builder.items) == NOB_FILE_REGULAR && strcmp(strrchr(src_dir_builder.items, '.'), ".c") == 0) {
+
+            // Building path for output.
+            nob_sb_append_cstr(&obj_dir_builder, output);
+            nob_sb_append_cstr(&obj_dir_builder, "/");
+            nob_sb_append_cstr(&obj_dir_builder, paths.items[i]);
+            obj_dir_builder.items[obj_dir_builder.count - 1] = 'o'; // Replacing 'c' with 'o'.
+            nob_sb_append_null(&obj_dir_builder);
+
+
 
             nob_cc(cmd);
             nob_cc_flags(cmd);
-            nob_cmd_append(cmd, "-c", file_path_buffer, "-o", obj_out_path_buffer);
+            nob_cmd_append(cmd, "-c", src_dir_builder.items, "-o", obj_dir_builder.items);
             nob_cc_includes(cmd);
 
             if (!nob_cmd_run_sync_and_reset(cmd)) return 1;
 
-            obj_out_path_buffer[strlen(directory) + 1 - 3 + strlen(OBJ_DIR)] = '\0';
+
+
+            obj_dir_builder.count = 0;
         }
 
-        file_path_buffer[strlen(directory) + 1] = '\0';
+        src_dir_builder.count = 0;
     }
+
+
+    nob_sb_free(src_dir_builder);
+    nob_sb_free(obj_dir_builder);
 
     return true;
 }
@@ -158,40 +167,52 @@ int main(int argc, char **argv) {
 
     Nob_Cmd cmd = {0};
 
+    // Create basic dirs if they don't exist.
+    if (!nob_mkdir_if_not_exists(BUILD_DIR))        return 1;
+    if (!nob_mkdir_if_not_exists(BIN_DIR))          return 1;
+    if (!nob_mkdir_if_not_exists(SRC_DIR))          return 1;
+
+
+
+
+
 
     // Cleaning.
-    nob_cmd_append(&cmd, "rm", "-f", OBJ_DIR"/core/*.o");
+    // @Important: Each build fully clean rebuilds binaries and build files.
+    nob_cmd_append(&cmd, "rm", "-rf", BIN_DIR"/*");
     if (!nob_cmd_run_sync_and_reset(&cmd)) return 1;
 
-    nob_cmd_append(&cmd, "rm", "-f", OBJ_DIR"/*.o");
+    nob_cmd_append(&cmd, "rm", "-rf", BUILD_DIR"/*");
     if (!nob_cmd_run_sync_and_reset(&cmd)) return 1;
 
-    nob_cmd_append(&cmd, "rm", "-f", BIN_DIR"/*.a");
-    if (!nob_cmd_run_sync_and_reset(&cmd)) return 1;
 
-    nob_cmd_append(&cmd, "rm", "-f", BIN_DIR"/*.dll");
-    if (!nob_cmd_run_sync_and_reset(&cmd)) return 1;
+    // Making obj dir for .o files.
+    if (!nob_mkdir_if_not_exists(BUILD_DIR"/obj"))  return 1;
 
-    nob_cmd_append(&cmd, "rm", "-f", BIN_DIR"/*.exe");
-    if (!nob_cmd_run_sync_and_reset(&cmd)) return 1;
+    // Main building will be done in build/src, cause meta files are generated there.
+    if (!nob_mkdir_if_not_exists(BUILD_DIR"/"SRC_DIR)) return 1;
 
-    // Compile all obj's.
-    nob_cc_compile_objs(&cmd, CORE_SRC_DIR);
+
+    // Compile core c files into core.o.
+    if (!nob_mkdir_if_not_exists(SRC_DIR"/core"))       return 1;
+    if (!nob_mkdir_if_not_exists(BUILD_DIR"/obj/core")) return 1;
+
+    nob_cc_compile_objs(&cmd, SRC_DIR"/core", BUILD_DIR"/obj/core");
+
 
     // Link all obj's into static lib.
     nob_cmd_append(&cmd, "ar", "rcs", BIN_DIR"/libcore.a");
-    nob_cmd_append_all_in_dir(&cmd, OBJ_DIR"/core", ".o");
+    nob_cmd_append_all_in_dir(&cmd, BUILD_DIR"/obj/core", ".o");
 
     if (!nob_cmd_run_sync_and_reset(&cmd)) return 1;
     reset_saved_strings();
-
 
     // Building meta.exe
     nob_cc(&cmd);
     nob_cc_flags(&cmd);
     nob_cc_output(&cmd, BIN_DIR"/meta.exe");
     nob_cc_includes(&cmd);
-    nob_cmd_append_all_in_dir(&cmd, META_SRC_DIR, ".c");
+    nob_cmd_append_all_in_dir(&cmd, SRC_DIR"/meta", ".c");
     nob_cmd_append(&cmd, "-L"BIN_DIR, "-lcore");
 
     if (!nob_cmd_run_sync_and_reset(&cmd)) return 1;
@@ -200,20 +221,37 @@ int main(int argc, char **argv) {
 
     // Running meta.exe
     nob_cmd_append(&cmd, BIN_DIR"/meta.exe");
-    nob_cmd_append_all_in_dir(&cmd, GAME_M_SRC_DIR, ".c");
-    nob_cmd_append_all_in_dir(&cmd, GAME_M_SRC_DIR, ".h");
+    nob_cmd_append(&cmd, "-in");
+    nob_cmd_append_all_in_dir(&cmd, SRC_DIR"/game", ".c");
+    nob_cmd_append_all_in_dir(&cmd, SRC_DIR"/game", ".h");
+    nob_cmd_append(&cmd, "-out", BUILD_DIR);
+
+    if (!nob_mkdir_if_not_exists(BUILD_DIR"/"SRC_DIR"/game")) return 1;
 
     if (!nob_cmd_run_sync_and_reset(&cmd)) return 1;
+
     reset_saved_strings();
+
+
+
+
+    // The following is needed because includes will be specified relative to build/src directory so core headers, need to be copied over to the build.
+    // This solutions is cursed, but oh well...
+    if (!nob_copy_directory_recursively(SRC_DIR"/core", BUILD_DIR"/"SRC_DIR"/core")) return 1;
+
+    // This is cursed, but we also copy stb files...
+    if (!nob_copy_directory_recursively(SRC_DIR"/stb", BUILD_DIR"/"SRC_DIR"/stb")) return 1;
 
 
     // Building main.exe
     nob_cc(&cmd);
     nob_cc_flags(&cmd);
     nob_cc_output(&cmd, BIN_DIR"/main.exe");
-    nob_cc_includes(&cmd);
-    nob_cmd_append(&cmd, SRC_DIR"/meta_generated.c");
-    nob_cmd_append_all_in_dir(&cmd, GAME_SRC_DIR, ".c");
+    nob_cmd_append(&cmd, "-I"BUILD_DIR"/"SRC_DIR);
+
+    // nob_cmd_append(&cmd, BUILD_DIR"/"SRC_DIR"/meta_generated.c");
+    nob_cmd_append_all_in_dir(&cmd, BUILD_DIR"/"SRC_DIR"/game", ".c");
+
     nob_cmd_append(&cmd, "-L"BIN_DIR, "-lcore");
     nob_cc_libs(&cmd);
 

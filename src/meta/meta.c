@@ -8,9 +8,8 @@
 #include "core/structs.h"
 
 #include "meta/lexer.h"
+#include "meta/meta.h"
 
-
-// #define LOG
 
 
 const char* debug_meta_str = "\033[34m[META]\033[0m";
@@ -794,7 +793,7 @@ typedef_alias_end:
 
 
 
-int meta_note_process_RegisterCommand(Lexer lexer, FILE *output_c, FILE *output_h) {
+int meta_note_process_RegisterCommand(Lexer lexer, FILE *output_h) {
     Token next;
     
     // Lexing until SYMBOL token.
@@ -888,7 +887,7 @@ void meta_replace_with_space(String metanote_str) {
  * It will fwrite generated output to the output file.
  * @Important: output must be opened in "a" mode, in order for this function to properly append generated code.
  */
-int meta_process_file(char *file_name, FILE *output_c, FILE *output_h) {
+int meta_process_file(char *file_name, FILE *output_h, char *output_path) {
 #ifdef LOG
     meta_log("Processing '%s'\n", file_name);
 #endif
@@ -939,7 +938,7 @@ int meta_process_file(char *file_name, FILE *output_c, FILE *output_h) {
             }
 
             if (str_equals(next.str, CSTR("@RegisterCommand"))) {
-                if (meta_note_process_RegisterCommand(lexer, output_c, output_h) != 0) 
+                if (meta_note_process_RegisterCommand(lexer, output_h) != 0) 
                     return 1;
                 goto metanote_remove_continue;
             }
@@ -947,7 +946,7 @@ int meta_process_file(char *file_name, FILE *output_c, FILE *output_h) {
             printf_err("%s:%lld Unknown meta note: '%.*s'.\n", current_file_name, lexer.line_num, UNPACK(next.str));
             return 1;
 
-            metanote_remove_continue:
+metanote_remove_continue:
             // Removing meta note from final source.
             meta_replace_with_space(next.str);
         }
@@ -956,20 +955,19 @@ int meta_process_file(char *file_name, FILE *output_c, FILE *output_h) {
 
 
 
-    // Make source file.
-    s64 name_length = strlen(current_file_name);
-    if (name_length >= 128) {
-        printf_err("File name '%s' is too long, can't create source file.\n", current_file_name);
-        return 1;
-    }
+    // Write source to build.
+    char src_file_name[strlen(output_path) + 1 + strlen(current_file_name) + 1];
+    strcpy(src_file_name, output_path);
+    strcat(src_file_name, "/");
+    strcat(src_file_name, current_file_name);
 
-    char meta_file_name[128];
-    memcpy(meta_file_name, "src/game/", 9);
-    memcpy(meta_file_name + 9, current_file_name + 10, name_length - 9); // Discarding src/game_m/ and saving \0 at the end
+#ifdef LOG
+    meta_log("Producing build source file '%s'\n", src_file_name);
+#endif
+    
 
-
-    if (write_str_to_file(_content, meta_file_name) != 0) {
-        printf_err("Couldn't create source file '%s'\n", meta_file_name);
+    if (write_str_to_file(_content, src_file_name) != 0) {
+        printf_err("Couldn't create source file '%s'\n", src_file_name);
         return 1;
     }
 
@@ -1032,14 +1030,14 @@ FILE *meta_generate(char *file_name) {
 
 
 // Essentially meta programm is compiled into a file and immediately executed as a preprocces.
-int main(int argc, char **argv) {
+int meta_process(int count, char **files, char *output_path) {
     printf("\n\n");
 
     
 #ifdef LOG
     meta_log("Files passed to meta.exe: ");
-    for (int i = 1; i < argc; i++) {
-        printf("'%s' ", argv[i]);
+    for (int i = 0; i < count; i++) {
+        printf("'%s' ", files[i]);
     }
     printf("\n");
 #endif
@@ -1047,12 +1045,16 @@ int main(int argc, char **argv) {
     registered_functions_init();
     type_table_init();
 
+    char *meta_generated_file_name = "src/meta_generated.h";
+    char meta_generated_full_path[strlen(output_path) + 1 + strlen(meta_generated_file_name) + 1];
+    strcpy(meta_generated_full_path, output_path);
+    strcat(meta_generated_full_path, "/");
+    strcat(meta_generated_full_path, meta_generated_file_name);
 
     // Preparing meta generated files.
-    FILE *meta_generated_c = meta_generate("src/meta_generated.c");
-    FILE *meta_generated_h = meta_generate("src/meta_generated.h");
+    FILE *meta_generated_h = meta_generate(meta_generated_full_path);
 
-    if (meta_generated_c == NULL || meta_generated_h == NULL) {
+    if (meta_generated_h == NULL) {
         return 1;
     }
     
@@ -1064,9 +1066,8 @@ int main(int argc, char **argv) {
     /**
      * Processing each file.
      */
-    for (int i = 1; i < argc; i++) {
-        if (meta_process_file(argv[i], meta_generated_c, meta_generated_h) != 0) {
-            fclose(meta_generated_c);
+    for (int i = 0; i < count; i++) {
+        if (meta_process_file(files[i], meta_generated_h, output_path) != 0) {
             fclose(meta_generated_h);
             return 1;
         }
@@ -1275,7 +1276,6 @@ int main(int argc, char **argv) {
 
 
 
-    fclose(meta_generated_c);
     fclose(meta_generated_h);
 
     // hash_table_print((void **)&type_table);

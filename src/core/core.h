@@ -5,7 +5,9 @@
 #define LINUX   2
 
 #ifndef OS
-#define OS WINDOWS
+#   if _WIN32
+#       define OS WINDOWS
+#   endif
 #endif
 
 
@@ -15,8 +17,6 @@
 /**
  * Debug.
  */
-
-
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -86,8 +86,10 @@ void  allocator_free(Allocator *allocator, void *ptr);
 
 
 
+
 /**
  * Time.
+ * @Todo: Remove this somewhere else, definitly not part of a core.
  */
 typedef struct time_info {
     u32 current_time;
@@ -114,6 +116,9 @@ void ti_update(T_Interpolator *interpolator, float delta_time);
 float ti_elapsed_percent(T_Interpolator *interpolator);
 bool ti_is_complete(T_Interpolator *interpolator);
 void ti_reset(T_Interpolator *interpolator);
+
+
+
 
 
 
