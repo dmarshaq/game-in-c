@@ -544,10 +544,10 @@ void console_draw(Window_Info *window) {
     draw_begin(drawer);
 
     // Output.
-    draw_quad(vec2f_make(c_x0, c_y0 + input_height), vec2f_make(c_x1, c_y0 + console_max_height(window)), vec4f_make(0.10f, 0.12f, 0.24f, 0.98f), NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
+    draw_quad(vec2f_make(c_x0, c_y0 + input_height), vec2f_make(c_x1, c_y0 + console_max_height(window)), .color = vec4f_make(0.10f, 0.12f, 0.24f, 0.98f));
 
     // Input.
-    draw_quad(vec2f_make(c_x0, c_y0), vec2f_make(c_x1, c_y0 + input_height), vec4f_make(0.18f, 0.18f, 0.35f, 0.98f), NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
+    draw_quad(vec2f_make(c_x0, c_y0), vec2f_make(c_x1, c_y0 + input_height), .color = vec4f_make(0.18f, 0.18f, 0.35f, 0.98f));
     
     // Draw text of the history.
     Vec2f history_draw_origin = vec2f_make(c_x0 + console.text_pad, c_y0 + input_height);
@@ -576,7 +576,7 @@ void console_draw(Window_Info *window) {
         history_draw_origin.y += (msg_line_count - msg_cut_lines) * font_output.line_height; 
         // history_draw_origin.y += history_font_top_pad;
 
-        draw_text(msg_str, history_draw_origin, HISTORY_MESSAGE_COLORS[msg->type], &font_output, 1, NULL);
+        draw_text(msg_str, history_draw_origin, &font_output, .color = HISTORY_MESSAGE_COLORS[msg->type]);
     }
     
     display_line_offset = mini(display_line_offset, lines_drawen);
@@ -591,16 +591,16 @@ void console_draw(Window_Info *window) {
             width = 2;
         }
 
-        draw_quad(vec2f_make(c_x0 + console.text_pad + input_cursor_index * input_block_width, c_y0 + font_input.line_gap), vec2f_make(c_x0 + console.text_pad + input_cursor_index * input_block_width + width, c_y0 + input_height - input_font_top_pad * 0.5f), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0, NULL);
+        draw_quad(vec2f_make(c_x0 + console.text_pad + input_cursor_index * input_block_width, c_y0 + font_input.line_gap), vec2f_make(c_x0 + console.text_pad + input_cursor_index * input_block_width + width, c_y0 + input_height - input_font_top_pad * 0.5f), .color = color);
     }
 
 
     // Draw input text.
     if (user_input_peeked_message_index != -1) {
         User_Input_Handle handle = user_input_history[user_input_peeked_message_index];
-        draw_text(STR(handle.length, &user_input_history_buffer[handle.index]), vec2f_make(c_x0 + console.text_pad, c_y0 + input_height - input_font_top_pad), VEC4F_YELLOW, &font_input, 1, NULL);
+        draw_text(STR(handle.length, &user_input_history_buffer[handle.index]), vec2f_make(c_x0 + console.text_pad, c_y0 + input_height - input_font_top_pad), &font_input, .color = VEC4F_YELLOW);
     } else {
-        draw_text(STR(input_length, input), vec2f_make(c_x0 + console.text_pad, c_y0 + input_height - input_font_top_pad), VEC4F_CYAN, &font_input, 1, NULL);
+        draw_text(STR(input_length, input), vec2f_make(c_x0 + console.text_pad, c_y0 + input_height - input_font_top_pad), &font_input, .color = VEC4F_CYAN);
     }
 
     draw_end();

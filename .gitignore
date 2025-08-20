@@ -10,6 +10,9 @@ build/
 *.obj
 *.elf
 
+
+*.old
+
 # Linker output
 *.ilk
 *.map

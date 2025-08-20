@@ -8,12 +8,64 @@
 #include "core/mathf.h"
 #include "core/str.h"
 
-// Drawing basics.
-void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle, Vertex_Buffer *buffer);
-void draw_grid(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer);
-void draw_text(String text, Vec2f position, Vec4f color, Font_Baked *font, u32 unit_scale, Vertex_Buffer *buffer);
+
+
+
+
+typedef struct draw_quad_args_opt {
+    Vec4f           color;
+    Texture *       texture;
+    Vec2f           uv0;
+    Vec2f           uv1;
+    Texture *       mask;
+    float           offset_angle;
+    Vertex_Buffer * buffer;
+} Draw_Quad_Opt_Args;
+
+#define draw_quad(p0, p1, ...)  draw_quad_opt(p0, p1, (Draw_Quad_Opt_Args) { .color = VEC4F_PINK, .texture = NULL, .uv0 = VEC2F_ORIGIN, .uv1 = VEC2F_UNIT, .mask = NULL, .offset_angle = 0.0f, .buffer = NULL, __VA_ARGS__})
+
+/**
+ * Draws rectangular quad, p0 being bottom left corner, p1 being top right corner.
+ */
+void draw_quad_opt(Vec2f p0, Vec2f p1, Draw_Quad_Opt_Args opt);
+
+
+
+
+
+typedef struct draw_text_args_opt {
+    Vec4f           color;
+    u32             unit_scale;
+    Vertex_Buffer * buffer;
+} Draw_Text_Opt_Args;
+
+#define draw_text(text, position, font, ...)  draw_text_opt(text, position, font, (Draw_Text_Opt_Args) { .color = VEC4F_WHITE, .unit_scale = 1, .buffer = NULL, __VA_ARGS__})
+
+/**
+ * Draws text as series of quads, position being the top left origin of the text.
+ */
+void draw_text_opt(String text, Vec2f position, Font_Baked *font, Draw_Text_Opt_Args opt);
+
+/**
+ * Returns width and height of the text.
+ */
 Vec2f text_size(String text, Font_Baked *font);
+
+/**
+ * Returns width the text.
+ */
 float text_size_y(String text, Font_Baked *font);
+
+
+
+
+
+
+
+// @Todo: Write proper comments for each draw function, and properly supply optionals there, if there are any.
+
+
+// Drawing lines / dots.
 void draw_line(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer);
 void draw_dot(Vec2f position, Vec4f color, Camera *camera, Vertex_Buffer *buffer);
 

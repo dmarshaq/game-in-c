@@ -8,55 +8,41 @@
 
 static const float DOT_SCALE = 0.005f;
 
-void draw_quad(Vec2f p0, Vec2f p1, Vec4f color, Texture *texture, Vec2f uv0, Vec2f uv1, Texture *mask, float offset_angle, Vertex_Buffer *buffer) {
+void draw_quad_opt(Vec2f p0, Vec2f p1, Draw_Quad_Opt_Args opt) {
     float texture_slot = -1.0f; // @Important: -1.0f slot signifies shader to use color, not texture.
     float mask_slot = -1.0f;
 
-    if (texture != NULL)
-        texture_slot = add_texture_to_slots(texture);              
+    if (opt.texture != NULL)
+        texture_slot = add_texture_to_slots(opt.texture);              
 
-    if (mask != NULL)
-        mask_slot = add_texture_to_slots(mask);              
+    if (opt.mask != NULL)
+        mask_slot = add_texture_to_slots(opt.mask);              
     
-    Vec2f k = vec2f_make(cosf(offset_angle), sinf(offset_angle));
+    // What the in the world is offset angle? Probably has to do with rotation...
+    // Past me always had stupid shit to come up with.
+    // @Todo: Replace this with transformation matrix...
+    Vec2f k = vec2f_make(cosf(opt.offset_angle), sinf(opt.offset_angle));
     k = vec2f_multi_constant(k, vec2f_dot(k, vec2f_difference(p1, p0)));
     
     Vec2f p2 = vec2f_sum(p0, k);
     Vec2f p3 = vec2f_difference(p1, k);
     
     float quad_data[44] = {
-        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, uv0.x, uv0.y, texture_slot, mask_slot,
-        p2.x, p2.y, 0.0f, color.x, color.y, color.z, color.w, uv1.x, uv0.y, texture_slot, mask_slot,
-        p3.x, p3.y, 0.0f, color.x, color.y, color.z, color.w, uv0.x, uv1.y, texture_slot, mask_slot,
-        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, uv1.x, uv1.y, texture_slot, mask_slot,
+        p0.x, p0.y, 0.0f, opt.color.x, opt.color.y, opt.color.z, opt.color.w, opt.uv0.x, opt.uv0.y, texture_slot, mask_slot,
+        p2.x, p2.y, 0.0f, opt.color.x, opt.color.y, opt.color.z, opt.color.w, opt.uv1.x, opt.uv0.y, texture_slot, mask_slot,
+        p3.x, p3.y, 0.0f, opt.color.x, opt.color.y, opt.color.z, opt.color.w, opt.uv0.x, opt.uv1.y, texture_slot, mask_slot,
+        p1.x, p1.y, 0.0f, opt.color.x, opt.color.y, opt.color.z, opt.color.w, opt.uv1.x, opt.uv1.y, texture_slot, mask_slot,
     };
     
-    if (buffer == NULL)
+    if (opt.buffer == NULL)
         draw_quad_data(quad_data, 1);
     else
-        vertex_buffer_append_data(buffer, quad_data, VERTICIES_PER_QUAD * 11);
+        vertex_buffer_append_data(opt.buffer, quad_data, VERTICIES_PER_QUAD * 11);
 }
 
-void draw_grid(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer) {
-    Vec2f p2 = vec2f_make(p1.x, p0.y);
-    Vec2f p3 = vec2f_make(p0.x, p1.y);
-    
-    float quad_data[36] = {
-        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w, p0.x, p0.y,
-        p2.x, p2.y, 0.0f, color.x, color.y, color.z, color.w, p2.x, p2.y,
-        p3.x, p3.y, 0.0f, color.x, color.y, color.z, color.w, p3.x, p3.y,
-        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w, p1.x, p1.y,
-    };
-    
-    if (buffer == NULL)
-        draw_quad_data(quad_data, 1);
-    else
-        vertex_buffer_append_data(buffer, quad_data, VERTICIES_PER_QUAD * 9);
-}
-
-void draw_text(String text, Vec2f current_point, Vec4f color, Font_Baked *font, u32 unit_scale, Vertex_Buffer *buffer) {
+void draw_text_opt(String text, Vec2f current_point, Font_Baked *font, Draw_Text_Opt_Args opt) {
     // Scale and adjust current_point.
-    current_point = vec2f_multi_constant(current_point, (float)unit_scale);
+    current_point = vec2f_multi_constant(current_point, (float)opt.unit_scale);
     float origin_x = current_point.x;
     current_point.y += (float)font->baseline;
 
@@ -80,7 +66,16 @@ void draw_text(String text, Vec2f current_point, Vec4f color, Font_Baked *font, 
             width  = font->chars[font_char_index].x1 - font->chars[font_char_index].x0;
             height = font->chars[font_char_index].y1 - font->chars[font_char_index].y0;
 
-            draw_quad(vec2f_divide_constant(vec2f_make(current_point.x + c->xoff, current_point.y - c->yoff - height), (float)unit_scale), vec2f_divide_constant(vec2f_make(current_point.x + c->xoff + width, current_point.y - c->yoff), (float)unit_scale), color, NULL, vec2f_make(c->x0 / (float)font->bitmap.width, c->y1 / (float)font->bitmap.height), vec2f_make(c->x1 / (float)font->bitmap.width, c->y0 / (float)font->bitmap.height), &font->bitmap, 0.0f, buffer);
+            // Behold! The most unreadable piece of inlined shit...
+            // But it gets the job done...
+            draw_quad(
+                    vec2f_divide_constant(vec2f_make(current_point.x + c->xoff, current_point.y - c->yoff - height), (float)opt.unit_scale), 
+                    vec2f_divide_constant(vec2f_make(current_point.x + c->xoff + width, current_point.y - c->yoff), (float)opt.unit_scale), 
+                    .color = opt.color, 
+                    .uv0 = vec2f_make(c->x0 / (float)font->bitmap.width, c->y1 / (float)font->bitmap.height), 
+                    .uv1 = vec2f_make(c->x1 / (float)font->bitmap.width, c->y0 / (float)font->bitmap.height), 
+                    .mask = &font->bitmap, 
+                    .buffer = opt.buffer);
 
             current_point.x += font->chars[font_char_index].xadvance;
         }
@@ -167,7 +162,7 @@ void draw_line(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer) {
 
 
 void draw_dot(Vec2f position, Vec4f color, Camera *camera, Vertex_Buffer *buffer) {
-    draw_quad(vec2f_make(position.x - (float)camera->unit_scale * DOT_SCALE, position.y), vec2f_make(position.x + (float)camera->unit_scale * DOT_SCALE, position.y), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, PI/4, buffer);
+    draw_quad(vec2f_make(position.x - (float)camera->unit_scale * DOT_SCALE, position.y), vec2f_make(position.x + (float)camera->unit_scale * DOT_SCALE, position.y), .color = color, .offset_angle = PI/4, .buffer = buffer);
 }
 
 void draw_quad_outline(Vec2f p0, Vec2f p1, Vec4f color, float offset_angle, Vertex_Buffer *buffer) {
@@ -318,7 +313,7 @@ void draw_parametric(float t0, float t1, Function x, Function y, u32 detail, Vec
 void draw_area_function(float x0, float x1, Function y, u32 rect_count, Vec4f color, Vertex_Buffer *buffer) {
     float step = (x1 - x0) / (float)rect_count;
     for (u32 i = 0; i < rect_count; i++) {
-        draw_quad(vec2f_make(x0 + step * i, 0.0f), vec2f_make(x0 + step * (i + 1), y(x0 + step * (i + 1))), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f, buffer);
+        draw_quad(vec2f_make(x0 + step * i, 0.0f), vec2f_make(x0 + step * (i + 1), y(x0 + step * (i + 1))), .color = color, .buffer = buffer);
     }
 }
 
@@ -389,7 +384,7 @@ void draw_area_polar(float t0, float t1, Function r, u32 rect_count, Vec4f color
 void draw_area_parametric(float t0, float t1, Function x, Function y, u32 rect_count, Vec4f color, Vertex_Buffer *buffer) {
     float step = (t1 - t0) / (float)rect_count;
     for (u32 i = 0; i < rect_count; i++) {
-        draw_quad(vec2f_make(x(t0 + step * i), 0.0f), vec2f_make(x(t0 + step * (i + 1)), y(t0 + step * (i + 1))), color, NULL, VEC2F_ORIGIN, VEC2F_UNIT, NULL, 0.0f, buffer);
+        draw_quad(vec2f_make(x(t0 + step * i), 0.0f), vec2f_make(x(t0 + step * (i + 1)), y(t0 + step * (i + 1))), .color = color, .buffer = buffer);
     }
 }
 
@@ -400,7 +395,7 @@ void draw_viewport(u32 x, u32 y, u32 width, u32 height, Vec4f color, Camera *cam
     Vec2f p1 = vec2f_make((float)width / 2 / (float)camera->unit_scale, (float)height / 2 / (float)camera->unit_scale);
     Vec2f p0 = vec2f_negate(p1);
     
-    draw_quad(p0, p1, color, NULL, p0, p1, NULL, 0.0f, buffer);
+    draw_quad(p0, p1, .color = color, .uv0 = p0, .uv1 = p1, .buffer = buffer);
 
 }
 

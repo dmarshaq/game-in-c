@@ -3,7 +3,7 @@
 
 // Defining flags.
 #ifdef DEV
-#   define nob_cc_flags(cmd)    nob_cmd_append(cmd, "-std=gnu11", "-g", "-O0", "-DDEBUG")
+#   define nob_cc_flags(cmd)    nob_cmd_append(cmd, "-std=gnu11", "-g", "-O0", "-Wno-override-init-side-effects","-DDEBUG")
 #else
 #   define nob_cc_flags(cmd)    nob_cmd_append(cmd, "-std=gnu11", "-O2", "-DNDEBUG")
 #endif // DEV
