@@ -1013,7 +1013,7 @@ FILE *meta_generate(char *file_name) {
         return NULL;
     }
 
-    FILE *file = fopen(file_name, "a");
+    FILE *file = fopen(file_name, "ab");
     if (file == NULL) {
         printf_err("Couldn't open meta generated file for appending '%s'.\n", file_name);
         return NULL;

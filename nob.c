@@ -8,6 +8,7 @@
 #   define nob_cc_flags(cmd)    nob_cmd_append(cmd, "-std=gnu11", "-O2", "-DNDEBUG")
 #endif // DEV
 
+#define nob_cc(cmd) nob_cmd_append(cmd, "gcc")
 
 // Defining libs.
 #define nob_cc_libs(cmd)    nob_cmd_append(cmd, "-lmingw32", "-lSDL2main", "-lSDL2", "-lSDL2_mixer", "-lopengl32", "-lglew32")

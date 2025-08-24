@@ -74,7 +74,7 @@ String read_file_into_str(char *file_name, Allocator *allocator) {
 
 
 int write_str_to_file(String str, char *file_name) {
-    FILE *file = fopen(file_name, "w");
+    FILE *file = fopen(file_name, "wb");
     if (file == NULL) {
         printf_err("Couldn't open the file for writing '%s'.\n", file_name);
         return 1;
