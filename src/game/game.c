@@ -190,14 +190,17 @@ void game_init(State *global_state) {
 
 
 
-
     // Main camera init.
     state->main_camera = camera_make(VEC2F_ORIGIN, 48);
 
 
+
+
+    
+
+
     // Finishing vars tree.
     state->vars_tree = vars_tree_build();
-
 
     // Loading Vars files specifically. After the vars tree is built...
     for (u32 i = 0; i < changes_count; i++) {
@@ -214,10 +217,16 @@ void game_init(State *global_state) {
         }
     }
 
+
+
+
+
+
+
+
+
     // Setting clear color.
     glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-
-
 
     // Logging hello world to the console.
     console_log("Hello world!\n");
@@ -248,6 +257,13 @@ void game_update() {
 
 
 
+    Matrix4f projection = camera_calculate_projection(&state->main_camera, state->window.width, state->window.height);
+
+    shader_update_projection(state->quad_drawer.program, &projection);
+
+    draw_begin(&state->quad_drawer);
+    draw_quad(vec2f_make(-1.0f, -1.0f), vec2f_make(1.0f, 1.0f));
+    draw_end();
 
 
 

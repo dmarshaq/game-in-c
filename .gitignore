@@ -1,3 +1,6 @@
+nob.exe.old
+
+
 # Directories
 build/
 
@@ -11,7 +14,7 @@ build/
 *.elf
 
 
-*.old
+
 
 # Linker output
 *.ilk
