@@ -12,6 +12,7 @@
 #include "game/draw.h"
 #include "game/event.h"
 #include "game/console.h"
+#include "game/editor.h"
 #include "game/command.h"
 #include "game/vars.h"
 #include "game/imui.h"
@@ -182,16 +183,21 @@ void game_init(State *global_state) {
 
 
 
+    // Main camera init.
+    state->main_camera = camera_make(VEC2F_ORIGIN, 48);
+
+
     // Init commands.
     command_init();
 
     // Init console.
     console_init(state);
 
+    // Init editor.
+    editor_init(state);
 
 
-    // Main camera init.
-    state->main_camera = camera_make(VEC2F_ORIGIN, 48);
+
 
 
 
@@ -257,17 +263,21 @@ void game_update() {
 
 
 
-    Matrix4f projection = camera_calculate_projection(&state->main_camera, state->window.width, state->window.height);
+    // Matrix4f projection = camera_calculate_projection(&state->main_camera, state->window.width, state->window.height);
 
-    shader_update_projection(state->quad_drawer.program, &projection);
+    // shader_update_projection(state->quad_drawer.program, &projection);
 
-    draw_begin(&state->quad_drawer);
-    draw_quad(vec2f_make(-1.0f, -1.0f), vec2f_make(1.0f, 1.0f));
-    draw_end();
+    // draw_begin(&state->quad_drawer);
+
+    // draw_quad(vec2f_make(-1.0f, -1.0f), vec2f_make(1.0f, 1.0f));
+
+    // draw_end();
 
 
 
 
+    // Editor drawing.
+    editor_draw(&state->window);
 
     // Console update.
     console_update(&state->window, &state->events, &state->t);
