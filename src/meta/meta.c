@@ -864,6 +864,8 @@ int meta_note_process_RegisterCommand(Lexer lexer, FILE *output_h) {
 
 
 
+
+
 /**
  * END
  */
@@ -942,7 +944,7 @@ int meta_process_file(char *file_name, FILE *output_h, char *output_path) {
                     return 1;
                 goto metanote_remove_continue;
             }
-            
+
             printf_err("%s:%lld Unknown meta note: '%.*s'.\n", current_file_name, lexer.line_num, UNPACK(next.str));
             return 1;
 

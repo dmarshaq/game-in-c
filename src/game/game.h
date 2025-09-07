@@ -13,7 +13,11 @@
 
 
 
-
+typedef enum game_state : u8 {
+    GAME_STATE_MENU,
+    GAME_STATE_EDITOR,
+    GAME_STATE_LEVEL,
+} Game_State;
 
 
 
@@ -21,6 +25,7 @@ typedef struct state {
     Window_Info window;
     Events_Info events;
     Time_Info t;
+    Game_State game_state;
 
     Vars_Tree vars_tree;
 
@@ -30,6 +35,7 @@ typedef struct state {
     Font_Baked *font;
 
     Quad_Drawer quad_drawer;
+    Line_Drawer line_drawer;
 } State;
 
 
@@ -48,6 +54,7 @@ void game_update();
  * Simply frees all initted game memory.
  */
 void game_free();
+
 
 /**
  * This function will notify app to quit at the end of the next frame.

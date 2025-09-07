@@ -127,6 +127,10 @@ static Console_Openness console_state;
 
 
 
+bool console_active() {
+    return console_state != CLOSED;
+}
+
 
 
 

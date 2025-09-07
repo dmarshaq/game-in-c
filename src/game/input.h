@@ -6,6 +6,9 @@
 #include <SDL2/SDL_keycode.h>
 #include <stdbool.h>
 
+
+
+
 /**
  * Inits keyboard state.
  * Internally allocates buffer for number of the keys to hold keyboard state.
@@ -43,5 +46,11 @@ bool unpressed(SDL_KeyCode key);
  * Resets on specified key press.
  */
 bool repeat(SDL_KeyCode key, float dt_milliseconds);
+
+
+
+
+
+
 
 #endif

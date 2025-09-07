@@ -43,6 +43,12 @@ void console_log(char *format, ...);
  */
 void console_error(char *format, ...);
 
+/**
+ * Returns true if console is active (open).
+ */
+bool console_active();
+
+
 
 /**
  * Adds two integers, returns the result.

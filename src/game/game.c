@@ -131,8 +131,12 @@ void game_init(State *global_state) {
     // Initing graphics.
     graphics_init();
 
+
+
     // Keyboard input init.
     keyboard_state_init();
+
+
 
     // Initing events.
     event_init_handler(&state->events);
@@ -181,6 +185,7 @@ void game_init(State *global_state) {
     // Drawers init.
     drawer_init(&state->quad_drawer, hash_table_get(&state->shader_table, UNPACK_LITERAL("quad")));
 
+    line_drawer_init(&state->line_drawer, hash_table_get(&state->shader_table, UNPACK_LITERAL("line")));
 
 
     // Main camera init.
@@ -229,6 +234,8 @@ void game_init(State *global_state) {
 
 
 
+    // Setting game state: GAME_STATE_EDITOR for now.
+    state->game_state = GAME_STATE_EDITOR;
 
 
     // Setting clear color.
@@ -275,12 +282,38 @@ void game_update() {
 
 
 
+    switch (state->game_state) {
+        case GAME_STATE_MENU:
 
-    // Editor drawing.
-    editor_draw(&state->window);
+            break;
+        case GAME_STATE_EDITOR:
+
+            // Updating editor, if console is not active.
+            if (!console_active()) {
+                if (editor_update(&state->window, &state->events, &state->t)) {
+                    TODO("Editor exitting.");
+                    // Editor is exitted.
+                    // Rebuild the level.
+                    // Load level.
+                    // Switch to GAME_STATE_LEVEL.
+                }
+            }
+
+            // Editor drawing.
+            editor_draw(&state->window);
+
+            break;
+        case GAME_STATE_LEVEL:
+            break;
+    }
+    
+
+
+
 
     // Console update.
     console_update(&state->window, &state->events, &state->t);
+
     // Console drawing.
     console_draw(&state->window);
    
