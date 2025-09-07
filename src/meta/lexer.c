@@ -17,6 +17,9 @@ void token_print_block(Token *token, bool show_token_type) {
             case (TOKEN_SYMBOL):
                 printf("SYMBOL(");
                 break;
+            case (TOKEN_COLON):
+                printf("COLON(");
+                break;
             case (TOKEN_SEMICOLON):
                 printf("SEMICOLON(");
                 break;
@@ -90,6 +93,9 @@ void token_print(Token *token) {
         case (TOKEN_SYMBOL):
             printf("%s\n", "symbol");
             break;
+        case (TOKEN_COLON):
+            printf("%s\n", "colon");
+            break;
         case (TOKEN_SEMICOLON):
             printf("%s\n", "semicolon");
             break;
@@ -158,6 +164,9 @@ void token_type_print(Token_Type token_type) {
             break;
         case (TOKEN_SYMBOL):
             printf("SYMBOL");
+            break;
+        case (TOKEN_COLON):
+            printf("COLON");
             break;
         case (TOKEN_SEMICOLON):
             printf("SEMICOLON");
@@ -231,6 +240,7 @@ void token_type_print(Token_Type token_type) {
 #define LITERAL_TOKENS_LENGTH (sizeof(LITERAL_TOKENS) / sizeof(Literal_Token))
 
 static const Literal_Token LITERAL_TOKENS[] = {
+    { TOKEN_COLON,              STR_BUFFER(":") },
     { TOKEN_SEMICOLON,          STR_BUFFER(";") },
     { TOKEN_PARAN_OPEN,         STR_BUFFER("(") },
     { TOKEN_PARAN_CLOSE,        STR_BUFFER(")") },

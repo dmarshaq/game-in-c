@@ -36,6 +36,7 @@ static Arena arena_strings; //@Leak.
 static Arena arena_type_info; // @Leak.
 static Arena arena_type_info_function_argument; // @Leak.
 static Arena arena_type_info_struct_member; // @Leak.
+static Arena arena_type_info_enum_member; // @Leak.
 
 static Type_Info **type_table; // @Leak.
 
@@ -207,6 +208,27 @@ void type_table_add_struct_member(Type_Info *struct_type, String member_typename
 }
 
 
+
+
+Type_Info* type_table_add_enum(String typename) {
+    Type_Info *item = arena_alloc(&arena_type_info, sizeof(Type_Info));
+    *item = ((Type_Info) { ENUM, typename, 4, 4, .t_enum = { true, 0, arena_type_info_enum_member.ptr } });
+    hash_table_put(&type_table, item, UNPACK(typename));
+    return item;
+}
+
+void type_table_add_enum_member(Type_Info *enum_type, String member_name, u64 value) {
+    
+    Type_Info_Enum_Member *member = arena_alloc(&arena_type_info_enum_member, sizeof(Type_Info_Enum_Member));
+
+    *member = ((Type_Info_Enum_Member) { member_name, value });
+
+    enum_type->t_enum.members_length++;
+}
+
+
+
+
 Type_Info* type_table_add_function(Type_Info *return_type, String typename) {
     // @Perfomance: Maybe move this on a higher level to reduce total amount of the strings saved, and simply save one string per file processed.
     String definition_file = CSTR(current_file_name);
@@ -343,6 +365,7 @@ void type_table_init() {
     arena_type_info                     = arena_make(2*KB);
     arena_type_info_function_argument   = arena_make(2*KB);
     arena_type_info_struct_member       = arena_make(2*KB);
+    arena_type_info_enum_member         = arena_make(2*KB);
 
     type_table = hash_table_make(Type_Info *, 32, &std_allocator);
 
@@ -536,6 +559,7 @@ int meta_note_process_Introspect(Lexer lexer) {
         if (parser_get_and_expect_token(&lexer, &next, TOKEN_SYMBOL) != 0) return 1;
         
         if (str_equals(next.str, STRUCT_STR)) {
+
             // Parsing [struct] [SYMBOL typename] ['{...}'].
             if (parser_get_and_expect_token(&lexer, &next, TOKEN_SYMBOL) != 0) return 1;
 
@@ -617,10 +641,122 @@ int meta_note_process_Introspect(Lexer lexer) {
         else if (str_equals(next.str, UNION_STR)) {
             // Parsing [union] [SYMBOL typename] ['{...}'].
             TODO("UNION introspection.");
+
         }
         else if (str_equals(next.str, ENUM_STR)) {
-            // Parsing [enum] [SYMBOL typename] ['{...}'].
-            TODO("ENUM introspection.");
+            // Parsing [enum] [SYMBOL typename] [optional ':', SYMBOL int typename] ['{...}'].
+
+            // Getting typename
+            if (parser_get_and_expect_token(&lexer, &next, TOKEN_SYMBOL) != 0) return 1;
+
+            typename = next.str;
+
+            // Type checking if defined.
+            if (type_table_defined(typename)) {
+                printf_err("%s:%lld @Introspect: Enum typename is already defined as: '%.*s'\n", current_file_name, next.line_num, UNPACK(typename));
+                return 1;
+            }
+
+            SAVE_STRING(typename);
+            Type_Info *enum_type = type_table_add_enum(typename);
+#ifdef LOG 
+            printf("Identified enum typename as: '%.*s'\n", UNPACK(typename)); 
+#endif
+            
+            // [optional ':', SYMBOL integer typename]
+            // Colon check.
+            next = parser_peek_next(lexer);
+            if (next.type == TOKEN_COLON) {
+                lexer_next_token(&lexer);
+
+                next = lexer_next_token(&lexer);
+                
+                Type_Info *integer_type = *(Type_Info **)hash_table_get(&type_table, UNPACK(next.str)); 
+                if (integer_type == NULL) {
+                    printf_err("%s:%lld @Introspect: Unknown underlying enum type: '%.*s'\n", current_file_name, next.line_num, UNPACK(next.str));
+                    return 1;
+                }
+
+
+                if (integer_type->type != INTEGER) {
+                    printf_err("%s:%lld @Introspect: Underlying enum type is not integer: '%.*s'\n", current_file_name, next.line_num, UNPACK(next.str));
+                    return 1;
+                }
+                
+                // Making enum to have underlying integer type specified.
+                enum_type->size = integer_type->size;
+                enum_type->align = integer_type->align;
+                enum_type->t_enum.is_signed = integer_type->t_integer.is_signed;
+            }
+
+            
+
+
+
+            // Expecting '{'
+            if (parser_get_and_expect_token(&lexer, &next, TOKEN_CURLY_OPEN) != 0) return 1;
+
+            u64 enum_value_counter = 0;
+            while(true) {
+                next = lexer_next_token(&lexer);
+                
+                if (next.type == TOKEN_CURLY_CLOSE) {
+                    break;
+                }
+                
+                // Parsing member.
+                // Expecting only:
+                //  [SYMBOL member_name] [optional '=', int value] [',']
+                
+                String member_name = {0};
+
+                if (parser_expect_token_type(&next, TOKEN_SYMBOL) != 0) return 1;
+
+                member_name = next.str;
+                SAVE_STRING(member_name);
+
+#ifdef LOG 
+                printf("    - Identified member name as: '%.*s'\n", UNPACK(member_name)); 
+#endif
+
+
+                // [optional '=', int value]
+                next = parser_peek_next(lexer);
+                if (next.type == TOKEN_ASSIGN) {
+                    lexer_next_token(&lexer);
+                    
+                    String value_str = lexer_next_token(&lexer).str;
+                    while (parser_peek_next(lexer).type != TOKEN_COMMA) {
+                        value_str.length += lexer_next_token(&lexer).str.length;
+                    }
+                    
+                
+                    
+                    if (!str_is_int(value_str)) {
+                        printf_err("%s:%lld @Introspect: Expected enum member value to be integer or is unsupported integer format: '%.*s'\n", current_file_name, next.line_num, UNPACK(value_str));
+                        return 1;
+                    }
+
+                    enum_value_counter = (u64)str_parse_int(value_str);
+                }
+
+
+                // Adding field type and name to struct.
+                type_table_add_enum_member(enum_type, member_name, enum_value_counter);
+
+#ifdef LOG 
+                printf("    - Identified member value as: '0x%llx'\n", enum_value_counter); 
+#endif
+
+                enum_value_counter++;
+
+
+
+
+                // Comma check.
+                if (parser_get_and_expect_token(&lexer, &next, TOKEN_COMMA) != 0) return 1;
+            }
+            
         }
         else {
             // Parsing [SYMBOL typename] [optional '*'].
@@ -776,6 +912,7 @@ typedef_alias_end:
             next = parser_peek_next(lexer);
             if (next.type == TOKEN_COMMA) {
                 next = lexer_next_token(&lexer);
+
             }
         }
 
@@ -1132,6 +1269,18 @@ int meta_process(int count, char **files, char *output_path) {
     }
     fwrite_str(STR_BUFFER("};\n\n"), meta_generated_h);
 
+
+    // Generating META_TYPE_ENUM_MEMBERS[]
+    fwrite_str(STR_BUFFER("static Type_Info_Enum_Member META_TYPE_ENUM_MEMBERS[] = {\n"), meta_generated_h);
+    for (u32 i = 0; i < arena_size(&arena_type_info_enum_member) / sizeof(Type_Info_Enum_Member); i++) {
+        Type_Info_Enum_Member *member = ((Type_Info_Enum_Member *)arena_type_info_enum_member.allocation) + i;
+        fprintf(meta_generated_h, "    { STR_BUFFER(\"%.*s\"), %llu", UNPACK(member->name), member->value);
+
+        fwrite_str(STR_BUFFER(" },\n"), meta_generated_h);
+    }
+    fwrite_str(STR_BUFFER("};\n\n"), meta_generated_h);
+
+
     // Now generating type table itself
     fwrite_str(STR_BUFFER("static Type_Info META_TYPE_TABLE[] = {\n"), meta_generated_h);
     for (u32 i = 0; i < hash_table_capacity(&type_table); i++) {
@@ -1185,10 +1334,9 @@ int meta_process(int count, char **files, char *output_path) {
                     fwrite_str(STR_BUFFER(" }"), meta_generated_h);
                     break;
                 case ENUM:
-                    TODO("Enum meta generation.");
-                    fwrite_str(STR_BUFFER("ENUM, .t_enum = { "), meta_generated_h);
-                    // ...
-                    fwrite_str(STR_BUFFER(" }"), meta_generated_h);
+                    u64 enum_member_index = item->t_enum.members - (Type_Info_Enum_Member *)arena_type_info_enum_member.allocation; 
+                    
+                    fprintf(meta_generated_h, "ENUM, STR_BUFFER(\"%.*s\"), %u, %u, .t_enum = { %d, %u, &META_TYPE_ENUM_MEMBERS[%llu] }", UNPACK(item->name), item->size, item->align, item->t_enum.is_signed, item->t_enum.members_length, enum_member_index);
                     break;
                 case TYPEDEF:
                     String typedef_of_typename = type_table_get_typename(item->t_typedef.typedef_of);

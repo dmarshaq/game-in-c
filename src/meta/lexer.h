@@ -17,6 +17,7 @@ typedef enum token_type {
     
 
     // Literal tokens.
+    TOKEN_COLON,
     TOKEN_SEMICOLON,
     TOKEN_PARAN_OPEN,
     TOKEN_PARAN_CLOSE,

@@ -342,6 +342,10 @@ void quit() {
     state->events.should_quit = true;
 }
 
+void game_set_state(Game_State game_state) {
+    state->game_state = game_state;
+}
+
 
 
 

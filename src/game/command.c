@@ -99,8 +99,9 @@ void command_run(String command) {
                             console_log("%.*s: Argument [%d]: '%.*s' type mismatch, expected 'Integer'.\n", UNPACK(command_name), args_count - 1, UNPACK(arg));
                             return;
                         }
-                        
-                        *(s64 *)(data) = str_parse_int(arg);
+
+                        s64 value = str_parse_int(arg);
+                        mem_copy_int(data, &value, expected_argument_type->size, 8, 0);
 
                         break;
                     case FLOAT:
@@ -111,6 +112,27 @@ void command_run(String command) {
 
                         *(float *)(data) = str_parse_float(arg);
 
+                        break;
+                    case ENUM:
+                        // Sending enum value based on integer supplied
+                        if (str_is_int(arg)) {
+                            s64 value = str_parse_int(arg);
+                            mem_copy_int(data, &value, expected_argument_type->size, 8, 0);
+                            goto enum_arg_parsing_break;
+                        }
+
+                        // Sending enum value based on actual enum member name supplied.
+                        for (u32 i = 0; i < expected_argument_type->t_enum.members_length; i++) {
+                            if (str_equals(expected_argument_type->t_enum.members[i].name, arg)) {
+                                mem_copy_int(data, &expected_argument_type->t_enum.members[i].value, expected_argument_type->size, 8, 0);
+                                goto enum_arg_parsing_break;
+                            }
+                        }
+
+                        console_log("%.*s: Argument [%d]: '%.*s' type mismatch, expected enum value of type '%.*s'.\n", UNPACK(command_name), args_count - 1, UNPACK(arg), UNPACK(expected_argument_type->name));
+                        return;
+
+enum_arg_parsing_break:
                         break;
                     default :
                         TODO("Other arguments types handling.");

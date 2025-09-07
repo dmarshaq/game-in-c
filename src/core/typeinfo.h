@@ -27,12 +27,12 @@ typedef enum : u8 {
 } Type_Info_Kind;
 
 typedef struct {
-    u32 size_bits;
+    u32 size_bits; // Reduntnat?
     bool is_signed;
 } Type_Info_Integer;
 
 typedef struct {
-    u32 size_bits;
+    u32 size_bits; // Reduntnat?
 } Type_Info_Float;
 
 typedef struct {
@@ -74,10 +74,19 @@ typedef struct {
     u64 length;
 } Type_Info_Array;
 
-// @Todo: enum.
-typedef struct {
 
+
+typedef struct {
+    String name;
+    u64 value;
+} Type_Info_Enum_Member;
+
+typedef struct {
+    bool is_signed;
+    u32 members_length;
+    Type_Info_Enum_Member *members;
 } Type_Info_Enum;
+
 
 typedef struct {
     Type_Info *typedef_of;

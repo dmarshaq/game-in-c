@@ -55,7 +55,7 @@ bool console_active();
  */
 @Introspect;
 @RegisterCommand;
-s64 add(s64 a, s64 b);
+s64 add(s32 a, s32 b);
 
 /**
  * Clears console's history.

@@ -12,7 +12,7 @@
 #include "game/vars.h"
 
 
-
+@Introspect;
 typedef enum game_state : u8 {
     GAME_STATE_MENU,
     GAME_STATE_EDITOR,
@@ -62,5 +62,12 @@ void game_free();
 @Introspect;
 @RegisterCommand;
 void quit();
+
+/**
+ * This function will change game state to the state specified.
+ */
+@Introspect;
+@RegisterCommand;
+void game_set_state(Game_State game_state);
 
 #endif

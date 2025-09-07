@@ -1,12 +1,10 @@
 #include "core/core.h"
+#include "core/type.h"
 #include "core/structs.h"
 
 #include "game/game.h"
 #include "game/graphics.h"
 #include "game/input.h"
-
-
-
 
 
 

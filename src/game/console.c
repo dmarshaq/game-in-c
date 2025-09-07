@@ -627,7 +627,7 @@ void console_free() {
 
 
 // Example function that we want to register (doesn't have to be in this file).
-s64 add(s64 a, s64 b) {
+s64 add(s32 a, s32 b) {
     return a + b;
 }
 
