@@ -7,6 +7,8 @@
 
 #include "core/mathf.h"
 #include "core/structs.h"
+#include "core/arena.h"
+#include "core/str.h"
 #include "core/file.h"
 
 
@@ -60,6 +62,7 @@ static Editor_Quad *quads_list;
 
 
 static Quad_Drawer *quad_drawer_ptr;
+static Quad_Drawer *ui_quad_drawer_ptr;
 static Line_Drawer *line_drawer_ptr;
 
 static Font_Baked font_small;
@@ -69,18 +72,27 @@ static Camera editor_camera;
 
 
 
+
+#define ARENA_SIZE 1024
+
+static Arena arena;
+
+static String info_buffer;
+
+
 void editor_init(State *state) {
     quads_list = array_list_make(Editor_Quad, 8, &std_allocator);
 
     // @Copypasta: From console.c ... 
     // Get resources.
     quad_drawer_ptr = &state->quad_drawer;
+    ui_quad_drawer_ptr = &state->ui_quad_drawer;
     line_drawer_ptr = &state->line_drawer;
 
     // Load needed font... Hard coded...
     u8* font_data = read_file_into_buffer("res/font/Consolas-Regular.ttf", NULL, &std_allocator);
 
-    font_small  = font_bake(font_data, 14.0f);
+    font_small  = font_bake(font_data, 14.0f);;
     font_medium = font_bake(font_data, 20.0f);
 
     free(font_data);
@@ -88,6 +100,13 @@ void editor_init(State *state) {
 
     // Copying main camera for editor.
     editor_camera = state->main_camera;
+
+
+    // Make arena and allocate space for the buffers.
+    arena = arena_make(ARENA_SIZE);
+
+    info_buffer.data   = arena_alloc(&arena, 256);
+    info_buffer.length = 256;
 }
 
 bool editor_update(Window_Info *window, Events_Info *events, Time_Info *t) {
@@ -96,6 +115,10 @@ bool editor_update(Window_Info *window, Events_Info *events, Time_Info *t) {
     if (events->mouse_input.left_pressed) {
         console_log("Editor: Select.\n");
     }
+
+    
+
+    
 
     return false;
 }
@@ -134,14 +157,25 @@ void editor_draw(Window_Info *window) {
 
 
 
+    // Set ui to use specific font.
+    ui_set_font(&font_small);
+
 
 
     projection = screen_calculate_projection(window->width, window->height);
-    shader_update_projection(quad_drawer_ptr->program, &projection);
+    shader_update_projection(ui_quad_drawer_ptr->program, &projection);
 
-    draw_begin(quad_drawer_ptr);
+    draw_begin(ui_quad_drawer_ptr);
 
     // Draw editor ui.
+    UI_WINDOW(window->width, window->height, 
+            
+            ui_text(str_format(info_buffer, 
+                    "Window size: %dx%d\n"
+                    "Vert count: %u\n"
+                    , window->width, window->height, array_list_length(&quads_list) * 4));
+
+            );
 
     draw_end();
 }

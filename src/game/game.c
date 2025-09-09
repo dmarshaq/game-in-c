@@ -185,6 +185,9 @@ void game_init(State *global_state) {
     // Drawers init.
     drawer_init(&state->quad_drawer, hash_table_get(&state->shader_table, UNPACK_LITERAL("quad")));
 
+    drawer_init(&state->ui_quad_drawer, hash_table_get(&state->shader_table, UNPACK_LITERAL("ui_quad")));
+
+
     line_drawer_init(&state->line_drawer, hash_table_get(&state->shader_table, UNPACK_LITERAL("line")));
 
 
@@ -198,10 +201,13 @@ void game_init(State *global_state) {
     // Init console.
     console_init(state);
 
+    // Init immediate ui.
+    ui_init(&state->ui_state, &state->events.mouse_input);
+
     // Init editor.
     editor_init(state);
 
-
+    
 
 
 

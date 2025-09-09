@@ -93,9 +93,9 @@ s64 str_count_chars(String str, char c);
  * Copies contents of the src string into buffer.
  * @Important: buffer should have enough space to hold src data!
  */
-void* str_copy_to(String str, void *buffer);
+void *str_copy_to(String str, void *buffer);
 
-
+String str_format(String buffer, char *format, ...);
 
 
 

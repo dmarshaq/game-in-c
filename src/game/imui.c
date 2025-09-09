@@ -54,7 +54,7 @@ void ui_init(UI_State *ui_state, Mouse_Input *mouse_input) {
     ui->cursor = vec2f_make(0, 0);
     ui->frame_stack = array_list_make(UI_Frame, 8, &std_allocator); // Maybe replace with the custom defined arena allocator later. @Leak.
 
-    ui->x_axis = UI_ALIGN_OPPOSITE;
+    ui->x_axis = UI_ALIGN_DEFAULT;
     ui->y_axis = UI_ALIGN_OPPOSITE;
 
     ui->element_size = VEC2F_ORIGIN;
@@ -86,6 +86,12 @@ void ui_activate_next() {
 void ui_end_element() {
     ui->set_prefix_id = -1;
     ui->activate_next = false;
+}
+
+
+// UI Font
+void ui_set_font(Font_Baked *font) {
+    ui->font = font;
 }
 
 // UI Alignment.
@@ -184,9 +190,7 @@ bool ui_is_hover(Vec2f size) {
     return value_inside_domain(ui->cursor.x, ui->cursor.x + size.x, mouse_i->position.x) && value_inside_domain(ui->cursor.y, ui->cursor.y + size.y, mouse_i->position.y);
 }
 
-void ui_draw_text(char *text, Vec2f position, Vec4f color) {
-    u64 text_length = strlen(text);
-
+void ui_draw_text(String text, Vec2f position, Vec4f color) {
     // Scale and adjust current_point.
     Vec2f current_point = position;
     Font_Baked *font = ui->font;
@@ -198,15 +202,15 @@ void ui_draw_text(char *text, Vec2f position, Vec4f color) {
     u16 width, height;
     stbtt_bakedchar *c;
 
-    for (u64 i = 0; i < text_length; i++) {
-        if (text[i] == '\n') {
+    for (u64 i = 0; i < text.length; i++) {
+        if (text.data[i] == '\n') {
             current_point.x = origin_x;
             current_point.y -= (float)font->line_height;
             continue;
         }
 
         // Character drawing.
-        font_char_index = (s32)text[i] - font->first_char_code;
+        font_char_index = (s32)text.data[i] - font->first_char_code;
         if (font_char_index < font->chars_count) {
             c = &font->chars[font_char_index];
             width  = font->chars[font_char_index].x1 - font->chars[font_char_index].x0;
@@ -237,11 +241,8 @@ void ui_draw_text(char *text, Vec2f position, Vec4f color) {
     }
 }
 
-void ui_draw_text_centered(char *text, Vec2f position, Vec2f size, Vec4f color) {
-    if (text == NULL)
-        return;
-
-    Vec2f t_size = text_size(CSTR(text), ui->font);
+void ui_draw_text_centered(String text, Vec2f position, Vec2f size, Vec4f color) {
+    Vec2f t_size = text_size(text, ui->font);
 
     // Following ui_draw_text centered calculations are for the system where y axis points up, and x axis to the right.
     ui_draw_text(text, vec2f_make(position.x + (size.x - t_size.x) * 0.5f, position.y + (size.y + t_size.y) * 0.5f), color);
@@ -250,7 +251,7 @@ void ui_draw_text_centered(char *text, Vec2f position, Vec2f size, Vec4f color) 
 
 // UI Button
 
-bool ui_button(Vec2f size, char *text, s32 id) {
+bool ui_button(Vec2f size, String text, s32 id) {
     ui_cursor_advance(size);
     ui_set_element_size(size);
 
@@ -407,97 +408,10 @@ leave_draw:
 }
 
 
-// UI Input field
-
-#define UI_INPUT_FIELD(size, buffer, buffer_size) ui_input_field(size, buffer, buffer_size, __LINE__)
-
-bool ui_input_field(Vec2f size, char *buffer, s32 buffer_size, s32 id) {
-    // Mouse_Input *mouse_i = &mouse_i->
-    // Text_Input *text_i = &state->events.text_input;
-
-    // ui_cursor_advance(size);
-    // ui_set_element_size(size);
-
-    // s32 prefix_id = ui->set_prefix_id;
-
-    // Vec4f res_color = ui->theme.btn_bg;
-    // Vec4f res_bar_color = ui->theme.btn_bg_hover;
-    // bool  res_flushed = false;
-
-    // if (ui->active_line_id == id && ui->active_prefix_id == prefix_id) {
-    //     if (mouse_i->left_pressed || pressed(SDLK_ESCAPE)) {
-    //         // If was pressed but was pressed again outside (deselected)
-    //         ui->active_line_id = -1;
-    //         ui->active_prefix_id = -1;
-
-    //         SDL_StopTextInput();
-
-    //         text_i->buffer = NULL;
-    //         text_i->capacity = 0;
-    //         text_i->length = 0;
-    //         text_i->write_index = 0;
 
 
-    //         goto leave_draw;
-    //     }
-
-    //     res_color = ui->theme.btn_bg_press;
-
-    //     if (pressed(SDLK_RETURN)) {
-    //         res_flushed = true;
-    //         goto leave_draw;
-    //     } 
-
-
-    //     // If is still active.
-    //     
-
-
-    // }
-
-
-
-    // if (ui_is_hover(size) || ui->activate_next) {
-    //     // If just pressed.
-    //     if (mouse_i->left_pressed || ui->activate_next) {
-    //         ui->active_line_id = id;
-    //         ui->active_prefix_id = prefix_id;
-    //         
-    //         SDL_StartTextInput();
-
-    //         // Setting text input for appending.
-    //         text_i->buffer = buffer;
-    //         text_i->capacity = buffer_size;
-    //         text_i->length = strlen(buffer);
-    //         text_i->write_index = text_i->length;
-    //         
-    //     }
-
-    //     res_color = ui->theme.btn_bg_hover;
-
-    //     goto leave_draw;
-    // }
-
-
-
-//leav// e_draw:
-    //  Vec2f t_size = text_size(CSTR(buffer), ui->font);
-    //  ui_draw_rect(ui->cursor, size, res_color); // Input field.
-    // // Please rework
-    //  // ui_draw_rect(vec2f_make(ui->cursor.x + text_size(CSTR(buffer), text_i->write_index, ui->font).x, ui->cursor.y), vec2f_make(10, size.y), res_bar_color); // Input bar.
-    //  ui_draw_text(buffer, vec2f_make(ui->cursor.x, ui->cursor.y + (size.y + t_size.y) * 0.5f), ui->theme.text);
-
-    //  ui_end_element();
-
-    //  return res_flushed;
-    return false;
-}
-
-
-
-
-void ui_text(char *text) {
-    Vec2f t_size = text_size(CSTR(text), ui->font);
+void ui_text(String text) {
+    Vec2f t_size = text_size(text, ui->font);
     ui_cursor_advance(t_size);
     ui_set_element_size(t_size);
     ui_draw_text(text, vec2f_make(ui->cursor.x, ui->cursor.y + t_size.y), ui->theme.text);

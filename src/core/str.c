@@ -1,9 +1,11 @@
 #include "core/str.h"
 #include "core/core.h"
-#include"core/type.h"
+#include "core/type.h"
+
 #include <ctype.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdarg.h>
 
 
 String str_substring(String str, s64 start, s64 end) {
@@ -272,6 +274,24 @@ s64 str_count_chars(String str, char c) {
 
 void *str_copy_to(String str, void *buffer) {
     return memcpy(buffer, str.data, str.length);
+}
+
+String str_format(String buffer, char *format, ...) {
+    va_list args;
+    va_start(args, format);
+
+    // vsnprintf returns the number of chars that *would* have been written
+    int written = vsnprintf(buffer.data, buffer.length, format, args);
+
+    va_end(args);
+
+    if (written < 0) {
+        return STR(0, NULL);
+    }
+
+    buffer.length = written;
+
+    return buffer;
 }
 
 

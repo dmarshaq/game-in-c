@@ -1,6 +1,8 @@
 #ifndef IMUI_H
 #define IMUI_H
 
+#include "core/str.h"
+
 #include "game/graphics.h"
 #include "game/event.h"
 
@@ -55,9 +57,9 @@ typedef struct ui_state {
 
 void ui_draw_rect(Vec2f position, Vec2f size, Vec4f color);
 
-void ui_draw_text(char *text, Vec2f position, Vec4f color);
+void ui_draw_text(String text, Vec2f position, Vec4f color);
 
-void ui_draw_text_centered(char *text, Vec2f position, Vec2f size, Vec4f color);
+void ui_draw_text_centered(String text, Vec2f position, Vec2f size, Vec4f color);
 
 
 void ui_init(UI_State *ui_state, Mouse_Input *mouse_input);
@@ -78,6 +80,8 @@ void ui_set_prefix(s32 id);
 
 void ui_activate_next();
 
+void ui_set_font(Font_Baked *font);
+
 #define UI_FRAME(width, height, code)\
     ui_frame_start(width, height);\
     code\
@@ -94,7 +98,7 @@ void ui_frame_end(float width, float height);
 
 
 #define UI_BUTTON(size, text) ui_button(size, text, __LINE__)
-bool ui_button(Vec2f size, char *text, s32 id);
+bool ui_button(Vec2f size, String text, s32 id);
 
 #define UI_SLIDER_INT(size, output, min, max) ui_slider_int(size, output, min, max, __LINE__)
 bool ui_slider_int(Vec2f size, s32 *output, s32 min, s32 max, s32 id);
@@ -103,6 +107,6 @@ bool ui_slider_int(Vec2f size, s32 *output, s32 min, s32 max, s32 id);
 bool ui_slider_float(Vec2f size, float *output, float min, float max, s32 id);
 
 
-void ui_text(char *text);
+void ui_text(String text);
 
 #endif

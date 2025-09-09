@@ -26,6 +26,7 @@ typedef struct state {
     Events_Info events;
     Time_Info t;
     Game_State game_state;
+    UI_State ui_state;
 
     Vars_Tree vars_tree;
 
@@ -35,6 +36,7 @@ typedef struct state {
     Font_Baked *font;
 
     Quad_Drawer quad_drawer;
+    Quad_Drawer ui_quad_drawer;
     Line_Drawer line_drawer;
 } State;
 
