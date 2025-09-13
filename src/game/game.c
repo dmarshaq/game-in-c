@@ -296,7 +296,7 @@ void game_update() {
 
             // Updating editor, if console is not active.
             if (!console_active()) {
-                if (editor_update(&state->window, &state->events, &state->t)) {
+                if (editor_update()) {
                     TODO("Editor exitting.");
                     // Editor is exitted.
                     // Rebuild the level.
@@ -306,7 +306,7 @@ void game_update() {
             }
 
             // Editor drawing.
-            editor_draw(&state->window);
+            editor_draw();
 
             break;
         case GAME_STATE_LEVEL:

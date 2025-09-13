@@ -14,12 +14,12 @@ void editor_init(State *state);
  * Following function updates editor logic, should be called every frame when editor is active.
  * Returns true if editor is exitted.
  */
-bool editor_update(Window_Info *window, Events_Info *events, Time_Info *t);
+bool editor_update();
 
 /**
  * Draws editor to the screen.
  */
-void editor_draw(Window_Info *window);
+void editor_draw();
 
 /**
  * Outputs all verticies into supplied verticies array.

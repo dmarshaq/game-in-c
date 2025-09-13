@@ -378,8 +378,13 @@ Matrix4f camera_calculate_projection(Camera *camera, float window_width, float w
     return matrix4f_orthographic(camera->center.x - camera_width_offset, camera->center.x + camera_width_offset, camera->center.y - camera_height_offset, camera->center.y + camera_height_offset, -1.0f, 1.0f);
 }
 
+Vec2f screen_to_camera(Vec2f screen_position, Camera *camera, float window_width, float window_height) {
+    return vec2f_sum(vec2f_divide_constant(vec2f_difference(screen_position, vec2f_make(window_width / 2.0f, window_height / 2.0f)), camera->unit_scale), camera->center);
+}
+
+
 /**
- * @Todo: When shader loading would be more deterministic, optimize glGetUniformLocation use.
+ * @Todo: When shader loading will be more deterministic, optimize glGetUniformLocation use.
  */
 void shader_update_projection(Shader *shader, Matrix4f *projection) {
     s32 quad_shader_pr_matrix_loc = glGetUniformLocation(shader->id, shader_uniform_pr_matrix_name);

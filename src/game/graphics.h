@@ -303,6 +303,12 @@ Matrix4f camera_calculate_projection(Camera *camera, float window_width, float w
 #define screen_calculate_projection(window_width, window_height) ((Matrix4f) { .array = { 2.0f / (float)(window_width), 0.0f, 0.0f, -1.0f,    0.0f, 2.0f / (float)(window_height), 0.0f, -1.0f,    0.0f, 0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f, 1.0f } })
 
 /**
+ * Transforms screen position to camera (world) position.
+ */
+Vec2f screen_to_camera(Vec2f screen_pos, Camera *camera, float window_width, float window_height);
+
+
+/**
  * Sets shader uniform projection matrix to the specified 4x4 matrix.
  */
 void shader_update_projection(Shader *shader, Matrix4f *projection);
