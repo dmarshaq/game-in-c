@@ -10,9 +10,30 @@
 
 
 
-
-
 typedef struct draw_quad_args_opt {
+    Vec4f           color;
+    Texture *       texture;
+    Vec2f           uv0;
+    Vec2f           uv1;
+    Texture *       mask;
+    Vertex_Buffer * buffer;
+} Draw_Quad_Opt_Args;
+
+#define draw_quad(p0, p2, p3, p1, ...)  draw_quad_opt(p0, p2, p3, p1, (Draw_Quad_Opt_Args) { .color = VEC4F_PINK, .texture = NULL, .uv0 = VEC2F_ORIGIN, .uv1 = VEC2F_UNIT, .mask = NULL, .buffer = NULL, __VA_ARGS__})
+
+/**
+ * Draws p0 being bottom left corner, p1 being top right corner.
+ */
+void draw_quad_opt(Vec2f p0, Vec2f p2, Vec2f p3, Vec2f p1, Draw_Quad_Opt_Args opt);
+
+
+
+
+
+
+
+
+typedef struct draw_rect_args_opt {
     Vec4f           color;
     Texture *       texture;
     Vec2f           uv0;
@@ -20,14 +41,14 @@ typedef struct draw_quad_args_opt {
     Texture *       mask;
     float           offset_angle;
     Vertex_Buffer * buffer;
-} Draw_Quad_Opt_Args;
+} Draw_Rect_Opt_Args;
 
-#define draw_quad(p0, p1, ...)  draw_quad_opt(p0, p1, (Draw_Quad_Opt_Args) { .color = VEC4F_PINK, .texture = NULL, .uv0 = VEC2F_ORIGIN, .uv1 = VEC2F_UNIT, .mask = NULL, .offset_angle = 0.0f, .buffer = NULL, __VA_ARGS__})
+#define draw_rect(p0, p1, ...)  draw_rect_opt(p0, p1, (Draw_Rect_Opt_Args) { .color = VEC4F_PINK, .texture = NULL, .uv0 = VEC2F_ORIGIN, .uv1 = VEC2F_UNIT, .mask = NULL, .offset_angle = 0.0f, .buffer = NULL, __VA_ARGS__})
 
 /**
  * Draws rectangular quad, p0 being bottom left corner, p1 being top right corner.
  */
-void draw_quad_opt(Vec2f p0, Vec2f p1, Draw_Quad_Opt_Args opt);
+void draw_rect_opt(Vec2f p0, Vec2f p1, Draw_Rect_Opt_Args opt);
 
 
 
@@ -68,9 +89,11 @@ float text_size_y(String text, Font_Baked *font);
 // Drawing lines / dots.
 void draw_line(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer);
 void draw_dot(Vec2f position, Vec4f color, Camera *camera, Vertex_Buffer *buffer);
+void draw_cross(Vec2f position, Vec4f color, Camera *camera, Vertex_Buffer *buffer);
 
 // Drawing frames.
-void draw_quad_outline(Vec2f p0, Vec2f p1, Vec4f color, float offset_angle, Vertex_Buffer *buffer);
+void draw_quad_outline(Vec2f p0, Vec2f p2, Vec2f p3, Vec2f p1, Vec4f color, Vertex_Buffer *buffer);
+void draw_rect_outline(Vec2f p0, Vec2f p1, Vec4f color, float offset_angle, Vertex_Buffer *buffer);
 void draw_circle_outline(Vec2f position, float radius, u32 detail, Vec4f color, Vertex_Buffer *buffer);
 
 // Drawing function.

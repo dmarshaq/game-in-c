@@ -29,6 +29,7 @@ void event_init_handler(Events_Info *events) {
         .right_hold = false,
         .right_pressed = false,
         .right_unpressed = false,
+        .scrolled_y = 0.0f,
     };
 
     events->text_input = (Text_Input) {
@@ -49,6 +50,7 @@ void event_handle(Events_Info *events, Window_Info *window, Time_Info *t) {
     events->mouse_input.left_unpressed = false;
     events->mouse_input.right_pressed = false;
     events->mouse_input.right_unpressed = false;
+    events->mouse_input.scrolled_y = 0.0f;
 
     events->text_input.text_inputted = false;
     events->text_input.buffer[0] = '\0';
@@ -85,6 +87,9 @@ void event_handle(Events_Info *events, Window_Info *window, Time_Info *t) {
                     events->mouse_input.right_unpressed = true;
                     events->mouse_input.right_hold = false;
                 }
+                break;
+            case SDL_MOUSEWHEEL:
+                events->mouse_input.scrolled_y = event.wheel.preciseY;
                 break;
             case SDL_TEXTINPUT:
                 memcpy(events->text_input.buffer, event.text.text, strlen(event.text.text));

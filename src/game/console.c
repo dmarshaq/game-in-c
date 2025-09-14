@@ -548,10 +548,10 @@ void console_draw(Window_Info *window) {
     draw_begin(drawer);
 
     // Output.
-    draw_quad(vec2f_make(c_x0, c_y0 + input_height), vec2f_make(c_x1, c_y0 + console_max_height(window)), .color = vec4f_make(0.10f, 0.12f, 0.24f, 0.98f));
+    draw_rect(vec2f_make(c_x0, c_y0 + input_height), vec2f_make(c_x1, c_y0 + console_max_height(window)), .color = vec4f_make(0.10f, 0.12f, 0.24f, 0.98f));
 
     // Input.
-    draw_quad(vec2f_make(c_x0, c_y0), vec2f_make(c_x1, c_y0 + input_height), .color = vec4f_make(0.18f, 0.18f, 0.35f, 0.98f));
+    draw_rect(vec2f_make(c_x0, c_y0), vec2f_make(c_x1, c_y0 + input_height), .color = vec4f_make(0.18f, 0.18f, 0.35f, 0.98f));
     
     // Draw text of the history.
     Vec2f history_draw_origin = vec2f_make(c_x0 + console.text_pad, c_y0 + input_height);
@@ -595,7 +595,7 @@ void console_draw(Window_Info *window) {
             width = 2;
         }
 
-        draw_quad(vec2f_make(c_x0 + console.text_pad + input_cursor_index * input_block_width, c_y0 + font_input.line_gap), vec2f_make(c_x0 + console.text_pad + input_cursor_index * input_block_width + width, c_y0 + input_height - input_font_top_pad * 0.5f), .color = color);
+        draw_rect(vec2f_make(c_x0 + console.text_pad + input_cursor_index * input_block_width, c_y0 + font_input.line_gap), vec2f_make(c_x0 + console.text_pad + input_cursor_index * input_block_width + width, c_y0 + input_height - input_font_top_pad * 0.5f), .color = color);
     }
 
 

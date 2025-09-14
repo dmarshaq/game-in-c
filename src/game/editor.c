@@ -17,9 +17,20 @@
 
 
 
+typedef enum editor_quad_flags : u8 {
+    EDITOR_QUAD_FLAG_P0_SELECTED = 0x01, // 00000001
+    EDITOR_QUAD_FLAG_P2_SELECTED = 0x02, // 00000010
+    EDITOR_QUAD_FLAG_P3_SELECTED = 0x04, // 00000100
+    EDITOR_QUAD_FLAG_P1_SELECTED = 0x08, // 00001000
+} Editor_Quad_Flags;
+
+static const u8 EDITOR_QUAD_BITMASK_ANY_POINT_SELECTED = EDITOR_QUAD_FLAG_P0_SELECTED | EDITOR_QUAD_FLAG_P1_SELECTED | EDITOR_QUAD_FLAG_P2_SELECTED | EDITOR_QUAD_FLAG_P3_SELECTED;
+
+
 
 typedef struct editor_quad {
-    Vec2f verticies[VERTICIES_PER_QUAD];
+    Editor_Quad_Flags flags;
+    Quad quad;
     Vec4f color;
 } Editor_Quad;
 
@@ -27,40 +38,47 @@ typedef struct editor_quad {
 
 void draw_editor_quad(Editor_Quad *quad) {
 
-    float quad_data[44] = {
-        quad->verticies[0].x, quad->verticies[0].y, 0.0f, quad->color.x, quad->color.y, quad->color.z, quad->color.w * 0.8f, 0.0f, 0.0f, -1.0f, -1.0f,
-        quad->verticies[1].x, quad->verticies[1].y, 0.0f, quad->color.x, quad->color.y, quad->color.z, quad->color.w * 0.8f, 1.0f, 0.0f, -1.0f, -1.0f,
-        quad->verticies[2].x, quad->verticies[2].y, 0.0f, quad->color.x, quad->color.y, quad->color.z, quad->color.w * 0.8f, 0.0f, 1.0f, -1.0f, -1.0f,
-        quad->verticies[3].x, quad->verticies[3].y, 0.0f, quad->color.x, quad->color.y, quad->color.z, quad->color.w * 0.8f, 1.0f, 1.0f, -1.0f, -1.0f,
-    };
+    // float quad_data[44] = {
+    //     quad->quad.verts[0].x, quad->quad.verts[0].y, 0.0f, quad->color.x, quad->color.y, quad->color.z, quad->color.w * 0.8f, 0.0f, 0.0f, -1.0f, -1.0f,
+    //     quad->quad.verts[1].x, quad->quad.verts[1].y, 0.0f, quad->color.x, quad->color.y, quad->color.z, quad->color.w * 0.8f, 1.0f, 0.0f, -1.0f, -1.0f,
+    //     quad->quad.verts[2].x, quad->quad.verts[2].y, 0.0f, quad->color.x, quad->color.y, quad->color.z, quad->color.w * 0.8f, 0.0f, 1.0f, -1.0f, -1.0f,
+    //     quad->quad.verts[3].x, quad->quad.verts[3].y, 0.0f, quad->color.x, quad->color.y, quad->color.z, quad->color.w * 0.8f, 1.0f, 1.0f, -1.0f, -1.0f,
+    // };
 
-    draw_quad_data(quad_data, 1);
+    // draw_quad_data(quad_data, 1);
 }
 
 
 void draw_editor_quad_outline(Editor_Quad *quad) {
 
-    float line_data[56] = {
-        quad->verticies[0].x, quad->verticies[0].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
-        quad->verticies[1].x, quad->verticies[1].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
-        quad->verticies[1].x, quad->verticies[1].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
-        quad->verticies[3].x, quad->verticies[3].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
-        quad->verticies[3].x, quad->verticies[3].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
-        quad->verticies[2].x, quad->verticies[2].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
-        quad->verticies[2].x, quad->verticies[2].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
-        quad->verticies[0].x, quad->verticies[0].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
-    };
+    // float line_data[56] = {
+    //     quad->quad.verts[0].x, quad->quad.verts[0].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
+    //     quad->quad.verts[1].x, quad->quad.verts[1].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
+    //     quad->quad.verts[1].x, quad->quad.verts[1].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
+    //     quad->quad.verts[3].x, quad->quad.verts[3].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
+    //     quad->quad.verts[3].x, quad->quad.verts[3].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
+    //     quad->quad.verts[2].x, quad->quad.verts[2].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
+    //     quad->quad.verts[2].x, quad->quad.verts[2].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
+    //     quad->quad.verts[0].x, quad->quad.verts[0].y, 0.0f, 0.95f, 0.95f, 0.95f, 1.0f,
+    // };
 
-    draw_line_data(line_data, 4);
+    // draw_line_data(line_data, 4);
 }
 
 
 @Introspect;
 typedef struct editor_params {
     float selection_radius;
+    float camera_speed;
+    float camera_move_lerp_t;
+    float camera_zoom_min;
+    float camera_zoom_max;
+    float camera_zoom_speed;
+    float camera_zoom_lerp_t;
 } Editor_Params;
 
 static Editor_Params editor_params;
+
 
 
 
@@ -70,25 +88,29 @@ static Editor_Quad *quads_list;
 
 
 static Vec2f world_mouse_position;
+static Vec2f world_mouse_position_change;
 
 typedef enum editor_selected_type : u8 {
     EDITOR_NONE,
-    EDITOR_VERTEX,
     EDITOR_QUAD,
 } Editor_Selected_Type;
+
+
 
 typedef struct editor_selected {
     Editor_Selected_Type type;
 
     union {
-        Vec2f *vertex;
         Editor_Quad *quad;
-    }
+    };
 } Editor_Selected;
 
-// @Temporary: Later it is going to an array of selected things in editor.
-static Editor_Selected editor_selected;
 
+static Editor_Selected *editor_selected;
+
+static Vec2f editor_camera_current_vel;
+static float editor_camera_current_zoom;
+static float editor_camera_current_zoom_vel;
 
 
 
@@ -125,10 +147,23 @@ static Time_Info   *time_ptr;
 
 void editor_init(State *state) {
     // Tweak vars default values.
-    editor_params.selection_radius = 0.1f;
+    editor_params.selection_radius      = 0.1f;
+    editor_params.camera_speed          = 1.0f;
+    editor_params.camera_move_lerp_t    = 0.8f;
+    editor_params.camera_zoom_min       = 1.0f;
+    editor_params.camera_zoom_max       = 1.0f;
+    editor_params.camera_zoom_speed     = 1.0f;
+    editor_params.camera_zoom_lerp_t    = 0.8f;
     
     vars_tree_add(TYPE_OF(editor_params), (u8 *)&editor_params, CSTR("editor_params"));
 
+
+    // Setting non tweak vars.
+    editor_camera_current_vel = VEC2F_ORIGIN;
+    editor_camera_current_zoom = 0.0f;
+    editor_camera_current_zoom_vel = 0.0f;
+    world_mouse_position = VEC2F_ORIGIN;
+    world_mouse_position_change = VEC2F_ORIGIN;
 
     // Setting pointers to global state.
     quad_drawer_ptr    = &state->quad_drawer;
@@ -140,8 +175,8 @@ void editor_init(State *state) {
 
 
 
-
     quads_list = array_list_make(Editor_Quad, 8, &std_allocator);
+    editor_selected = array_list_make(Editor_Selected, 8, &std_allocator);
 
     
     // @Copypasta: From console.c ... 
@@ -150,7 +185,7 @@ void editor_init(State *state) {
     // Load needed font... Hard coded...
     u8* font_data = read_file_into_buffer("res/font/Consolas-Regular.ttf", NULL, &std_allocator);
 
-    font_small  = font_bake(font_data, 14.0f);;
+    font_small  = font_bake(font_data, 14.0f);
     font_medium = font_bake(font_data, 20.0f);
 
     free(font_data);
@@ -167,47 +202,165 @@ void editor_init(State *state) {
     info_buffer.length = 256;
 }
 
+
+
+
+
+
+
+void editor_update_camera() {
+
+    // Position control.
+    Vec2f vel = VEC2F_ORIGIN;
+
+    if (hold(SDLK_d)) {
+        vel.x += 1.0f;
+    } 
+    if (hold(SDLK_a)) {
+        vel.x -= 1.0f;
+    }
+    if (hold(SDLK_w)) {
+        vel.y += 1.0f;
+    }
+    if (hold(SDLK_s)) {
+        vel.y -= 1.0f;
+    }
+    
+    if (!(fequal(vel.x, 0.0f) && fequal(vel.y, 0.0f))) {
+        vel = vec2f_normalize(vel);
+        vel = vec2f_multi_constant(vel, editor_params.camera_speed);
+    }
+
+    editor_camera_current_vel = vec2f_lerp(editor_camera_current_vel, vel, editor_params.camera_move_lerp_t);
+
+    editor_camera.center = vec2f_sum(editor_camera.center, vec2f_multi_constant(editor_camera_current_vel, time_ptr->delta_time));
+
+
+
+    // Zoom control.
+    editor_camera_current_zoom_vel = lerp(editor_camera_current_zoom_vel, mouse_input_ptr->scrolled_y * editor_params.camera_zoom_speed, editor_params.camera_zoom_lerp_t);
+
+    editor_camera_current_zoom += editor_camera_current_zoom_vel * time_ptr->delta_time;
+
+    editor_camera_current_zoom = clamp(editor_camera_current_zoom, 0.0f, 1.0f);
+
+    editor_camera.unit_scale = lerp(editor_params.camera_zoom_min, editor_params.camera_zoom_max, editor_camera_current_zoom);
+
+
+
+
+}
+
+
+
+
+
 bool editor_update() {
+    
+    editor_update_camera();
+
+
+
+
+
+    world_mouse_position_change = world_mouse_position;
     world_mouse_position = screen_to_camera(mouse_input_ptr->position, &editor_camera, window_ptr->width, window_ptr->height);
+    world_mouse_position_change = vec2f_difference(world_mouse_position, world_mouse_position_change);
 
+    Vec2f mouse_left_click_origin = VEC2F_ORIGIN;
+    
     if (mouse_input_ptr->left_pressed) {
-        console_log("Editor: Select at (%2.2f, %2.2f)\n", world_mouse_position.x, world_mouse_position.y);
+        mouse_left_click_origin = world_mouse_position;
 
-        // @Temporary: In the future loop over the verticies that are inside camera view boundaries.
+        // Basically if left shift is not holding user doesn't want to save what was previously selected.
+        if (!hold(SDLK_LSHIFT)) {
+            // Clear selected flags.
+            for (u32 i = 0; i < array_list_length(&editor_selected); i++) {
+                switch (editor_selected[i].type) {
+                    case EDITOR_QUAD:
+                        editor_selected[i].quad->flags &= ~(EDITOR_QUAD_BITMASK_ANY_POINT_SELECTED);
+                        break;
+                }
+            }
+            array_list_clear(&editor_selected);
+        }
+
+
         for (u32 i = 0; i < array_list_length(&quads_list); i++) {
+            // Selecting closes vertex if any.
             for (u32 j = 0; j < VERTICIES_PER_QUAD; j++) {
+                if (vec2f_distance(quads_list[i].quad.verts[j], world_mouse_position) < editor_params.selection_radius) {
+                    // If a quad with vertex that user selected is not selected, it gets selected. Yeah goodluck reading this comment in the future.
+                    if (!(quads_list[i].flags & EDITOR_QUAD_BITMASK_ANY_POINT_SELECTED)) {
+                        // quads_list[i].flags |= EDITOR_QUAD_BITMASK_ANY_POINT_SELECTED;
+                        array_list_append(&editor_selected, ((Editor_Selected) {
+                                    .type = EDITOR_QUAD,
+                                    .quad = &quads_list[i],
+                                    }));
+                    }
 
-                // Selecting vertex.
-                if (vec2f_distance(quads_list[i].verticies[j], world_mouse_position) < editor_params.selection_radius) {
-                    editor_selected = (Editor_Selected) {
-                        .type = EDITOR_VERTEX,
-                        .vertex = &quads_list[i].verticies[j],
-                    };
+                
+                    // Selected vertex flags are in the order p0 -> p2 -> p3 -> p1
+                    // Same order as verticies in quad.
+                    // So this will select needed vertex.
+                    quads_list[i].flags |= 1 << j;
                     
-                    goto editor_left_mouse_press_end;
+
+                    goto editor_left_mouse_select_end;
                 }
             }
         }
-        // If nothing was selected on mouse click. Select nothing.
-        editor_selected.type = EDITOR_NONE;
 
-editor_left_mouse_press_end:
+        AABB approximation_aabb;
+        // @Temporary: In the future loop over the verticies that are inside camera view boundaries.
+        for (u32 i = 0; i < array_list_length(&quads_list); i++) {
+            // Selecting quad if it's center is touched.
+            if (vec2f_distance(quad_center(&quads_list[i].quad), world_mouse_position) < editor_params.selection_radius) {
+                // @Redundant?
+                // Quad is selected, add it only if it is not already selected.
+                if (!(quads_list[i].flags & EDITOR_QUAD_BITMASK_ANY_POINT_SELECTED)) {
+                    quads_list[i].flags |= EDITOR_QUAD_BITMASK_ANY_POINT_SELECTED;
+                    array_list_append(&editor_selected, ((Editor_Selected) {
+                                .type = EDITOR_QUAD,
+                                .quad = &quads_list[i],
+                                }));
+                }
+
+                goto editor_left_mouse_select_end;
+                break;
+            }
+        }
+
+editor_left_mouse_select_end:
     }
+
+
 
     // @Clean: Remove edito_selected.type != EDITOR_NONE?
-    if (mouse_input_ptr->left_hold && editor_selected.type != EDITOR_NONE) {
-        switch (editor_selected.type) {
-            case EDITOR_VERTEX:
-                *editor_selected.vertex = world_mouse_position;
-                break;
-            default:
-                console_error("Editor: Unsupported selected type.\n");
-                break;
-        }
-    }
-    
+    if (mouse_input_ptr->left_hold) {
+        // One selected element.
+        if (array_list_length(&editor_selected) > 0) {
+            Vec2f selected_move_offset = vec2f_difference(world_mouse_position, mouse_left_click_origin);
 
-    
+            // For all selected elements.
+            for (u32 i = 0; i < array_list_length(&editor_selected); i++) {
+                switch(editor_selected[i].type) {
+                    case EDITOR_QUAD:
+                        for (u32 j = 0; j < VERTICIES_PER_QUAD; j++) {
+                            if (editor_selected[i].quad->flags & (1 << j)) {
+                                editor_selected[i].quad->quad.verts[j].x += world_mouse_position_change.x;
+                                editor_selected[i].quad->quad.verts[j].y += world_mouse_position_change.y;
+                            }
+                        }
+                        break;
+                }
+            }
+            mouse_left_click_origin;
+        } else {
+
+        }
+
+    }
     
 
     
@@ -229,7 +382,15 @@ void editor_draw() {
 
     // Draw editor quads.
     for (u32 i = 0; i < array_list_length(&quads_list); i++) {
-        draw_editor_quad(quads_list + i);
+        draw_quad(quads_list[i].quad.verts[0], quads_list[i].quad.verts[1], quads_list[i].quad.verts[2], quads_list[i].quad.verts[3], .color = quads_list[i].color);
+
+        for (u32 j = 0; j < VERTICIES_PER_QUAD; j++) {
+            if (quads_list[i].flags & (1 << j)) {
+                draw_dot(quads_list[i].quad.verts[j], VEC4F_RED, &editor_camera, NULL);
+            } else {
+                draw_dot(quads_list[i].quad.verts[j], VEC4F_CYAN, &editor_camera, NULL);
+            }
+        }
     }
 
     draw_end();
@@ -242,7 +403,14 @@ void editor_draw() {
 
     // Draw editor quads.
     for (u32 i = 0; i < array_list_length(&quads_list); i++) {
-        draw_editor_quad_outline(quads_list + i);
+        
+        if (quads_list[i].flags & EDITOR_QUAD_BITMASK_ANY_POINT_SELECTED) {
+            draw_quad_outline(quads_list[i].quad.verts[0], quads_list[i].quad.verts[1], quads_list[i].quad.verts[2], quads_list[i].quad.verts[3], VEC4F_RED, NULL);
+            draw_cross(quad_center(&quads_list[i].quad), VEC4F_RED, &editor_camera, NULL);
+        } else {
+            draw_quad_outline(quads_list[i].quad.verts[0], quads_list[i].quad.verts[1], quads_list[i].quad.verts[2], quads_list[i].quad.verts[3], VEC4F_WHITE, NULL);
+            draw_cross(quad_center(&quads_list[i].quad), VEC4F_WHITE, &editor_camera, NULL);
+        }
     }
 
     line_draw_end();
@@ -267,8 +435,8 @@ void editor_draw() {
                     "Window size: %dx%d\n"
                     "Vert count: %u\n"
                     "World mouse position: (%2.2f, %2.2f)\n"
-                    "Selection radius: %2.2f\n"
-                    , window_ptr->width, window_ptr->height, array_list_length(&quads_list) * 4, world_mouse_position.x, world_mouse_position.y, editor_params.selection_radius)
+                    "Camera unit scale: %d\n"
+                    , window_ptr->width, window_ptr->height, array_list_length(&quads_list) * 4, world_mouse_position.x, world_mouse_position.y, editor_camera.unit_scale)
             );
     );
 
@@ -281,7 +449,8 @@ void editor_get_verticies(Vec2f **verticies, s64 *verticies_count) {
 
 void editor_add_quad() {
     array_list_append(&quads_list, ((Editor_Quad) {
-                .verticies = { { -1.0f, -1.0f }, { 1.0f, -1.0f, }, { -1.0f, 1.0f }, { 1.0f, 1.0f } },
+                .flags = 0,
+                .quad = ((Quad) {{ { -1.0f, -1.0f }, { 1.0f, -1.0f, }, { -1.0f, 1.0f }, { 1.0f, 1.0f } }}),
                 .color = { randf() * 0.6f + 0.2f, randf() * 0.6f + 0.2f, randf() * 0.6f + 0.2f, 1.0f },
                 }));
 }

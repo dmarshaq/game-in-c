@@ -365,7 +365,7 @@ void shader_unload(Shader *shader) {
 }
 
 
-Camera camera_make(Vec2f center, u32 unit_scale) {
+Camera camera_make(Vec2f center, s32 unit_scale) {
     return (Camera) {
         .center = center,
         .unit_scale = unit_scale,

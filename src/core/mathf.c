@@ -117,3 +117,31 @@ AABB obb_enclose_in_aabb(OBB *box) {
     
     return result;
 }
+
+
+AABB quad_enclose_in_aabb(Quad *quad) {
+    AABB result = aabb_make(quad->verts[0], quad->verts[3]);
+
+    for (u32 i = 0; i < 4; i++) {
+        if (result.p0.x > quad->verts[i].x)
+            result.p0.x = quad->verts[i].x;
+        
+        if (result.p0.y > quad->verts[i].y)
+            result.p0.y = quad->verts[i].y;
+
+        if (result.p1.x < quad->verts[i].x)
+            result.p1.x = quad->verts[i].x;
+        
+        if (result.p1.y < quad->verts[i].y)
+            result.p1.y = quad->verts[i].y;
+    }
+    
+    return result;
+}
+
+
+
+
+
+
+

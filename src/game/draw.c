@@ -6,9 +6,34 @@
 #include "core/mathf.h"
 
 
-static const float DOT_SCALE = 0.005f;
+static const float DOT_SCALE = 6.0f;
+static const float CROSS_SCALE = 8.0f;
 
-void draw_quad_opt(Vec2f p0, Vec2f p1, Draw_Quad_Opt_Args opt) {
+
+void draw_quad_opt(Vec2f p0, Vec2f p2, Vec2f p3, Vec2f p1, Draw_Quad_Opt_Args opt) {
+    float texture_slot = -1.0f; // @Important: -1.0f slot signifies shader to use color, not texture.
+    float mask_slot = -1.0f;
+
+    if (opt.texture != NULL)
+        texture_slot = add_texture_to_slots(opt.texture);              
+
+    if (opt.mask != NULL)
+        mask_slot = add_texture_to_slots(opt.mask);              
+    
+    float quad_data[44] = {
+        p0.x, p0.y, 0.0f, opt.color.x, opt.color.y, opt.color.z, opt.color.w, opt.uv0.x, opt.uv0.y, texture_slot, mask_slot,
+        p2.x, p2.y, 0.0f, opt.color.x, opt.color.y, opt.color.z, opt.color.w, opt.uv1.x, opt.uv0.y, texture_slot, mask_slot,
+        p3.x, p3.y, 0.0f, opt.color.x, opt.color.y, opt.color.z, opt.color.w, opt.uv0.x, opt.uv1.y, texture_slot, mask_slot,
+        p1.x, p1.y, 0.0f, opt.color.x, opt.color.y, opt.color.z, opt.color.w, opt.uv1.x, opt.uv1.y, texture_slot, mask_slot,
+    };
+    
+    if (opt.buffer == NULL)
+        draw_quad_data(quad_data, 1);
+    else
+        vertex_buffer_append_data(opt.buffer, quad_data, VERTICIES_PER_QUAD * 11);
+}
+
+void draw_rect_opt(Vec2f p0, Vec2f p1, Draw_Rect_Opt_Args opt) {
     float texture_slot = -1.0f; // @Important: -1.0f slot signifies shader to use color, not texture.
     float mask_slot = -1.0f;
 
@@ -68,7 +93,7 @@ void draw_text_opt(String text, Vec2f current_point, Font_Baked *font, Draw_Text
 
             // Behold! The most unreadable piece of inlined shit...
             // But it gets the job done...
-            draw_quad(
+            draw_rect(
                     vec2f_divide_constant(vec2f_make(current_point.x + c->xoff, current_point.y - c->yoff - height), (float)opt.unit_scale), 
                     vec2f_divide_constant(vec2f_make(current_point.x + c->xoff + width, current_point.y - c->yoff), (float)opt.unit_scale), 
                     .color = opt.color, 
@@ -162,10 +187,45 @@ void draw_line(Vec2f p0, Vec2f p1, Vec4f color, Vertex_Buffer *buffer) {
 
 
 void draw_dot(Vec2f position, Vec4f color, Camera *camera, Vertex_Buffer *buffer) {
-    draw_quad(vec2f_make(position.x - (float)camera->unit_scale * DOT_SCALE, position.y), vec2f_make(position.x + (float)camera->unit_scale * DOT_SCALE, position.y), .color = color, .offset_angle = PI/4, .buffer = buffer);
+    draw_rect(vec2f_make(position.x - DOT_SCALE / (float)camera->unit_scale, position.y), vec2f_make(position.x + DOT_SCALE / (float)camera->unit_scale, position.y), .color = color, .offset_angle = PI/4, .buffer = buffer);
 }
 
-void draw_quad_outline(Vec2f p0, Vec2f p1, Vec4f color, float offset_angle, Vertex_Buffer *buffer) {
+
+void draw_cross(Vec2f position, Vec4f color, Camera *camera, Vertex_Buffer *buffer) {
+    float radius = CROSS_SCALE / (float)camera->unit_scale;
+    float line_data[28] = {
+        position.x - radius, position.y - radius, 0.0f, color.x, color.y, color.z, color.w,
+        position.x + radius, position.y + radius, 0.0f, color.x, color.y, color.z, color.w,
+        position.x + radius, position.y - radius, 0.0f, color.x, color.y, color.z, color.w,
+        position.x - radius, position.y + radius, 0.0f, color.x, color.y, color.z, color.w,
+    };
+
+    if (buffer == NULL)
+        draw_line_data(line_data, 2);
+    else
+        vertex_buffer_append_data(buffer, line_data, VERTICIES_PER_LINE * 2 * 7);
+}
+
+
+void draw_quad_outline(Vec2f p0, Vec2f p2, Vec2f p3, Vec2f p1, Vec4f color, Vertex_Buffer *buffer) {
+    float line_data[56] = {
+        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w,
+        p2.x, p2.y, 0.0f, color.x, color.y, color.z, color.w,
+        p2.x, p2.y, 0.0f, color.x, color.y, color.z, color.w,
+        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w,
+        p1.x, p1.y, 0.0f, color.x, color.y, color.z, color.w,
+        p3.x, p3.y, 0.0f, color.x, color.y, color.z, color.w,
+        p3.x, p3.y, 0.0f, color.x, color.y, color.z, color.w,
+        p0.x, p0.y, 0.0f, color.x, color.y, color.z, color.w,
+    };
+
+    if (buffer == NULL)
+        draw_line_data(line_data, 4);
+    else
+        vertex_buffer_append_data(buffer, line_data, 4 * VERTICIES_PER_LINE * 7);
+}
+
+void draw_rect_outline(Vec2f p0, Vec2f p1, Vec4f color, float offset_angle, Vertex_Buffer *buffer) {
     
     Vec2f k = vec2f_make(cosf(offset_angle), sinf(offset_angle));
     k = vec2f_multi_constant(k, vec2f_dot(k, vec2f_difference(p1, p0)));
@@ -313,7 +373,7 @@ void draw_parametric(float t0, float t1, Function x, Function y, u32 detail, Vec
 void draw_area_function(float x0, float x1, Function y, u32 rect_count, Vec4f color, Vertex_Buffer *buffer) {
     float step = (x1 - x0) / (float)rect_count;
     for (u32 i = 0; i < rect_count; i++) {
-        draw_quad(vec2f_make(x0 + step * i, 0.0f), vec2f_make(x0 + step * (i + 1), y(x0 + step * (i + 1))), .color = color, .buffer = buffer);
+        draw_rect(vec2f_make(x0 + step * i, 0.0f), vec2f_make(x0 + step * (i + 1), y(x0 + step * (i + 1))), .color = color, .buffer = buffer);
     }
 }
 
@@ -384,7 +444,7 @@ void draw_area_polar(float t0, float t1, Function r, u32 rect_count, Vec4f color
 void draw_area_parametric(float t0, float t1, Function x, Function y, u32 rect_count, Vec4f color, Vertex_Buffer *buffer) {
     float step = (t1 - t0) / (float)rect_count;
     for (u32 i = 0; i < rect_count; i++) {
-        draw_quad(vec2f_make(x(t0 + step * i), 0.0f), vec2f_make(x(t0 + step * (i + 1)), y(t0 + step * (i + 1))), .color = color, .buffer = buffer);
+        draw_rect(vec2f_make(x(t0 + step * i), 0.0f), vec2f_make(x(t0 + step * (i + 1)), y(t0 + step * (i + 1))), .color = color, .buffer = buffer);
     }
 }
 
@@ -395,7 +455,7 @@ void draw_viewport(u32 x, u32 y, u32 width, u32 height, Vec4f color, Camera *cam
     Vec2f p1 = vec2f_make((float)width / 2 / (float)camera->unit_scale, (float)height / 2 / (float)camera->unit_scale);
     Vec2f p0 = vec2f_negate(p1);
     
-    draw_quad(p0, p1, .color = color, .uv0 = p0, .uv1 = p1, .buffer = buffer);
+    draw_rect(p0, p1, .color = color, .uv0 = p0, .uv1 = p1, .buffer = buffer);
 
 }
 

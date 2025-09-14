@@ -290,10 +290,10 @@ void print_indicies();
 
 typedef struct camera {
     Vec2f   center;         // World center.
-    u32     unit_scale;     // Pixels per 1 world unit.
+    s32     unit_scale;     // Pixels per 1 world unit.
 } Camera;
 
-Camera camera_make(Vec2f center, u32 unit_scale);
+Camera camera_make(Vec2f center, s32 unit_scale);
 
 /**
  * Calculate 4x4 projection matrix that can be used by shaders to correctly transform then draw elements to the screen.

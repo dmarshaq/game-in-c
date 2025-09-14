@@ -7,6 +7,7 @@
 
 #include "core/type.h"
 #include <math.h>
+#include <stdbool.h>
 #include <float.h>
 
 #define PI 3.14159265358979323846f
@@ -285,7 +286,7 @@ typedef float (*Function)(float);
  *
  */
 
-
+// Rework AABB to work with static inline functions, not macros.
 typedef struct axis_aligned_bounding_box {
     Vec2f p0;
     Vec2f p1;
@@ -297,7 +298,12 @@ typedef struct axis_aligned_bounding_box {
 
 void aabb_move(AABB *box, Vec2f move);
 
+static inline bool aabb_touches_point(AABB *box, Vec2f point) {
+    return value_inside_domain(box->p0.x, box->p1.x, point.x) && value_inside_domain(box->p0.y, box->p1.y, point.y);
+}
 
+
+// Rework obb with static inline functions, NOT macros.
 typedef struct oriented_bounding_box {
     Vec2f center;
     Vec2f dimensions;
@@ -320,6 +326,31 @@ typedef struct oriented_bounding_box {
  * Returns AABB that covers or/and encloses specified OBB box.
  */
 AABB obb_enclose_in_aabb(OBB *box);
+
+
+
+
+
+typedef struct quad {
+    Vec2f verts[4];
+} Quad;
+
+static inline Quad quad_make(Vec2f p0, Vec2f p1, Vec2f p2, Vec2f p3) {
+    return (Quad){ p0, p2, p3, p1 };
+}
+
+static inline Vec2f quad_center(Quad *quad) {
+    return vec2f_make((quad->verts[0].x + quad->verts[1].x + quad->verts[2].x + quad->verts[3].x) / 4, (quad->verts[0].y + quad->verts[1].y + quad->verts[2].y + quad->verts[3].y) / 4);
+}
+
+AABB quad_enclose_in_aabb(Quad *quad);
+
+
+
+
+
+
+
 
 
 typedef struct circle {

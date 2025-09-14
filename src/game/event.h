@@ -8,6 +8,8 @@
 
 #include <stdbool.h>
 
+
+// @Perfomance: Optimize these bools into flags?
 typedef struct mouse_input {
     Vec2f position;
     bool left_hold;
@@ -16,6 +18,7 @@ typedef struct mouse_input {
     bool right_hold;
     bool right_pressed;
     bool right_unpressed;
+    float scrolled_y;
 } Mouse_Input;
 
 typedef struct text_input {
