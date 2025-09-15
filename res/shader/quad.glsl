@@ -54,6 +54,8 @@ void main() {
     if (mask_index != -1) {
         color.w = texture(u_textures[mask_index], v_uv0).x * color.w;
     }
+
+
 }
 
 #endif

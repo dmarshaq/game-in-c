@@ -90,6 +90,24 @@ static Editor_Quad *quads_list;
 static Vec2f world_mouse_position;
 static Vec2f world_mouse_position_change;
 
+
+Vec2f editor_mouse_snap_to_grid(Vec2f mouse_position) {
+    int x = (int)mouse_position.x;
+    int y = (int)mouse_position.y;
+
+    if (mouse_position.x > x + 0.5f) {
+        mouse_position.x += 1.0f;
+    }
+
+    if (mouse_position.y > y + 0.5f) {
+        mouse_position.y += 1.0f;
+    }
+
+    return vec2f_make((int)mouse_position.x, (int)mouse_position.y);
+}
+
+
+
 typedef enum editor_selected_type : u8 {
     EDITOR_NONE,
     EDITOR_QUAD,
@@ -138,11 +156,13 @@ static String info_buffer;
 
 // Pointers to global state.
 static Quad_Drawer *quad_drawer_ptr;
+static Quad_Drawer *grid_drawer_ptr;
 static Quad_Drawer *ui_quad_drawer_ptr;
 static Line_Drawer *line_drawer_ptr;
 static Window_Info *window_ptr;
 static Mouse_Input *mouse_input_ptr;
 static Time_Info   *time_ptr;
+static Shader      **shader_table_ptr;
 
 
 void editor_init(State *state) {
@@ -167,11 +187,13 @@ void editor_init(State *state) {
 
     // Setting pointers to global state.
     quad_drawer_ptr    = &state->quad_drawer;
+    grid_drawer_ptr    = &state->grid_drawer;
     ui_quad_drawer_ptr = &state->ui_quad_drawer;
     line_drawer_ptr    = &state->line_drawer;
     window_ptr         = &state->window;
     mouse_input_ptr    = &state->events.mouse_input;
     time_ptr           = &state->t;
+    shader_table_ptr   = &state->shader_table;
 
 
 
@@ -259,9 +281,8 @@ bool editor_update() {
     
     editor_update_camera();
 
-
-
-
+    
+    Vec2f world_mouse_snapped_position = editor_mouse_snap_to_grid(world_mouse_position);
 
     world_mouse_position_change = world_mouse_position;
     world_mouse_position = screen_to_camera(mouse_input_ptr->position, &editor_camera, window_ptr->width, window_ptr->height);
@@ -311,7 +332,6 @@ bool editor_update() {
             }
         }
 
-        AABB approximation_aabb;
         // @Temporary: In the future loop over the verticies that are inside camera view boundaries.
         for (u32 i = 0; i < array_list_length(&quads_list); i++) {
             // Selecting quad if it's center is touched.
@@ -374,6 +394,26 @@ void editor_draw() {
     projection = camera_calculate_projection(&editor_camera, window_ptr->width, window_ptr->height);
     
     
+    // Draw grid, with grid shader.
+    shader_update_projection(grid_drawer_ptr->program, &projection);
+
+    draw_begin(grid_drawer_ptr);
+
+    Vec2f editor_camera_p0 = vec2f_make(editor_camera.center.x - window_ptr->width * 0.5f / editor_camera.unit_scale, editor_camera.center.y - window_ptr->height * 0.5f / editor_camera.unit_scale);
+    Vec2f editor_camera_p1 = vec2f_make(editor_camera.center.x + window_ptr->width * 0.5f / editor_camera.unit_scale, editor_camera.center.y + window_ptr->height * 0.5f / editor_camera.unit_scale);
+
+    float grid_quad[36] = {
+        -1.0f, -1.0f, editor_camera.unit_scale, 0.2f, 0.2f, 0.2f, 1.0f, editor_camera_p0.x, editor_camera_p0.y,
+         1.0f, -1.0f, editor_camera.unit_scale, 0.2f, 0.2f, 0.2f, 1.0f, editor_camera_p1.x, editor_camera_p0.y,
+        -1.0f,  1.0f, editor_camera.unit_scale, 0.2f, 0.2f, 0.2f, 1.0f, editor_camera_p0.x, editor_camera_p1.y,
+         1.0f,  1.0f, editor_camera.unit_scale, 0.2f, 0.2f, 0.2f, 1.0f, editor_camera_p1.x, editor_camera_p1.y,
+    };
+
+    draw_quad_data(grid_quad, 1);
+
+    draw_end();
+
+
 
     // Drawing quads.
     shader_update_projection(quad_drawer_ptr->program, &projection);
@@ -394,6 +434,9 @@ void editor_draw() {
     }
 
     draw_end();
+
+
+
 
 
     // Drawing quad outlines.

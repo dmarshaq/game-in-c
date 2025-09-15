@@ -36,6 +36,7 @@ typedef struct state {
     Font_Baked *font;
 
     Quad_Drawer quad_drawer;
+    Quad_Drawer grid_drawer;
     Quad_Drawer ui_quad_drawer;
     Line_Drawer line_drawer;
 } State;

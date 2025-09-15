@@ -304,7 +304,10 @@ Shader shader_load(char *shader_path) {
     glCompileShader(vertex_shader);
     
     // Check results for errors.
-    (void)check_shader(vertex_shader, shader_path);
+    if (!check_shader(vertex_shader, shader_path)) {
+        allocator_free(&std_allocator, shader_source.data);
+        return (Shader) {0};
+    }
 
     shader_strings_lengths[1] = fragment_shader_defines.length;
     u32 fragment_shader;
@@ -313,7 +316,10 @@ Shader shader_load(char *shader_path) {
     glCompileShader(fragment_shader);
     
     // Check results for errors.
-    (void)check_shader(fragment_shader, shader_path);
+    if (!check_shader(fragment_shader, shader_path)) {
+        allocator_free(&std_allocator, shader_source.data);
+        return (Shader) {0};
+    }
     
 
 
@@ -324,7 +330,10 @@ Shader shader_load(char *shader_path) {
     glLinkProgram(shader.id);
     
     // Check results for errors.
-    (void)check_program(shader.id, shader_path);
+    if (!check_program(shader.id, shader_path)) {
+        allocator_free(&std_allocator, shader_source.data);
+        return (Shader) {0};
+    }
 
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
@@ -340,7 +349,7 @@ Shader shader_load(char *shader_path) {
 
     if (shader.attributes_count > MAX_ATTRIBUTES_PER_SHADER) {
         printf_err("Shader of %s, exceeded maximum attributes per shader limit on loading.\n", shader_path);
-        exit(1);
+        return (Shader) {0};
     }
     
     Attribute attribute;

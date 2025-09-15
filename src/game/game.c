@@ -167,6 +167,11 @@ void game_init(State *global_state) {
             _buffer[changes[i].full_path.length]     = '\0';
 
             Shader shader = shader_load(_buffer);
+            if (shader.id == 0) {
+                // If id is 0 this means shader failed to load, skipping it.
+                continue;
+            }
+
             shader_init_uniforms(&shader);
 
             String shader_name = str_substring(changes[i].file_name, 0, str_find_char_right(changes[i].file_name, '.'));
@@ -184,6 +189,8 @@ void game_init(State *global_state) {
 
     // Drawers init.
     drawer_init(&state->quad_drawer, hash_table_get(&state->shader_table, UNPACK_LITERAL("quad")));
+
+    drawer_init(&state->grid_drawer, hash_table_get(&state->shader_table, UNPACK_LITERAL("grid")));
 
     drawer_init(&state->ui_quad_drawer, hash_table_get(&state->shader_table, UNPACK_LITERAL("ui_quad")));
 
@@ -252,6 +259,53 @@ void game_init(State *global_state) {
     
 }
 
+
+
+
+
+void process_asset_changes() {
+    u32 count;
+    const Asset_Change *changes;
+
+    if (asset_view_changes(&count, &changes)) {
+        for (u32 i = 0; i < count; i++) {
+            // Vars files.
+            if (str_equals(changes[i].file_format, VARS_FILE_FORMAT)) {
+                console_log("Vars detected Asset Change: '%.*s'\n", UNPACK(changes[i].full_path));
+                vars_load_file(changes[i].full_path, &state->vars_tree);
+            } 
+            // Shader files.
+            else if (str_equals(changes[i].file_format, SHADER_FILE_FORMAT)) {
+                console_log("Shader detected Asset Change: '%.*s'\n", UNPACK(changes[i].full_path));
+                char _buffer[changes[i].full_path.length + 1]; 
+                str_copy_to(changes[i].full_path, _buffer);
+                _buffer[changes[i].full_path.length]     = '\0';
+
+    
+                Shader shader = shader_load(_buffer);
+                if (shader.id == 0) {
+                    // If id is 0 this means shader failed to load, skipping it.
+                    continue;
+                }
+
+
+                String shader_name = str_substring(changes[i].file_name, 0, str_find_char_right(changes[i].file_name, '.'));
+
+                Shader *existing = hash_table_get(&state->shader_table, UNPACK(shader_name));
+                if (existing != NULL) {
+                    shader_unload(existing);
+                }
+
+
+
+                shader_init_uniforms(&shader);
+
+                hash_table_put(&state->shader_table, shader, UNPACK(shader_name));
+            }
+        }
+    }
+}
+
 /**
  * @Important: In game update loops the order of procedures is: Updating -> Drawing.
  * Where in updating all logic of the game loop is contained including inputs, sound and so on.
@@ -264,8 +318,8 @@ void game_update() {
         exit(1);
     }
 
-    // Listen to any vars files changed.
-    vars_listen_to_changes(state->vars_tree);
+    process_asset_changes();
+
     
     // Handling events
     event_handle(&state->events, &state->window, &state->t);
@@ -341,6 +395,7 @@ void game_free() {
     console_free();
 
     shader_unload(hash_table_get(&state->shader_table, UNPACK_LITERAL("quad")));
+    shader_unload(hash_table_get(&state->shader_table, UNPACK_LITERAL("ui_quad")));
     drawer_free(&state->quad_drawer);
 }
 
