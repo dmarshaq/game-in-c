@@ -89,18 +89,36 @@ static Editor_Quad *quads_list;
 
 static Vec2f world_mouse_position;
 static Vec2f world_mouse_position_change;
+static Vec2f world_mouse_snapped_position;
+static Vec2f world_mouse_snapped_click_origin;
+static Vec2f world_mouse_click_origin;
+static Vec2f selection_move_offset;
 
 
 Vec2f editor_mouse_snap_to_grid(Vec2f mouse_position) {
     int x = (int)mouse_position.x;
     int y = (int)mouse_position.y;
 
-    if (mouse_position.x > x + 0.5f) {
-        mouse_position.x += 1.0f;
+    if (mouse_position.x >= 0.0f) {
+        if (mouse_position.x > x + 0.5f) {
+            mouse_position.x += 1.0f;
+        }
+    }
+    else {
+        if (mouse_position.x < x - 0.5f) {
+            mouse_position.x -= 1.0f;
+        }
     }
 
-    if (mouse_position.y > y + 0.5f) {
-        mouse_position.y += 1.0f;
+    if (mouse_position.y >= 0.0f) {
+        if (mouse_position.y > y + 0.5f) {
+            mouse_position.y += 1.0f;
+        }
+    }
+    else {
+        if (mouse_position.y < y - 0.5f) {
+            mouse_position.y -= 1.0f;
+        }
     }
 
     return vec2f_make((int)mouse_position.x, (int)mouse_position.y);
@@ -145,6 +163,7 @@ static Camera editor_camera;
 static Arena arena;
 
 static String info_buffer;
+static Editor_Selected selection_arena;
 
 
 
@@ -184,6 +203,10 @@ void editor_init(State *state) {
     editor_camera_current_zoom_vel = 0.0f;
     world_mouse_position = VEC2F_ORIGIN;
     world_mouse_position_change = VEC2F_ORIGIN;
+    world_mouse_snapped_position = VEC2F_ORIGIN;
+    world_mouse_click_origin = VEC2F_ORIGIN;
+    world_mouse_snapped_click_origin = VEC2F_ORIGIN;
+    selection_move_offset = VEC2F_ORIGIN;
 
     // Setting pointers to global state.
     quad_drawer_ptr    = &state->quad_drawer;
@@ -273,25 +296,14 @@ void editor_update_camera() {
 
 }
 
-
-
-
-
-bool editor_update() {
-    
-    editor_update_camera();
-
-    
-    Vec2f world_mouse_snapped_position = editor_mouse_snap_to_grid(world_mouse_position);
-
+void editor_update_mouse() {
     world_mouse_position_change = world_mouse_position;
     world_mouse_position = screen_to_camera(mouse_input_ptr->position, &editor_camera, window_ptr->width, window_ptr->height);
     world_mouse_position_change = vec2f_difference(world_mouse_position, world_mouse_position_change);
 
-    Vec2f mouse_left_click_origin = VEC2F_ORIGIN;
-    
+
     if (mouse_input_ptr->left_pressed) {
-        mouse_left_click_origin = world_mouse_position;
+        world_mouse_click_origin = world_mouse_position;
 
         // Basically if left shift is not holding user doesn't want to save what was previously selected.
         if (!hold(SDLK_LSHIFT)) {
@@ -313,7 +325,6 @@ bool editor_update() {
                 if (vec2f_distance(quads_list[i].quad.verts[j], world_mouse_position) < editor_params.selection_radius) {
                     // If a quad with vertex that user selected is not selected, it gets selected. Yeah goodluck reading this comment in the future.
                     if (!(quads_list[i].flags & EDITOR_QUAD_BITMASK_ANY_POINT_SELECTED)) {
-                        // quads_list[i].flags |= EDITOR_QUAD_BITMASK_ANY_POINT_SELECTED;
                         array_list_append(&editor_selected, ((Editor_Selected) {
                                     .type = EDITOR_QUAD,
                                     .quad = &quads_list[i],
@@ -354,37 +365,71 @@ bool editor_update() {
 editor_left_mouse_select_end:
     }
 
-
-
-    // @Clean: Remove edito_selected.type != EDITOR_NONE?
+    // Snapping mouse position.
+    world_mouse_snapped_position = editor_mouse_snap_to_grid(world_mouse_position);
+    world_mouse_snapped_click_origin = editor_mouse_snap_to_grid(world_mouse_click_origin);
     if (mouse_input_ptr->left_hold) {
-        // One selected element.
-        if (array_list_length(&editor_selected) > 0) {
-            Vec2f selected_move_offset = vec2f_difference(world_mouse_position, mouse_left_click_origin);
+        selection_move_offset = vec2f_difference(world_mouse_snapped_position, world_mouse_snapped_click_origin);
+    }
 
-            // For all selected elements.
-            for (u32 i = 0; i < array_list_length(&editor_selected); i++) {
-                switch(editor_selected[i].type) {
-                    case EDITOR_QUAD:
-                        for (u32 j = 0; j < VERTICIES_PER_QUAD; j++) {
-                            if (editor_selected[i].quad->flags & (1 << j)) {
-                                editor_selected[i].quad->quad.verts[j].x += world_mouse_position_change.x;
-                                editor_selected[i].quad->quad.verts[j].y += world_mouse_position_change.y;
-                            }
+
+    if (mouse_input_ptr->left_unpressed) {
+        // For all selected elements.
+        for (u32 i = 0; i < array_list_length(&editor_selected); i++) {
+            switch(editor_selected[i].type) {
+                case EDITOR_QUAD:
+                    for (u32 j = 0; j < VERTICIES_PER_QUAD; j++) {
+                        if (editor_selected[i].quad->flags & (1 << j)) {
+                            editor_selected[i].quad->quad.verts[j].x += selection_move_offset.x;
+                            editor_selected[i].quad->quad.verts[j].y += selection_move_offset.y;
                         }
-                        break;
-                }
+                    }
+                    break;
             }
-            mouse_left_click_origin;
-        } else {
-
         }
 
+        // If there were no elements selected, select all elements in the region.
+        if (array_list_length(&editor_selected) == 0) {
+            AABB selection_region = (AABB) {
+                .p0 = vec2f_make(fminf(world_mouse_snapped_position.x, world_mouse_snapped_click_origin.x), fminf(world_mouse_snapped_position.y, world_mouse_snapped_click_origin.y)),
+                .p1 = vec2f_make(fmaxf(world_mouse_snapped_position.x, world_mouse_snapped_click_origin.x), fmaxf(world_mouse_snapped_position.y, world_mouse_snapped_click_origin.y)),
+            };
+
+            // @Speed: Unoptimized, currenly searches through all elements.
+            for (u32 i = 0; i < array_list_length(&quads_list); i++) {
+                for (u32 j = 0; j < VERTICIES_PER_QUAD; j++) {
+                    if (aabb_touches_point(&selection_region, quads_list[i].quad.verts[j])) {
+                        // Selected vertex flags are in the order p0 -> p2 -> p3 -> p1
+                        // Same order as verticies in quad.
+                        // So this will select needed vertex.
+                        quads_list[i].flags |= 1 << j;
+                    }
+                }
+
+                if (quads_list[i].flags & EDITOR_QUAD_BITMASK_ANY_POINT_SELECTED) {
+                    array_list_append(&editor_selected, ((Editor_Selected) {
+                                .type = EDITOR_QUAD,
+                                .quad = &quads_list[i],
+                                }));
+                }
+            }
+        }
+
+        selection_move_offset = VEC2F_ORIGIN;
     }
+}
+
+
+
+
+
+bool editor_update() {
     
+    editor_update_camera();
+
+    editor_update_mouse();
 
     
-
     return false;
 }
 
@@ -433,6 +478,12 @@ void editor_draw() {
         }
     }
 
+
+    // Drawing selection region if holding mouse, and nothing is selected.
+    if (mouse_input_ptr->left_hold && array_list_length(&editor_selected) == 0) {
+        draw_rect(world_mouse_snapped_click_origin, world_mouse_snapped_position, .color = vec4f_make(0.4f, 0.4f, 0.85f, 0.4f));
+    }
+
     draw_end();
 
 
@@ -444,12 +495,26 @@ void editor_draw() {
 
     line_draw_begin(line_drawer_ptr);
 
-    // Draw editor quads.
+    // Draw editor quads outlines.
     for (u32 i = 0; i < array_list_length(&quads_list); i++) {
-        
         if (quads_list[i].flags & EDITOR_QUAD_BITMASK_ANY_POINT_SELECTED) {
-            draw_quad_outline(quads_list[i].quad.verts[0], quads_list[i].quad.verts[1], quads_list[i].quad.verts[2], quads_list[i].quad.verts[3], VEC4F_RED, NULL);
-            draw_cross(quad_center(&quads_list[i].quad), VEC4F_RED, &editor_camera, NULL);
+            // Original selected.
+            draw_cross(quad_center(&quads_list[i].quad), VEC4F_YELLOW, &editor_camera, NULL);
+            draw_quad_outline(quads_list[i].quad.verts[0], quads_list[i].quad.verts[1], quads_list[i].quad.verts[2], quads_list[i].quad.verts[3], VEC4F_YELLOW, NULL);
+
+
+            // Preview of where selected quad.
+            Quad preview_quad;
+            for (u32 j = 0; j < VERTICIES_PER_QUAD; j++) {
+                if (quads_list[i].flags & (1 << j)) {
+                    preview_quad.verts[j] = vec2f_sum(quads_list[i].quad.verts[j], selection_move_offset);
+                } else {
+                    preview_quad.verts[j] = quads_list[i].quad.verts[j];
+                }
+            }
+            draw_cross(quad_center(&preview_quad), VEC4F_RED, &editor_camera, NULL);
+            draw_quad_outline(preview_quad.verts[0], preview_quad.verts[1], preview_quad.verts[2], preview_quad.verts[3], VEC4F_RED, NULL);
+
         } else {
             draw_quad_outline(quads_list[i].quad.verts[0], quads_list[i].quad.verts[1], quads_list[i].quad.verts[2], quads_list[i].quad.verts[3], VEC4F_WHITE, NULL);
             draw_cross(quad_center(&quads_list[i].quad), VEC4F_WHITE, &editor_camera, NULL);
@@ -478,8 +543,11 @@ void editor_draw() {
                     "Window size: %dx%d\n"
                     "Vert count: %u\n"
                     "World mouse position: (%2.2f, %2.2f)\n"
+                    "World mouse snapped position: (%2.2f, %2.2f)\n"
+                    "World mouse snapped click origin: (%2.2f, %2.2f)\n"
+                    "Selected count: %u\n"
                     "Camera unit scale: %d\n"
-                    , window_ptr->width, window_ptr->height, array_list_length(&quads_list) * 4, world_mouse_position.x, world_mouse_position.y, editor_camera.unit_scale)
+                    , window_ptr->width, window_ptr->height, array_list_length(&quads_list) * 4, world_mouse_position.x, world_mouse_position.y, world_mouse_snapped_position.x, world_mouse_snapped_position.y, world_mouse_snapped_click_origin.x, world_mouse_snapped_click_origin.y, array_list_length(&editor_selected), editor_camera.unit_scale)
             );
     );
 
