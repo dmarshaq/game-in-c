@@ -6,6 +6,7 @@
 #include "core/file.h"
 #include "core/structs.h"
 #include "core/mathf.h"
+#include "core/log.h"
 
 
 #include "SDL2/SDL_video.h"
@@ -27,7 +28,7 @@
 bool check_gl_error() {
     s32 error = glGetError();
     if (error != 0) {
-        printf_err("OpenGL error: %d.\n", error);
+        LOG_ERROR("OpenGL error: %d.", error);
         return false;
     }
     return true;
@@ -36,7 +37,7 @@ bool check_gl_error() {
 int init_sdl_gl() {
     // Initialize SDL.
     if (SDL_Init(SDL_INIT_VIDEO) < 0 || SDL_Init(SDL_INIT_AUDIO) < 0) {
-        printf_err("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+        LOG_ERROR("SDL could not initialize! SDL_Error: %s.", SDL_GetError());
         return 1;
     }
 
@@ -52,25 +53,25 @@ Window_Info create_gl_window(const char *title, int x, int y, int width, int hei
     // Create window.
     SDL_Window *window = SDL_CreateWindow(title, x, y, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     if (window == NULL) {
-        printf_err("Window could not be created! SDL_Error: %s\n", SDL_GetError());
+        LOG_ERROR("Window could not be created! SDL_Error: %s.", SDL_GetError());
         return (Window_Info) { NULL, 0, 0 };
     }
 
     // Create OpenGL context.
     SDL_GLContext glContext = SDL_GL_CreateContext(window);
     if (glContext == NULL) {
-        printf_err("OpenGL context could not be created! SDL_Error: %s\n", SDL_GetError());
+        LOG_ERROR("OpenGL context could not be created! SDL_Error: %s.", SDL_GetError());
         return (Window_Info) { window, width, height };
     }
 
     if (SDL_GL_MakeCurrent(window, glContext) < 0) {
-        printf_err("OpenGL current could not be created! SDL_Error: %s\n", SDL_GetError());
+        LOG_ERROR("OpenGL current could not be created! SDL_Error: %s.", SDL_GetError());
         return (Window_Info) { window, width, height };
     }
 
     // Initialize GLEW.
     if (glewInit() != GLEW_OK) {
-        printf_err("GLEW initialization failed!\n");
+        LOG_ERROR("GLEW initialization failed!.");
         return (Window_Info) { window, width, height };
     }
 
@@ -80,7 +81,7 @@ Window_Info create_gl_window(const char *title, int x, int y, int width, int hei
 int init_sdl_audio() {
     // Initialize sound.
     if (Mix_Init(MIX_INIT_MP3) < 0) {
-        printf_err("SDL Mixer could not initialize! SDL_Error: %s\n", SDL_GetError());
+        LOG_ERROR("SDL Mixer could not initialize! SDL_Error: %s.", SDL_GetError());
         return 1;
     }
 
@@ -142,7 +143,7 @@ Texture texture_load(char *texture_path) {
     u8 *data = stbi_load(texture_path, &texture.width, &texture.height, &nrChannels, 0);
 
     if (data == NULL) {
-        printf_err("Stbi couldn't load image.\n");
+        LOG_ERROR("Stbi couldn't load image.");
     }
 
     // Loading a single image into texture example:
@@ -190,17 +191,17 @@ void shader_init_uniforms(Shader *program) {
     // Get uniform's locations based on unifrom's name.
     s32 quad_shader_pr_matrix_loc = glGetUniformLocation(program->id, shader_uniform_pr_matrix_name);
     if (quad_shader_pr_matrix_loc == -1) {
-        printf_warning("Couldn't get location of %s uniform, in shader with id: %d.\n", shader_uniform_pr_matrix_name, program->id);
+        LOG_WARNING("Couldn't get location of %s uniform, in shader with id: %d.", shader_uniform_pr_matrix_name, program->id);
     }
 
     s32 quad_shader_ml_matrix_loc = glGetUniformLocation(program->id, shader_uniform_ml_matrix_name);
     if (quad_shader_ml_matrix_loc == -1) {
-        printf_warning("Couldn't get location of %s uniform, in shader with id: %d.\n", shader_uniform_ml_matrix_name, program->id);
+        LOG_WARNING("Couldn't get location of %s uniform, in shader with id: %d.", shader_uniform_ml_matrix_name, program->id);
     }
 
     s32 quad_shader_samplers_loc = glGetUniformLocation(program->id, shader_uniform_samplers_name);
     if (quad_shader_samplers_loc == -1) {
-        printf_warning("Couldn't get location of %s uniform, in shader with id: %d.\n", shader_uniform_samplers_name, program->id);
+        LOG_WARNING("Couldn't get location of %s uniform, in shader with id: %d.", shader_uniform_samplers_name, program->id);
     }
     
     // Set uniforms.
@@ -215,7 +216,7 @@ bool check_program(u32 id, char *shader_path) {
     s32 is_linked = 0;
     glGetProgramiv(id, GL_LINK_STATUS, &is_linked); 
     if (is_linked == GL_FALSE) {
-        printf_err("Program of %s, failed to link.\n", shader_path);
+        LOG_ERROR("Program of %s, failed to link.", shader_path);
        
         s32 info_log_length;
         glGetProgramiv(id, GL_INFO_LOG_LENGTH, &info_log_length);
@@ -236,7 +237,7 @@ bool check_shader(u32 id, char *shader_path) {
     s32 is_compiled = 0;
     glGetShaderiv(id, GL_COMPILE_STATUS, &is_compiled); 
     if (is_compiled == GL_FALSE) {
-        printf_err("Shader of %s, failed to compile.\n", shader_path);
+        LOG_ERROR("Shader of %s, failed to compile.", shader_path);
         
         s32 info_log_length;
         glGetShaderiv(id, GL_INFO_LOG_LENGTH, &info_log_length);
@@ -348,7 +349,7 @@ Shader shader_load(char *shader_path) {
     glGetProgramiv(shader.id, GL_ACTIVE_ATTRIBUTES, &shader.attributes_count);
 
     if (shader.attributes_count > MAX_ATTRIBUTES_PER_SHADER) {
-        printf_err("Shader of %s, exceeded maximum attributes per shader limit on loading.\n", shader_path);
+        LOG_ERROR("Shader of %s, exceeded maximum attributes per shader limit on loading.", shader_path);
         return (Shader) {0};
     }
     
@@ -398,7 +399,7 @@ Vec2f screen_to_camera(Vec2f screen_position, Camera *camera, float window_width
 void shader_update_projection(Shader *shader, Matrix4f *projection) {
     s32 quad_shader_pr_matrix_loc = glGetUniformLocation(shader->id, shader_uniform_pr_matrix_name);
     if (quad_shader_pr_matrix_loc == -1) {
-        printf_err("Couldn't get location of %s uniform, in shader, when updating projection.\n", shader_uniform_pr_matrix_name);
+        LOG_ERROR("Couldn't get location of %s uniform, in shader, when updating projection.", shader_uniform_pr_matrix_name);
     }
 
     // Set uniforms.
@@ -421,7 +422,7 @@ float add_texture_to_slots(Texture *texture) {
         texture_ids_filled_length++;
         return texture_ids_filled_length - 1;
     }
-    printf_err("Overflow of 32 texture slots limit, can't add texture id: %d, to current draw call texture slots.\n", texture->id);
+    LOG_ERROR("Overflow of 32 texture slots limit, can't add texture id: %d, to current draw call texture slots.", texture->id);
     return -1.0f;
 }
 

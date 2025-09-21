@@ -69,12 +69,17 @@ void draw_editor_quad_outline(Editor_Quad *quad) {
 @Introspect;
 typedef struct editor_params {
     float selection_radius;
+
     float camera_speed;
     float camera_move_lerp_t;
     float camera_zoom_min;
     float camera_zoom_max;
     float camera_zoom_speed;
     float camera_zoom_lerp_t;
+
+    s64 ui_mouse_menu_width;
+    s64 ui_mouse_menu_element_height;
+    s64 ui_mouse_menu_element_count;
 } Editor_Params;
 
 static Editor_Params editor_params;
@@ -149,6 +154,10 @@ static float editor_camera_current_zoom;
 static float editor_camera_current_zoom_vel;
 
 
+static bool editor_ui_mouse_menu_toggle;
+static Vec2f editor_ui_mouse_menu_origin;
+
+
 
 static Font_Baked font_small;
 static Font_Baked font_medium;
@@ -186,13 +195,16 @@ static Shader      **shader_table_ptr;
 
 void editor_init(State *state) {
     // Tweak vars default values.
-    editor_params.selection_radius      = 0.1f;
-    editor_params.camera_speed          = 1.0f;
-    editor_params.camera_move_lerp_t    = 0.8f;
-    editor_params.camera_zoom_min       = 1.0f;
-    editor_params.camera_zoom_max       = 1.0f;
-    editor_params.camera_zoom_speed     = 1.0f;
-    editor_params.camera_zoom_lerp_t    = 0.8f;
+    editor_params.selection_radius              = 0.1f;
+    editor_params.camera_speed                  = 1.0f;
+    editor_params.camera_move_lerp_t            = 0.8f;
+    editor_params.camera_zoom_min               = 1.0f;
+    editor_params.camera_zoom_max               = 1.0f;
+    editor_params.camera_zoom_speed             = 1.0f;
+    editor_params.camera_zoom_lerp_t            = 0.8f;
+    editor_params.ui_mouse_menu_width           = 160;
+    editor_params.ui_mouse_menu_element_height  = 20;
+    editor_params.ui_mouse_menu_element_count   = 1;
     
     vars_tree_add(TYPE_OF(editor_params), (u8 *)&editor_params, CSTR("editor_params"));
 
@@ -207,6 +219,8 @@ void editor_init(State *state) {
     world_mouse_click_origin = VEC2F_ORIGIN;
     world_mouse_snapped_click_origin = VEC2F_ORIGIN;
     selection_move_offset = VEC2F_ORIGIN;
+    editor_ui_mouse_menu_toggle = false;
+    editor_ui_mouse_menu_origin = VEC2F_ORIGIN;
 
     // Setting pointers to global state.
     quad_drawer_ptr    = &state->quad_drawer;
@@ -417,6 +431,13 @@ editor_left_mouse_select_end:
 
         selection_move_offset = VEC2F_ORIGIN;
     }
+
+
+
+    if (mouse_input_ptr->right_pressed) {
+        editor_ui_mouse_menu_toggle = !editor_ui_mouse_menu_toggle;
+        editor_ui_mouse_menu_origin = vec2f_make(mouse_input_ptr->position.x, mouse_input_ptr->position.y - editor_params.ui_mouse_menu_element_height * editor_params.ui_mouse_menu_element_count);
+    }
 }
 
 
@@ -536,7 +557,7 @@ void editor_draw() {
     draw_begin(ui_quad_drawer_ptr);
 
     // Draw editor ui.
-    UI_WINDOW(window_ptr->width, window_ptr->height, 
+    UI_WINDOW(0, 0, window_ptr->width, window_ptr->height, 
             
             ui_text(
                 str_format(info_buffer, 
@@ -550,6 +571,14 @@ void editor_draw() {
                     , window_ptr->width, window_ptr->height, array_list_length(&quads_list) * 4, world_mouse_position.x, world_mouse_position.y, world_mouse_snapped_position.x, world_mouse_snapped_position.y, world_mouse_snapped_click_origin.x, world_mouse_snapped_click_origin.y, array_list_length(&editor_selected), editor_camera.unit_scale)
             );
     );
+
+    if (editor_ui_mouse_menu_toggle) {
+        UI_WINDOW(editor_ui_mouse_menu_origin.x, editor_ui_mouse_menu_origin.y, editor_params.ui_mouse_menu_width, editor_params.ui_mouse_menu_element_height * editor_params.ui_mouse_menu_element_count,
+            if (UI_BUTTON(vec2f_make(editor_params.ui_mouse_menu_width, editor_params.ui_mouse_menu_element_height), CSTR("Add quad"))) {
+                editor_add_quad();
+            }
+        );
+    }
 
     draw_end();
 }

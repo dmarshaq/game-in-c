@@ -1,6 +1,7 @@
 #include "core/core.h"
 #include "core/type.h"
 #include "core/structs.h"
+#include "core/log.h"
 
 #include "game/game.h"
 #include "game/graphics.h"
@@ -11,6 +12,10 @@
 static State *state;
 
 int main(int argc, char **argv) {
+    log_set_minimum_level(LOG_LEVEL_INFO);
+    log_set_output(stderr);
+
+
     // Allocate global state.
     state = allocator_alloc(&std_allocator, sizeof(State));
     

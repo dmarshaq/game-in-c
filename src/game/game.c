@@ -6,6 +6,7 @@
 #include "core/file.h"
 #include "core/mathf.h"
 #include "core/typeinfo.h"
+#include "core/log.h"
 
 #include "game/graphics.h"
 #include "game/input.h"
@@ -83,13 +84,13 @@ void game_init(State *global_state) {
 
     // Init assets observer.
     if (asset_observer_init("res") != 0) {
-        printf_err("Couldn't init Asset Observer.\n");
+        LOG_ERROR("Couldn't init Asset Observer.");
         exit(1);
     }
     
     // Force load asset changes.
     if (asset_force_changes("res") != 0) {
-        printf_err("Couldn't force load asset changes.\n");
+        LOG_ERROR("Couldn't force load asset changes.");
         exit(1);
     }
     
@@ -98,7 +99,7 @@ void game_init(State *global_state) {
     const Asset_Change *changes;
 
     if (!asset_view_changes(&changes_count, &changes)) {
-        printf_err("Couldn't view loaded asset changes.\n");
+        LOG_ERROR("Couldn't view loaded asset changes.");
         exit(1);
     }
 
@@ -106,13 +107,13 @@ void game_init(State *global_state) {
 
     // Init SDL and GL.
     if (init_sdl_gl()) {
-        fprintf(stderr, "%s Couldn't init SDL and GL.\n", debug_error_str);
+        LOG_ERROR("Couldn't init SDL and GL.");
         exit(1);
     }
     
     // Init audio.
     if (init_sdl_audio()) {
-        fprintf(stderr, "%s Couldn't init audio.\n", debug_error_str);
+        LOG_ERROR("Couldn't init audio.");
         exit(1);
     }
 
@@ -121,7 +122,7 @@ void game_init(State *global_state) {
     state->window = create_gl_window("Game", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 700);
 
     if (state->window.ptr == NULL) {
-        fprintf(stderr, "%s Couldn't create window.\n", debug_error_str);
+        LOG_ERROR("Couldn't create window.");
         exit(1);
     }
 
@@ -161,7 +162,7 @@ void game_init(State *global_state) {
     // Loading Shaders specifically.
     for (u32 i = 0; i < changes_count; i++) {
         if (str_equals(changes[i].file_format, SHADER_FILE_FORMAT)) {
-            printf("Detected Shader Asset: '%.*s'\n", UNPACK(changes[i].full_path));
+            LOG_INFO("Detected Shader Asset: '%.*s'.", UNPACK(changes[i].full_path));
             char _buffer[changes[i].full_path.length + 1]; 
             str_copy_to(changes[i].full_path, _buffer);
             _buffer[changes[i].full_path.length]     = '\0';
@@ -229,7 +230,7 @@ void game_init(State *global_state) {
     // Loading Vars files specifically. After the vars tree is built...
     for (u32 i = 0; i < changes_count; i++) {
         if (str_equals(changes[i].file_format, VARS_FILE_FORMAT)) {
-            printf("Detected Vars Asset: '%.*s'\n", UNPACK(changes[i].full_path));
+            LOG_INFO("Detected Vars Asset: '%.*s'.", UNPACK(changes[i].full_path));
 
             vars_load_file(changes[i].full_path, &state->vars_tree);
 
@@ -314,7 +315,7 @@ void process_asset_changes() {
 void game_update() {
     // Polling any asset changes.
     if (asset_observer_poll_changes() != 0) {
-        printf_err("Couldn't poll asset changes.\n");
+        LOG_ERROR("Couldn't poll asset changes.");
         exit(1);
     }
 

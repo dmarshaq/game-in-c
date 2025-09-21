@@ -61,7 +61,6 @@ void ui_draw_text(String text, Vec2f position, Vec4f color);
 
 void ui_draw_text_centered(String text, Vec2f position, Vec2f size, Vec4f color);
 
-
 void ui_init(UI_State *ui_state, Mouse_Input *mouse_input);
 
 void ui_push_frame(float x, float y, float width, float height);
@@ -90,8 +89,8 @@ void ui_set_font(Font_Baked *font);
 void ui_frame_start(float width, float height);
 void ui_frame_end(float width, float height);
 
-#define UI_WINDOW(window_w, window_h, code)\
-    ui_push_frame(0, 0, window_w, window_h);\
+#define UI_WINDOW(x, y, width, height, code)\
+    ui_push_frame(x, y, width, height);\
     ui_cursor_reset();\
     code\
     ui_pop_frame()\
