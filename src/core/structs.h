@@ -151,12 +151,25 @@ typedef enum structs_type : u8 {
 } Structs_Type;
 
 
-typedef struct structs_diagnostic_buffer {
+typedef enum operation_flag : u8 {
+    ALLOC    = 0x01,
+    RESIZE   = 0x02,
+    ADD      = 0x04,
+    SUBTRACT = 0x08,
+    CLEAR    = 0x10,
+    FREE     = 0x20,
+} Operation_Flag;
 
+
+typedef struct structs_diagnostic_buffer {
+    
 } Structs_Diagnostic_Buffer;
 
-typedef struct structs_diagnostic_array_list {
 
+typedef struct structs_diagnostic_array_list {
+    u32 capacity;
+    u32 length;
+    u32 item_size;
 } Structs_Diagnostic_Array_List;
 
 typedef struct structs_diagnostic_looped_array {
@@ -170,12 +183,13 @@ typedef struct structs_diagnostic_hash_table {
 
 typedef struct structs_diagnostic {
     FILE *output;   // Not included in diagnostic data.
-
+    
     Structs_Type type;
     char *name;
-    s64 timestamp;
+    u64 timestamp;
     u64 size;
     void *allocation;
+    Operation_Flag operation;
     union {
         Structs_Diagnostic_Buffer t_buffer;
         Structs_Diagnostic_Array_List t_array_list;
@@ -191,7 +205,7 @@ typedef struct structs_diagnostic {
  */
 void diagnostic_attach(char *attach_name, FILE *stream);
 
-
+void diagnostic_set_allowed_flags(Operation_Flag flags);
 
 
 

@@ -20,10 +20,15 @@
 
 static Structs_Diagnostic diagnostics[MAX_DIAGNOSTICS];
 static s64 diagnostic_count = 0;
+static Operation_Flag diagnostic_allowed_flags = ALLOC | RESIZE | ADD | SUBTRACT | CLEAR | FREE;
 
 static bool attach_next = false;
 static char *attach_next_name = NULL;
 static FILE *attach_next_output = NULL;
+
+void diagnostic_set_allowed_flags(Operation_Flag flags) {
+    diagnostic_allowed_flags = flags;
+}
 
 void diagnostic_attach(char *attach_name, FILE *stream) {
     attach_next = true;
@@ -33,10 +38,36 @@ void diagnostic_attach(char *attach_name, FILE *stream) {
 
 // @Important: Right we just assume pointer is 64 bit.
 void diagnostic_write(s64 id) {
-    switch (diagnostics[id].type) {
-        case STRUCTS_BUFFER:
-            fprintf(diagnostics[id].output, "Buffer,%s,%lld,%llu,0x%016llx\n", diagnostics[id].name, diagnostics[id].timestamp, diagnostics[id].size, diagnostics[id].allocation);
-            break;
+    if (diagnostics[id].operation & diagnostic_allowed_flags) {
+        switch (diagnostics[id].type) {
+            case STRUCTS_BUFFER:
+                fprintf(diagnostics[id].output, "Buffer,%s,%llu,%llu,0x%016llx,", diagnostics[id].name, diagnostics[id].timestamp, diagnostics[id].size, diagnostics[id].allocation);
+                break;
+            case STRUCTS_ARRAY_LIST:
+                fprintf(diagnostics[id].output, "Array List,%s,%llu,%llu,0x%016llx,%u,%u,%u,", diagnostics[id].name, diagnostics[id].timestamp, diagnostics[id].size, diagnostics[id].allocation, diagnostics[id].t_array_list.capacity, diagnostics[id].t_array_list.length, diagnostics[id].t_array_list.item_size);
+                break;
+        }
+
+        switch (diagnostics[id].operation) {
+            case ALLOC:
+                fprintf(diagnostics[id].output, "ALLOC\n");
+                break;
+            case RESIZE:
+                fprintf(diagnostics[id].output, "RESIZE\n");
+                break;
+            case ADD:
+                fprintf(diagnostics[id].output, "ADD\n");
+                break;
+            case SUBTRACT:
+                fprintf(diagnostics[id].output, "SUBTRACT\n");
+                break;
+            case CLEAR:
+                fprintf(diagnostics[id].output, "CLEAR\n");
+                break;
+            case FREE:
+                fprintf(diagnostics[id].output, "FREE\n");
+                break;
+        }
     }
 }
 
@@ -53,6 +84,10 @@ s64 diagnostic_find_id(void *allocation) {
 
 void diagnostic_attach() {
     LOG_ERROR("Structs Diagnostics are not defined. Cannot attach diagnostic.");
+}
+
+void diagnostic_set_allowed_flags(Operation_Flag flags) {
+    LOG_ERROR("Structs Diagnostics are not defined. Cannot set diagnostic allowed flags.");
 }
 
 #endif
@@ -78,10 +113,9 @@ void *buffer_data_struct_make(u32 size, u32 header_size, Allocator *allocator) {
 
 
 #ifdef STRUCTS_DIAGNOSTIC
-    
     if (attach_next) {
         if (attach_next_name == NULL) {
-            LOG_ERROR("Structs Diagnostic: couldn't attach to allocated buffer, no name specified.");
+            LOG_ERROR("Structs Diagnostic: couldn't attach, no name specified.");
         }
         else if (diagnostic_count >= MAX_DIAGNOSTICS) {
             LOG_ERROR("Structs Diagnostic: cannot attach diagnostic, max limit of %d has been reached.", MAX_DIAGNOSTICS);
@@ -94,9 +128,10 @@ void *buffer_data_struct_make(u32 size, u32 header_size, Allocator *allocator) {
                 .output = attach_next_output,
                     .type = STRUCTS_BUFFER,
                     .name = attach_next_name,
-                    .timestamp = (s64)time(NULL),
+                    .timestamp = get_time_ns(),
                     .size = size + header_size + sizeof(Buffer_Data_Struct_Header),
                     .allocation = data,
+                    .operation = ALLOC,
             };
 
             diagnostic_write(diagnostic_count);
@@ -132,10 +167,11 @@ void *buffer_data_struct_resize(void *data, u32 new_size, u32 header_size) {
     }
 
 #ifdef STRUCTS_DIAGNOSTIC
-    if (diagnostic_id != -1) {
-        diagnostics[diagnostic_id].timestamp = (s64)time(NULL);
+    if (diagnostic_id != -1 && diagnostics[diagnostic_id].type == STRUCTS_BUFFER) {
+        diagnostics[diagnostic_id].timestamp = get_time_ns();
         diagnostics[diagnostic_id].size = new_size + header_size + sizeof(Buffer_Data_Struct_Header);
         diagnostics[diagnostic_id].allocation = data;
+        diagnostics[diagnostic_id].operation = RESIZE;
 
         diagnostic_write(diagnostic_id);
     }
@@ -155,10 +191,11 @@ void buffer_data_struct_free(void *data, u32 header_size) {
     allocator_free(allocator, data - header_size - sizeof(Buffer_Data_Struct_Header));
 
 #ifdef STRUCTS_DIAGNOSTIC
-    if (diagnostic_id != -1) {
-        diagnostics[diagnostic_id].timestamp = (s64)time(NULL);
+    if (diagnostic_id != -1 && diagnostics[diagnostic_id].type == STRUCTS_BUFFER) {
+        diagnostics[diagnostic_id].timestamp = get_time_ns();
         diagnostics[diagnostic_id].size = 0;
         diagnostics[diagnostic_id].allocation = NULL;
+        diagnostics[diagnostic_id].operation = FREE;
 
         diagnostic_write(diagnostic_id);
     }
@@ -171,10 +208,42 @@ void buffer_data_struct_free(void *data, u32 header_size) {
  */
 
 void *_array_list_make(u32 item_size, u32 capacity, Allocator *allocator) {
+
+#ifdef STRUCTS_DIAGNOSTIC
+    s64 diagnostic_id = -1;
+    if (attach_next) {
+        if (attach_next_name == NULL) {
+            LOG_ERROR("Structs Diagnostic: couldn't attach, no name specified.");
+        }
+        else if (diagnostic_count >= MAX_DIAGNOSTICS) {
+            LOG_ERROR("Structs Diagnostic: cannot attach diagnostic, max limit of %d has been reached.", MAX_DIAGNOSTICS);
+        } else {
+            if (attach_next_output == NULL) {
+                attach_next_output = stdout;
+            }
+
+            diagnostics[diagnostic_count] = (Structs_Diagnostic) {
+                    .output = attach_next_output,
+                    .type = STRUCTS_ARRAY_LIST,
+                    .name = attach_next_name,
+                    .timestamp = get_time_ns(),
+            };
+
+            diagnostic_id = diagnostic_count;
+
+            attach_next = false;
+            attach_next_name = NULL;
+            attach_next_output = NULL;
+            diagnostic_count++;
+
+        }
+    }
+#endif
+
     Array_List_Header *ptr = buffer_data_struct_make(item_size * capacity, sizeof(Array_List_Header), allocator) - sizeof(Array_List_Header);
 
     if (ptr == NULL) {
-        printf_err("Couldn't allocate more memory of size: %lld bytes, for the array list.\n", item_size * capacity + sizeof(Array_List_Header));
+        LOG_ERROR("Couldn't allocate more memory of size: %lld bytes, for the array list.", item_size * capacity + sizeof(Array_List_Header));
         return NULL;
     }
 
@@ -182,7 +251,25 @@ void *_array_list_make(u32 item_size, u32 capacity, Allocator *allocator) {
     ptr->item_size = item_size;
     ptr->length = 0;
     
+
+#ifdef STRUCTS_DIAGNOSTIC
+    if (diagnostic_id != -1) {
+        diagnostics[diagnostic_id].size = item_size * capacity + sizeof(Array_List_Header) + sizeof(Buffer_Data_Struct_Header),
+        diagnostics[diagnostic_id].allocation = (void *)ptr - sizeof(Buffer_Data_Struct_Header),
+        diagnostics[diagnostic_id].t_array_list.capacity = ptr->capacity,
+        diagnostics[diagnostic_id].t_array_list.length = ptr->length,
+        diagnostics[diagnostic_id].t_array_list.item_size = ptr->item_size,
+        diagnostics[diagnostic_id].operation = ALLOC;
+
+        diagnostic_write(diagnostic_id);
+
+        LOG_INFO("Structs Diagnostic: succesfully attached to allocated array list.");
+    }
+#endif
+
+
     // @Important: Because ptr is of type "Array_List_Header *", compiler will automatically translate "ptr + 1" to "(void*)(ptr) + sizeof(Array_List_Header)".
+
     return ptr + 1;
 }
 
@@ -199,34 +286,94 @@ u32 _array_list_item_size(void *list) {
 }
 
 void _array_list_free(void **list) {
+
+#ifdef STRUCTS_DIAGNOSTIC
+    s64 diagnostic_id = diagnostic_find_id((void *)(*list - sizeof(Array_List_Header) - sizeof(Buffer_Data_Struct_Header)));
+#endif
+
     buffer_data_struct_free(*list, sizeof(Array_List_Header));
     *list = NULL;
+
+
+#ifdef STRUCTS_DIAGNOSTIC
+    if (diagnostic_id != -1 && diagnostics[diagnostic_id].type == STRUCTS_ARRAY_LIST) {
+        diagnostics[diagnostic_id].timestamp = get_time_ns();
+        diagnostics[diagnostic_id].size = 0;
+        diagnostics[diagnostic_id].allocation = NULL;
+        diagnostics[diagnostic_id].t_array_list.capacity = 0;
+        diagnostics[diagnostic_id].t_array_list.length = 0;
+        diagnostics[diagnostic_id].t_array_list.item_size = 0;
+        diagnostics[diagnostic_id].operation = FREE;
+
+        diagnostic_write(diagnostic_id);
+    }
+#endif
 }
 
 void _array_list_resize_to_fit(void **list, u32 requiered_length) {
     Array_List_Header *header = *list - sizeof(Array_List_Header);
 
+
+
     if (requiered_length > header->capacity) {
         u32 capacity_multiplier = (u32)powf(2.0f, (float)((u32)(log2f((float)requiered_length / (float)header->capacity)) + 1));
+
+
+#ifdef STRUCTS_DIAGNOSTIC
+    s64 diagnostic_id = diagnostic_find_id((void *)(*list - sizeof(Array_List_Header) - sizeof(Buffer_Data_Struct_Header)));
+#endif
 
         
         *list = buffer_data_struct_resize(*list, header->capacity * capacity_multiplier * header->item_size, sizeof(Array_List_Header));
         header = *list - sizeof(Array_List_Header); // @Important: Resizing perfomed above changes the pointer to the list, so it is neccessary to reassign header ptr again, otherwise segfault occure.
         header->capacity *= capacity_multiplier; // @Important: Using "buffer_data_struct_resize" will not update capacity in the header, because this function is only designed to only resize the whole data structure, there for it is needed to manually set capacity to the right value, which was intended.
+
+#ifdef STRUCTS_DIAGNOSTIC
+    if (diagnostic_id != -1 && diagnostics[diagnostic_id].type == STRUCTS_ARRAY_LIST) {
+        diagnostics[diagnostic_id].timestamp = get_time_ns();
+        diagnostics[diagnostic_id].size = header->capacity * header->item_size + sizeof(Buffer_Data_Struct_Header) + sizeof(Array_List_Header);
+        diagnostics[diagnostic_id].allocation = (void *)(*list - sizeof(Array_List_Header) - sizeof(Buffer_Data_Struct_Header));
+        diagnostics[diagnostic_id].t_array_list.capacity = header->capacity;
+        diagnostics[diagnostic_id].operation = RESIZE;
+
+        diagnostic_write(diagnostic_id);
+    }
+#endif
     }
 
     if (header->capacity * header->item_size < requiered_length * header->item_size) {
-        printf_err("List capacity size is less than requiered length size after being resized, capacity size: %d, size of requiered length: %d.\n", header->capacity * header->item_size, requiered_length * header->item_size);
+        LOG_ERROR("List capacity size is less than requiered length size after being resized, capacity size: %d, size of requiered length: %d.", header->capacity * header->item_size, requiered_length * header->item_size);
     }
+
+
 }
 
 u32 _array_list_next_index(void **list) {
+#ifdef STRUCTS_DIAGNOSTIC
+    s64 diagnostic_id = diagnostic_find_id((void *)(*list - sizeof(Array_List_Header) - sizeof(Buffer_Data_Struct_Header)));
+#endif
+
     Array_List_Header *header = *list - sizeof(Array_List_Header);
     header->length += 1;
+
+#ifdef STRUCTS_DIAGNOSTIC
+    if (diagnostic_id != -1 && diagnostics[diagnostic_id].type == STRUCTS_ARRAY_LIST) {
+        diagnostics[diagnostic_id].timestamp = get_time_ns();
+        diagnostics[diagnostic_id].t_array_list.length = header->length;
+        diagnostics[diagnostic_id].operation = ADD;
+
+        diagnostic_write(diagnostic_id);
+    }
+#endif
+
     return header->length - 1;
 }
 
 u32 _array_list_append_multiple(void **list, void *items, u32 count) {
+#ifdef STRUCTS_DIAGNOSTIC
+    s64 diagnostic_id = diagnostic_find_id((void *)(*list - sizeof(Array_List_Header) - sizeof(Buffer_Data_Struct_Header)));
+#endif
+
     Array_List_Header *header = *list - sizeof(Array_List_Header);
     
     u32 requiered_length = header->length + count;
@@ -237,15 +384,53 @@ u32 _array_list_append_multiple(void **list, void *items, u32 count) {
     (void)memcpy(*list + header->length * header->item_size, items, header->item_size * count);
     header->length += count;
 
+
+#ifdef STRUCTS_DIAGNOSTIC
+    if (diagnostic_id != -1 && diagnostics[diagnostic_id].type == STRUCTS_ARRAY_LIST) {
+        diagnostics[diagnostic_id].timestamp = get_time_ns();
+        diagnostics[diagnostic_id].t_array_list.length = header->length;
+        diagnostics[diagnostic_id].operation = ADD;
+
+        diagnostic_write(diagnostic_id);
+    }
+#endif
+
     return header->length - count;
 }
 
 void _array_list_pop(void *list, u32 count) {
+
+#ifdef STRUCTS_DIAGNOSTIC
+    s64 diagnostic_id = diagnostic_find_id((void *)(list - sizeof(Array_List_Header) - sizeof(Buffer_Data_Struct_Header)));
+#endif
+
     ((Array_List_Header *)(list - sizeof(Array_List_Header)))->length -= count;
+
+#ifdef STRUCTS_DIAGNOSTIC
+    if (diagnostic_id != -1 && diagnostics[diagnostic_id].type == STRUCTS_ARRAY_LIST) {
+        diagnostics[diagnostic_id].timestamp = get_time_ns();
+        diagnostics[diagnostic_id].t_array_list.length = ((Array_List_Header *)(list - sizeof(Array_List_Header)))->length;
+        diagnostics[diagnostic_id].operation = SUBTRACT;
+
+        diagnostic_write(diagnostic_id);
+    }
+#endif
 }
 
 void _array_list_clear(void *list) {
+#ifdef STRUCTS_DIAGNOSTIC
+    s64 diagnostic_id = diagnostic_find_id((void *)(list - sizeof(Array_List_Header) - sizeof(Buffer_Data_Struct_Header)));
+#endif
     ((Array_List_Header *)(list - sizeof(Array_List_Header)))->length = 0;
+#ifdef STRUCTS_DIAGNOSTIC
+    if (diagnostic_id != -1 && diagnostics[diagnostic_id].type == STRUCTS_ARRAY_LIST) {
+        diagnostics[diagnostic_id].timestamp = get_time_ns();
+        diagnostics[diagnostic_id].t_array_list.length = 0;
+        diagnostics[diagnostic_id].operation = CLEAR;
+
+        diagnostic_write(diagnostic_id);
+    }
+#endif
 }
 
 void _array_list_unordered_remove(void *list, u32 index) {

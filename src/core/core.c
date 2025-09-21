@@ -122,6 +122,46 @@ void ti_reset(T_Interpolator *interpolator) {
 
 
 
+#ifdef _WIN32
+    #include <windows.h>
+#elif defined(__APPLE__) || defined(__MACH__) || defined(__linux__) || defined(__unix__)
+    #include <time.h>
+#else
+    #error "No high-resolution timer available for this platform"
+#endif
+
+// Store program start time.
+static u64 start_time_ns = 0;
+
+u64 get_time_ns() {
+#if defined(_WIN32)
+    static LARGE_INTEGER freq = {0};
+    LARGE_INTEGER counter;
+
+    if (freq.QuadPart == 0) {
+        QueryPerformanceFrequency(&freq);
+        QueryPerformanceCounter(&counter);
+        start_time_ns = (u64)((counter.QuadPart * 1000000000ULL) / freq.QuadPart);
+        return 0;
+    }
+
+    QueryPerformanceCounter(&counter);
+    u64 now_ns = (u64)((counter.QuadPart * 1000000000ULL) / freq.QuadPart);
+    return now_ns - start_time_ns;
+
+#elif defined(__APPLE__) || defined(__MACH__) || defined(__linux__) || defined(__unix__)
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    uint64_t now_ns = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+
+    if (start_time_ns == 0) {
+        start_time_ns = now_ns;
+        return 0;
+    }
+    return now_ns - start_time_ns;
+
+#endif
+}
 
 
 

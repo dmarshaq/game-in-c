@@ -17,6 +17,8 @@ int main(int argc, char **argv) {
 
 
 
+    diagnostic_set_allowed_flags(ALLOC | RESIZE | ADD | SUBTRACT | CLEAR | FREE);
+
     // s32 *arr = array_list_make(s32, 2, &std_allocator);
     // array_list_append(&arr, 7);
     // array_list_append(&arr, -31);

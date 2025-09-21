@@ -120,6 +120,12 @@ void ti_reset(T_Interpolator *interpolator);
 
 
 
+/**
+ * Returns time in nano seconds since program start.
+ */
+u64 get_time_ns();
+
+
 
 
 #endif
