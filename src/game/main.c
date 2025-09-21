@@ -16,6 +16,16 @@ int main(int argc, char **argv) {
     log_set_output(stderr);
 
 
+
+    // s32 *arr = array_list_make(s32, 2, &std_allocator);
+    // array_list_append(&arr, 7);
+    // array_list_append(&arr, -31);
+    // array_list_append(&arr, 11);
+    // array_list_append(&arr, 4);
+    // array_list_append(&arr, -8);
+    // array_list_free(&arr);
+
+
     // Allocate global state.
     state = allocator_alloc(&std_allocator, sizeof(State));
     

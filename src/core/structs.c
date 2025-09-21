@@ -3,6 +3,61 @@
 #include "core/type.h"
 #include "core/mathf.h"
 #include "core/str.h"
+#include "core/log.h"
+
+
+
+
+#define STRUCTS_DIAGNOSTIC
+
+#include <time.h>
+/**
+ * Diagnostic.
+ */
+#ifdef STRUCTS_DIAGNOSTIC
+
+#define MAX_DIAGNOSTICS 32
+
+static Structs_Diagnostic diagnostics[MAX_DIAGNOSTICS];
+static s64 diagnostic_count = 0;
+
+static bool attach_next = false;
+static char *attach_next_name = NULL;
+static FILE *attach_next_output = NULL;
+
+void diagnostic_attach(char *attach_name, FILE *stream) {
+    attach_next = true;
+    attach_next_name = attach_name;
+    attach_next_output = stream;
+}
+
+// @Important: Right we just assume pointer is 64 bit.
+void diagnostic_write(s64 id) {
+    switch (diagnostics[id].type) {
+        case STRUCTS_BUFFER:
+            fprintf(diagnostics[id].output, "Buffer,%s,%lld,%llu,0x%016llx\n", diagnostics[id].name, diagnostics[id].timestamp, diagnostics[id].size, diagnostics[id].allocation);
+            break;
+    }
+}
+
+s64 diagnostic_find_id(void *allocation) {
+    for (s64 i = 0; i < diagnostic_count; i++) {
+        if (diagnostics[i].allocation == allocation) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+#else
+
+void diagnostic_attach() {
+    LOG_ERROR("Structs Diagnostics are not defined. Cannot attach diagnostic.");
+}
+
+#endif
+
+
 
 /**
  * Data strucutres.
@@ -17,28 +72,98 @@ void *buffer_data_struct_make(u32 size, u32 header_size, Allocator *allocator) {
     ((Buffer_Data_Struct_Header *)data)->allocator = allocator;
 
     if (data == NULL) {
-        printf_err("Couldn't allocate memory of size: %llu bytes, for the buffer data structure.\n", size + header_size + sizeof(Buffer_Data_Struct_Header));
+        LOG_ERROR("Couldn't allocate memory of size: %llu bytes, for the buffer data structure.", size + header_size + sizeof(Buffer_Data_Struct_Header));
         return NULL;
     }
+
+
+#ifdef STRUCTS_DIAGNOSTIC
+    
+    if (attach_next) {
+        if (attach_next_name == NULL) {
+            LOG_ERROR("Structs Diagnostic: couldn't attach to allocated buffer, no name specified.");
+        }
+        else if (diagnostic_count >= MAX_DIAGNOSTICS) {
+            LOG_ERROR("Structs Diagnostic: cannot attach diagnostic, max limit of %d has been reached.", MAX_DIAGNOSTICS);
+        } else {
+            if (attach_next_output == NULL) {
+                attach_next_output = stdout;
+            }
+
+            diagnostics[diagnostic_count] = (Structs_Diagnostic) {
+                .output = attach_next_output,
+                    .type = STRUCTS_BUFFER,
+                    .name = attach_next_name,
+                    .timestamp = (s64)time(NULL),
+                    .size = size + header_size + sizeof(Buffer_Data_Struct_Header),
+                    .allocation = data,
+            };
+
+            diagnostic_write(diagnostic_count);
+
+
+            attach_next = false;
+            attach_next_name = NULL;
+            attach_next_output = NULL;
+            diagnostic_count++;
+
+            LOG_INFO("Structs Diagnostic: succesfully attached to allocated buffer.");
+        }
+    }
+#endif
+
 
     return data + header_size + sizeof(Buffer_Data_Struct_Header);
 }
 
 void *buffer_data_struct_resize(void *data, u32 new_size, u32 header_size) {
     Allocator *allocator = ((Buffer_Data_Struct_Header *)(data - header_size - sizeof(Buffer_Data_Struct_Header)))->allocator;
+
+#ifdef STRUCTS_DIAGNOSTIC
+    s64 diagnostic_id = diagnostic_find_id((void *)(data - header_size - sizeof(Buffer_Data_Struct_Header)));
+#endif
+
+
     data = allocator_re_alloc(allocator, data - header_size - sizeof(Buffer_Data_Struct_Header), new_size + header_size + sizeof(Buffer_Data_Struct_Header));
 
     if (data == NULL) {
-        printf_err("Couldn't reallocate memory of size: %llu bytes, for the buffer data structure.\n", new_size + header_size + sizeof(Buffer_Data_Struct_Header));
+        LOG_ERROR("Couldn't reallocate memory of size: %llu bytes, for the buffer data structure.", new_size + header_size + sizeof(Buffer_Data_Struct_Header));
         return NULL;
     }
+
+#ifdef STRUCTS_DIAGNOSTIC
+    if (diagnostic_id != -1) {
+        diagnostics[diagnostic_id].timestamp = (s64)time(NULL);
+        diagnostics[diagnostic_id].size = new_size + header_size + sizeof(Buffer_Data_Struct_Header);
+        diagnostics[diagnostic_id].allocation = data;
+
+        diagnostic_write(diagnostic_id);
+    }
+#endif
+
 
     return data + header_size + sizeof(Buffer_Data_Struct_Header);
 }
 
 void buffer_data_struct_free(void *data, u32 header_size) {
+
+#ifdef STRUCTS_DIAGNOSTIC
+    s64 diagnostic_id = diagnostic_find_id((void *)(data - header_size - sizeof(Buffer_Data_Struct_Header)));
+#endif
+
     Allocator *allocator = ((Buffer_Data_Struct_Header *)(data - header_size - sizeof(Buffer_Data_Struct_Header)))->allocator;
     allocator_free(allocator, data - header_size - sizeof(Buffer_Data_Struct_Header));
+
+#ifdef STRUCTS_DIAGNOSTIC
+    if (diagnostic_id != -1) {
+        diagnostics[diagnostic_id].timestamp = (s64)time(NULL);
+        diagnostics[diagnostic_id].size = 0;
+        diagnostics[diagnostic_id].allocation = NULL;
+
+        diagnostic_write(diagnostic_id);
+    }
+#endif
+
 }
 
 /**

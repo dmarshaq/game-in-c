@@ -139,4 +139,60 @@ void hash_table_print(void **table);
 
 
 
+
+
+// Diagnostic
+
+typedef enum structs_type : u8 {
+    STRUCTS_BUFFER,
+    STRUCTS_ARRAY_LIST,
+    STRUCTS_LOOPED_ARRAY,
+    STRUCTS_HASH_TABLE,
+} Structs_Type;
+
+
+typedef struct structs_diagnostic_buffer {
+
+} Structs_Diagnostic_Buffer;
+
+typedef struct structs_diagnostic_array_list {
+
+} Structs_Diagnostic_Array_List;
+
+typedef struct structs_diagnostic_looped_array {
+
+} Structs_Diagnostic_Looped_Array;
+
+typedef struct structs_diagnostic_hash_table {
+
+} Structs_Diagnostic_Hash_Table;
+
+
+typedef struct structs_diagnostic {
+    FILE *output;   // Not included in diagnostic data.
+
+    Structs_Type type;
+    char *name;
+    s64 timestamp;
+    u64 size;
+    void *allocation;
+    union {
+        Structs_Diagnostic_Buffer t_buffer;
+        Structs_Diagnostic_Array_List t_array_list;
+        Structs_Diagnostic_Looped_Array t_looped_array;
+        Structs_Diagnostic_Hash_Table t_hash_table;
+    };
+} Structs_Diagnostic;
+
+
+/**
+ * Will automatically attach diagnostic to view next allocated memory structure from this header.
+ * Will output diagnostic everytime struct is modified into stream.
+ */
+void diagnostic_attach(char *attach_name, FILE *stream);
+
+
+
+
+
 #endif
